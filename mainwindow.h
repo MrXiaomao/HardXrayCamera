@@ -17,8 +17,12 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+signals:
+    void sigAppendMsg(const QString &msg, QtMsgType msgType);
+
 private slots:
     void on_action_setting_triggered();
+    void slotAppendMsg(const QString &msg, QtMsgType msgType);
 
 private:
     Ui::MainWindow *ui;
