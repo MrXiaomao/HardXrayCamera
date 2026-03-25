@@ -12,6 +12,7 @@
 #include <QAction>
 
 #include "detectorsetting.h"
+#include "commandhelper.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -60,6 +61,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotTemp->setXAxisLabel("时间");
     ui->plotTemp->setYAxisLabel("温度 (℃)");
     ui->plotTemp->setTimeWindow(300);
+
+    commandHelper = new CommandHelper();
 }
 
 MainWindow::~MainWindow()
@@ -110,5 +113,23 @@ void MainWindow::slotAppendMsg(const QString &msg, QtMsgType msgType)
         }
         cursor.removeSelectedText();//删除选择的文本
     }
+}
+
+
+void MainWindow::on_btn_relayNetOpen_clicked()
+{
+    commandHelper->openRelay();
+}
+
+
+void MainWindow::on_btn_relayNetClose_clicked()
+{
+    commandHelper->closeRelay();
+}
+
+
+void MainWindow::on_btn_startMeasure_clicked()
+{
+    commandHelper->testSend();
 }
 

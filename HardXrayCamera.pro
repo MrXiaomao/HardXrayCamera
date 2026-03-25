@@ -12,6 +12,7 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    commandhelper.cpp \
     detectorsetting.cpp \
     fixeddataplotwidget.cpp \
     globalsettings.cpp \
@@ -20,9 +21,11 @@ SOURCES += \
     mainwindow.cpp \
     offlinewindow.cpp \
     qcustomplot.cpp \
+    tcpclient.cpp \
     trendplotwidget.cpp
 
 HEADERS += \
+    commandhelper.h \
     detectorsetting.h \
     fixeddataplotwidget.h \
     globalsettings.h \
@@ -30,6 +33,7 @@ HEADERS += \
     mainwindow.h \
     offlinewindow.h \
     qcustomplot.h \
+    tcpclient.h \
     trendplotwidget.h
 
 FORMS += \

@@ -437,7 +437,7 @@
              </widget>
             </item>
             <item row="0" column="1">
-             <widget class="QPushButton" name="pushButton_3">
+             <widget class="QPushButton" name="btn_relayNetClose">
               <property name="text">
                <string>网络断开</string>
               </property>
@@ -470,7 +470,7 @@
              </widget>
             </item>
             <item row="0" column="0">
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="btn_relayNetOpen">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                 <horstretch>0</horstretch>
@@ -803,7 +803,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_7">
+        <widget class="QPushButton" name="btn_startMeasure">
          <property name="text">
           <string>开始测量</string>
          </property>
