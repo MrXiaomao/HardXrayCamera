@@ -22,14 +22,14 @@ void TcpClientThread::sendData(const QByteArray& data) {
         return;
     }
 
-    // 分包处理（假设协议头包含4字节长度）
+    // 分包处理
     const int chunkSize = 4096;
     for(int i=0; i<data.size(); i+=chunkSize) {
         QByteArray chunk = data.mid(i, chunkSize);
-        QByteArray header;
-        QDataStream ds(&header, QIODevice::WriteOnly);
-        ds << qToBigEndian<quint32>(chunk.size());
-        m_socket->write(header + chunk);
+        // QByteArray header;
+        // QDataStream ds(&header, QIODevice::WriteOnly);
+        // ds << qToBigEndian<quint32>(chunk.size());
+        m_socket->write(chunk);
     }
 }
 
@@ -55,18 +55,18 @@ void TcpClientThread::connectToHost() {
     m_socket->connectToHost(m_host, m_port);
 }
 
-// 把收到的数据追加到缓冲区，然后按“4 字节长度头 + 包体”的格式拆包，拆出完整包后发
+// 把收到的数据追加到缓冲区
 void TcpClientThread::processData() {
     m_recvBuffer.append(m_socket->readAll());
-    // 协议解析（基于长度头）
-    while(m_recvBuffer.size() >= 4) {
-        quint32 packetSize = qFromBigEndian<quint32>(m_recvBuffer.left(4));
-        if(m_recvBuffer.size() < packetSize + 4) break;
 
-        QByteArray packet = m_recvBuffer.mid(4, packetSize);
-        m_recvBuffer.remove(0, packetSize + 4);
+    while(m_recvBuffer.size() >= 12) {
+        // quint32 packetSize = qFromBigEndian<quint32>(m_recvBuffer.left(4));
+        // if(m_recvBuffer.size() < packetSize + 4) break;
 
-        emit dataReceived(packet);
+        // QByteArray packet = m_recvBuffer.mid(0, packetSize);
+        // m_recvBuffer.remove(0, packetSize);
+
+        emit dataReceived(m_recvBuffer);
     }
 }
 

@@ -45,7 +45,7 @@ private slots:
     }
 
     void onDisconnected() {
-        qWarning() << "Disconnected from server";
+        qInfo() << "Disconnected from server";
         emit connectionStatusChanged(false);
         // scheduleReconnect();
     }

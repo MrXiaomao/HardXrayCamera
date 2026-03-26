@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QTextCodec>
 
 #include <log4qt/log4qt.h>
 #include <log4qt/logger.h>
@@ -38,8 +39,8 @@ void AppMessageHandler(QtMsgType type, const QMessageLogContext& context, const 
 
     // 加锁
     QMutexLocker locker(&mutexMsg);
-    if (type == QtWarningMsg)
-        return;
+    // if (type == QtWarningMsg)
+    //     return;
 
     if (mw && type != QtDebugMsg)
         emit mw->sigAppendMsg(msg + "\n", type);
@@ -69,6 +70,9 @@ void shutdownRootLogger()
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+
+    //全局代码都采用该编码方式。
+    QTextCodec::setCodecForLocale(QTextCodec::codecForMib(106));/* Utf8 */
 
     // 启用新的日子记录类
     QString sConfFilename = "./log4qt.conf";

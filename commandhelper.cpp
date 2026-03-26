@@ -96,7 +96,7 @@ void CommandHelper::closeRelay()
 void CommandHelper::testSend()
 {
     QByteArray data = QByteArray::fromHex("12 34 00 0A DA 11");
-    client_det1->send(data);
+    client_relay->send(data);
 }
 
 void CommandHelper::initCommand()

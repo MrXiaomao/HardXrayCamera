@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-03-25 11:00:43
+ * @LastEditTime: 2026-03-25 17:09:10
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -31,7 +31,9 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(this, SIGNAL(sigAppendMsg(const QString &, QtMsgType)), this, SLOT(slotAppendMsg(const QString &, QtMsgType)));
-
+    qRegisterMetaType<QtMsgType>("QtMsgType");
+    connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
+    
     ui->plotWave->setTitle("波形");
     ui->plotWave->setXAxisLabel("时间(us)");
     ui->plotWave->setYAxisLabel("幅值");
