@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-03-25 16:48:53
+ * @LastEditTime: 2026-05-07 14:03:35
  * @Description: 请填写简介
  */
 #ifndef COMMANDHELPER_H
@@ -29,10 +29,15 @@ public:
 
     void testSend();
     
-    // 连接继电器网络，并发送指令：打开/关闭电源
-    void openRelay(bool first = false);
-    // 关闭继电器网络，并发送关闭电源指令
-    void closeRelay();
+    // 继电器控制,电源开
+    void PowerOnRelay();
+    // 继电器控制,电源关
+    void PowerOffRelay();
+    
+    // 连接继电器网络
+    void connectRelay();
+    // 关闭继电器网络
+    void disconnectRelay();
 
     void openDetector();
     void closeDetector();
@@ -52,15 +57,18 @@ signals:
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
     // 继电器状态
     void sigRelayStatus(bool on);
-    void sigRelayFault();//故障，一般指网络不通
+    void sigRelayConnectError(QAbstractSocket::SocketError error);//故障，一般指网络不通
+    void sigRelayPowerStatus(bool on);//继电器控制的电源状态
 
     // 探测器状态
     void sigDetector1Status(bool on);
     void sigDetector2Status(bool on);
-    void sigDetectorFault();//故障，一般指网络不通
+    void sigDetector1Fault();//故障，一般指网络不通
+    void sigDetector2Fault();
 
 public slots:
-
+    // 继电器数据处理
+    void handleRelayData(const QByteArray &binaryData);
 
 private:
     TcpClient* client_det1; //FPGA板1

@@ -31,6 +31,10 @@ private slots:
 
     void on_btn_startMeasure_clicked();
 
+    void on_bt_powerOn_clicked();
+
+    void on_bt_powerOff_clicked();
+
 private:
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络

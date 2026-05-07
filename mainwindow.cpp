@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-03-25 17:09:10
+ * @LastEditTime: 2026-05-07 14:51:00
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -10,6 +10,8 @@
 #include <QFileDialog>
 #include <QToolButton>
 #include <QAction>
+#include <QTextCharFormat>
+#include <QTextCursor>
 
 #include "detectorsetting.h"
 #include "commandhelper.h"
@@ -29,10 +31,14 @@ MainWindow::MainWindow(QWidget *parent)
             ui->le_savePath->setText(cacheDir);
         }
     });
-
+    
+    // 获取当前时间
+    ui->plainTextEdit_log->clear();
+    // 使用 QPlainTextEdit 内建限行能力，自动丢弃最早日志
+    ui->plainTextEdit_log->document()->setMaximumBlockCount(2000);
+    
     connect(this, SIGNAL(sigAppendMsg(const QString &, QtMsgType)), this, SLOT(slotAppendMsg(const QString &, QtMsgType)));
     qRegisterMetaType<QtMsgType>("QtMsgType");
-    connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     
     ui->plotWave->setTitle("波形");
     ui->plotWave->setXAxisLabel("时间(us)");
@@ -65,6 +71,50 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotTemp->setTimeWindow(300);
 
     commandHelper = new CommandHelper();
+    connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
+    connect(commandHelper, &CommandHelper::sigRelayStatus, this, [=](bool on){
+        if (on){
+            qInfo() << "继电器网络状态: 已连接";
+        } else {
+            qInfo() << "继电器网络状态: 已断开";
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError error){
+        qWarning() << "继电器网络连接失败";
+    });
+
+    connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, [=](bool on){
+        if (on){
+            qInfo() << "继电器控制的电源状态: 已开启";
+        } else {
+            qInfo() << "继电器控制的电源状态: 已关闭";
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigDetector1Status, this, [=](bool on){
+        if (on){
+            qInfo() << "FPGA板1状态: 已连接";
+        } else {
+            qInfo() << "FPGA板1状态: 已断开";
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigDetector2Status, this, [=](bool on){
+        if (on){
+            qInfo() << "FPGA板2状态: 已连接";
+        } else {
+            qInfo() << "FPGA板2状态: 已断开";
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigDetector1Fault, this, [=](){
+        qWarning() << "FPGA板1连接失败";
+    });
+
+    connect(commandHelper, &CommandHelper::sigDetector2Fault, this, [=](){
+        qWarning() << "FPGA板2连接失败";
+    });
 }
 
 MainWindow::~MainWindow()
@@ -81,57 +131,55 @@ void MainWindow::on_action_setting_triggered()
 
 void MainWindow::slotAppendMsg(const QString &msg, QtMsgType msgType)
 {
-    // 创建一个 QTextCursor
-    QTextCursor cursor = ui->tbLog_system->textCursor();
-    // 将光标移动到文本末尾
-    cursor.movePosition(QTextCursor::End);
+    QTextCharFormat format;
+    const QString ts = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz>>");
+    QString logLine;
 
-    // 先插入时间
-    cursor.insertHtml(QString("<span style='color:black;'>%1</span>").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz >> ")));
-    // 再插入文本
-    if (msgType == QtDebugMsg || msgType == QtInfoMsg)
-        cursor.insertHtml(QString("<span style='color:black;'>%1</span>").arg(msg));
-    else if (msgType == QtCriticalMsg || msgType == QtFatalMsg)
-        cursor.insertHtml(QString("<span style='color:red;'>%1</span>").arg(msg));
-    else
-        cursor.insertHtml(QString("<span style='color:green;'>%1</span>").arg(msg));
-
-    // 最后插入换行符
-    cursor.insertHtml("<br>");
-
-    // 确保 QTextEdit 显示了光标的新位置
-    ui->tbLog_system->setTextCursor(cursor);
-
-    //限制行数
-    QTextDocument *document = ui->tbLog_system->document(); // 获取文档对象，想象成打开了一个TXT文件
-    int rowCount = document->blockCount(); // 获取输出区的行数
-    int maxRowNumber = 2000;//设定最大行
-    if(rowCount > maxRowNumber){//超过最大行则开始删除
-        QTextCursor cursor = QTextCursor(document); // 创建光标对象
-        cursor.movePosition(QTextCursor::Start); //移动到开头，就是TXT文件开头
-
-        for (int var = 0; var < rowCount - maxRowNumber; ++var) {
-            cursor.movePosition(QTextCursor::Down, QTextCursor::KeepAnchor); // 向下移动并选中当前行
-        }
-        cursor.removeSelectedText();//删除选择的文本
+    if (msgType == QtWarningMsg) {
+        format.setForeground(Qt::blue);
+        logLine = QStringLiteral("%1 [WARN] %2").arg(ts).arg(msg);
+    } else if (msgType == QtCriticalMsg || msgType == QtFatalMsg) {
+        format.setForeground(Qt::red);
+        logLine = QStringLiteral("%1 [ERROR] %2").arg(ts).arg(msg);
+    } else {
+        // QtDebugMsg、QtInfoMsg、QtSystemMsg 等：不打印级别字样
+        logLine = QStringLiteral("%1 %2").arg(ts).arg(msg);
     }
+
+    QTextCursor cursor = ui->plainTextEdit_log->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(logLine, format);
+    cursor.insertBlock();
+    ui->plainTextEdit_log->setTextCursor(cursor);
 }
 
 
 void MainWindow::on_btn_relayNetOpen_clicked()
 {
-    commandHelper->openRelay();
+    commandHelper->connectRelay();
 }
 
 
 void MainWindow::on_btn_relayNetClose_clicked()
 {
-    commandHelper->closeRelay();
+    commandHelper->disconnectRelay();
 }
 
 
 void MainWindow::on_btn_startMeasure_clicked()
 {
     commandHelper->testSend();
+}
+
+//打开探测器供电电源，通过继电器进行控制探测器的电源
+void MainWindow::on_bt_powerOn_clicked()
+{
+    commandHelper->PowerOnRelay();
+}
+
+//关闭探测器供电电源，通过继电器进行控制探测器的电源
+void MainWindow::on_bt_powerOff_clicked()
+{
+    commandHelper->PowerOffRelay();
 }
 

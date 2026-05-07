@@ -41,6 +41,8 @@ void TcpClientThread::connectToHost() {
     }
 
     m_socket = new QTcpSocket(this);
+    m_socket->setProxy(QNetworkProxy::NoProxy); // 禁止使用系统代理，直接连接服务器
+
     int bufferSize = 4 * 1024 * 1024;
     m_socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, bufferSize);
     m_socket->setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, bufferSize);
@@ -67,10 +69,17 @@ void TcpClientThread::processData() {
         // m_recvBuffer.remove(0, packetSize);
 
         emit dataReceived(m_recvBuffer);
+        m_recvBuffer.clear();
     }
 }
 
 void TcpClientThread::scheduleReconnect() {
+    const int maxAttempts = 2;
+    if (m_reconnectAttempts >= maxAttempts) {
+        qWarning() << "Reconnect failed after" << maxAttempts << "attempts. Stop retrying.";
+        return;
+    }
+
     const int maxDelay = 30000; // 最大重试间隔30秒
     int delay = qMin(1000 * (1 << m_reconnectAttempts), maxDelay);
     m_reconnectTimer->start(delay);
@@ -81,6 +90,8 @@ void TcpClientThread::scheduleReconnect() {
 TcpClient::TcpClient(QObject *parent)
     : QObject{parent}
 {
+    qRegisterMetaType<QAbstractSocket::SocketError>();
+
     m_thread = new QThread;
     m_worker = new TcpClientThread;
     m_worker->moveToThread(m_thread);

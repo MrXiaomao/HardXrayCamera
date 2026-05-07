@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-03-25 11:48:25
+ * @LastEditTime: 2026-05-07 14:50:53
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -43,7 +43,7 @@ void AppMessageHandler(QtMsgType type, const QMessageLogContext& context, const 
     //     return;
 
     if (mw && type != QtDebugMsg)
-        emit mw->sigAppendMsg(msg + "\n", type);
+        emit mw->sigAppendMsg(msg, type);
 
     //这里必须调用，否则消息被拦截，log4qt无法捕获系统日志
     if (system_default_message_handler){

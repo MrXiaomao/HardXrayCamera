@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-03-25 16:51:23
+ * @LastEditTime: 2026-05-07 14:03:16
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -43,29 +43,33 @@ CommandHelper::CommandHelper(QObject *parent)
 
     connect(client_relay, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            qInfo() << "继电器连接成功";
-            emit sigAppendMsg("继电器连接成功\n", QtInfoMsg);
+            //查询继电器状态指令
+            QByteArray cmdStatusQuery = QByteArray::fromHex("48 3a 01 53 00 00 00 00 00 00 00 00 d6 45 44"); 
+            client_relay->send(cmdStatusQuery);
+
             emit sigRelayStatus(true);
         } else {
-            qWarning() << "继电器断开连接";
-            emit sigAppendMsg("继电器断开连接\n", QtWarningMsg);
+            emit sigRelayStatus(false);
         }
     });
 
+    connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData);
+
     // 连接失败
     connect(client_det1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        qWarning() << "FPGA板1连接失败:" << error;
-        emit sigAppendMsg(QString("FPGA板1连接失败: %1\n").arg(error), QtWarningMsg);
+        // qWarning() << "FPGA板1连接失败:" << error;
+        // emit sigAppendMsg(QString("FPGA板1连接失败: %1\n").arg(error), QtWarningMsg);
+        emit sigDetector1Fault();
     });
 
     connect(client_det2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        qWarning() << "FPGA板2连接失败:" << error;
-        emit sigAppendMsg(QString("FPGA板2连接失败: %1\n").arg(error), QtWarningMsg);
+        // qWarning() << "FPGA板2连接失败:" << error;
+        // emit sigAppendMsg(QString("FPGA板2连接失败: %1\n").arg(error), QtWarningMsg);
+        emit sigDetector2Fault();
     });
 
     connect(client_relay, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        qWarning() << "继电器连接失败:" << error;
-        emit sigAppendMsg(QString("继电器连接失败: %1\n").arg(error), QtWarningMsg);
+        emit sigRelayConnectError(error);
     });
 }
 
@@ -82,15 +86,33 @@ void CommandHelper::closeDetector()
     // client_det2->disconnectFromHost();
 }
 
-void CommandHelper::openRelay(bool first)
+void CommandHelper::connectRelay()
 {
     loadIPConfig(); //确保使用最新的网络配置
     client_relay->connectToHost(ip_relay, port_relay);
 }
 
-void CommandHelper::closeRelay()
+void CommandHelper::disconnectRelay()
 {
     client_relay->disconnectFromHost();
+}
+
+// 继电器开启电源
+void CommandHelper::PowerOnRelay()
+{
+    if (client_relay) {
+        QByteArray cmdPowerOn = QByteArray::fromHex("48 3a 01 57 01 01 00 00 00 00 00 00 dc 45 44"); 
+        client_relay->send(cmdPowerOn);
+    }
+}
+
+// 继电器关闭电源
+void CommandHelper::PowerOffRelay()
+{
+    if (client_relay) {
+        QByteArray cmdPowerOff = QByteArray::fromHex("48 3a 01 57 00 00 00 00 00 00 00 00 da 45 44"); 
+        client_relay->send(cmdPowerOff);
+    }
 }
 
 void CommandHelper::testSend()
@@ -121,4 +143,25 @@ void CommandHelper::loadIPConfig()
     port_det1 = settings->getValueByPath("network/port_det1").toUInt();
     port_det2 = settings->getValueByPath("network/port_det2").toUInt();
     port_relay = settings->getValueByPath("network/port_relay").toUInt();
+}
+
+void CommandHelper::handleRelayData(const QByteArray &binaryData)
+{
+    qDebug() << "Received relay data:" << binaryData.toHex(' ');
+    if (binaryData.size() != 15) {
+        return;
+    }
+
+    const quint8 *data = reinterpret_cast<const quint8 *>(binaryData.constData());
+    if (data[0] != 0x48 || data[1] != 0x3a || data[2] != 0x01 || data[3] != 0x54) {
+        return;
+    }
+
+    const bool relayOff = (data[4] == 0x00 && data[5] == 0x00);
+    const bool relayOn = (data[4] == 0x01 && data[5] == 0x01);
+    if (relayOff) {
+        emit sigRelayPowerStatus(false);
+    } else if (relayOn) {
+        emit sigRelayPowerStatus(true);
+    }
 }

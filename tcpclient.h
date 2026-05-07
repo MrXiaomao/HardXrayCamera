@@ -34,7 +34,7 @@ private slots:
 
     void onConnected() {
         m_reconnectAttempts = 0;
-        qInfo() << "Connected to server";
+        // qInfo() << "Connected to server";
         emit connectionStatusChanged(true);
     }
 
@@ -45,7 +45,7 @@ private slots:
     }
 
     void onDisconnected() {
-        qInfo() << "Disconnected from server";
+        // qInfo() << "Disconnected from server";
         emit connectionStatusChanged(false);
         // scheduleReconnect();
     }
