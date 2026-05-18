@@ -20,6 +20,12 @@ private slots:
     void on_btn_ok_accepted();
 
 private:
+    void initThresholdTable();
+    void applyThresholdToAll();
+    void applyThresholdToChecked();
+    int thresholdValue(int channel) const;
+    void setThresholdValue(int channel, int value);
+
     Ui::DetectorSetting *ui;
 };
 

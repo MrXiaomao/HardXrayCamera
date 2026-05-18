@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-07 14:03:35
+ * @LastEditTime: 2026-05-18 11:32:01
  * @Description: 请填写简介
  */
 #ifndef COMMANDHELPER_H
@@ -29,19 +29,23 @@ public:
 
     void testSend();
     
-    // 继电器控制,电源开
-    void PowerOnRelay();
-    // 继电器控制,电源关
-    void PowerOffRelay();
-    
     // 连接继电器网络
     void connectRelay();
     // 关闭继电器网络
     void disconnectRelay();
 
-    void openDetector();
-    void closeDetector();
+    void connectDetector();
+    void disconnectDetector();
 
+    void connectARM();
+    void disconnectARM();
+
+    // 继电器控制,电源开
+    void PowerOnRelay();
+    
+    // 继电器控制,电源关
+    void PowerOffRelay();
+       
 private:
     // 初始化常用指令
     void initCommand(); 
@@ -66,20 +70,36 @@ signals:
     void sigDetector1Fault();//故障，一般指网络不通
     void sigDetector2Fault();
 
+    // ARM状态
+    void sigARM1Status(bool on);
+    void sigARM2Status(bool on);
+    void sigARM1Fault();//故障，一般指网络不通
+    void sigARM2Fault();
+
 public slots:
     // 继电器数据处理
     void handleRelayData(const QByteArray &binaryData);
+    void handleDet1Data(const QByteArray &binaryData);
+    void handleDet2Data(const QByteArray &binaryData);
+    void handleARM1Data(const QByteArray &binaryData);
+    void handleARM2Data(const QByteArray &binaryData);
 
 private:
     TcpClient* client_det1; //FPGA板1
     TcpClient* client_det2; //FPGA板2
+    TcpClient* client_arm1; //ARM设备1
+    TcpClient* client_arm2; //ARM设备2
     TcpClient* client_relay; //继电器
 
     QString ip_det1;
     QString ip_det2;
+    QString ip_arm1;
+    QString ip_arm2;
     QString ip_relay;
     quint16 port_det1;
     quint16 port_det2;
+    quint16 port_arm1;
+    quint16 port_arm2;
     quint16 port_relay;
     
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量

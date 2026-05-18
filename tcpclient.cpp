@@ -1,90 +1,143 @@
 #include "tcpclient.h"
+#include <QThread>
+#include <QtGlobal>
 
 TcpClientThread::TcpClientThread(QObject* parent)
-    : QObject(parent), m_socket(nullptr), m_reconnectTimer(new QTimer(this)) {
-    // 初始化重连定时器（指数退避策略）
+    : QObject(parent)
+    , m_socket(nullptr)
+    , m_reconnectTimer(new QTimer(this))
+    , m_heartbeatTimer(new QTimer(this))
+{
     m_reconnectTimer->setSingleShot(true);
     connect(m_reconnectTimer, &QTimer::timeout, this, &TcpClientThread::connectToHost);
 
-    // 心跳定时器
-    m_heartbeatTimer = new QTimer(this);
-    connect(m_heartbeatTimer, &QTimer::timeout, [this](){
-        if(m_socket && m_socket->state() == QAbstractSocket::ConnectedState) {
+    connect(m_heartbeatTimer, &QTimer::timeout, this, [this]() {
+        if (!m_heartbeatEnabled)
+            return;
+        if (m_socket && m_socket->state() == QAbstractSocket::ConnectedState) {
             m_socket->write("HEARTBEAT");
         }
     });
 }
 
-// 发送数据，并且把发送数据按 4096 字节切块，每块前面加 4 字节长度头
-void TcpClientThread::sendData(const QByteArray& data) {
-    if(!m_socket || m_socket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "Attempt to send data when disconnected";
+void TcpClientThread::applyHostPort(const QString& host, quint16 port)
+{
+    m_host = host;
+    m_port = port;
+}
+
+void TcpClientThread::setOptions(bool heartbeatEnabled, bool autoReconnect)
+{
+    m_heartbeatEnabled = heartbeatEnabled;
+    m_autoReconnect = autoReconnect;
+}
+
+void TcpClientThread::start()
+{
+    connectToHost();
+    if (m_heartbeatEnabled)
+        m_heartbeatTimer->start(5000);
+}
+
+void TcpClientThread::tearDownSocket()
+{
+    if (!m_socket)
+        return;
+    QObject::disconnect(m_socket, nullptr, this, nullptr);
+    m_socket->abort();
+    delete m_socket;
+    m_socket = nullptr;
+}
+
+void TcpClientThread::stop()
+{
+    m_reconnectTimer->stop();
+    m_heartbeatTimer->stop();
+    tearDownSocket();
+    emit connectionStatusChanged(false);
+}
+
+void TcpClientThread::sendData(const QByteArray& data)
+{
+    if (!m_socket || m_socket->state() != QAbstractSocket::ConnectedState) {
+        qWarning() << "TcpClientThread: send while disconnected";
         return;
     }
-
-    // 分包处理
     const int chunkSize = 4096;
-    for(int i=0; i<data.size(); i+=chunkSize) {
-        QByteArray chunk = data.mid(i, chunkSize);
-        // QByteArray header;
-        // QDataStream ds(&header, QIODevice::WriteOnly);
-        // ds << qToBigEndian<quint32>(chunk.size());
-        m_socket->write(chunk);
+    for (int i = 0; i < data.size(); i += chunkSize) {
+        m_socket->write(data.mid(i, chunkSize));
+        m_socket->flush(); //本项目的指令发送都比较小，且需要尽快到达，发送后立即 flush。对于大数据传输不可用该方法。
     }
 }
 
-// 每次连接前先删旧 socket，再创建新 socket，然后连接
-void TcpClientThread::connectToHost() {
-    if(m_socket) {
-        m_socket->deleteLater();
-        m_socket = nullptr;
-    }
+void TcpClientThread::connectToHost()
+{
+    tearDownSocket();
 
     m_socket = new QTcpSocket(this);
-    m_socket->setProxy(QNetworkProxy::NoProxy); // 禁止使用系统代理，直接连接服务器
+    m_socket->setProxy(QNetworkProxy::NoProxy); //无代理
 
-    int bufferSize = 4 * 1024 * 1024;
+    const int bufferSize = 4 * 1024 * 1024;
     m_socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, bufferSize);
     m_socket->setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, bufferSize);
 
-    // 连接信号槽
     connect(m_socket, &QTcpSocket::connected, this, &TcpClientThread::onConnected);
     connect(m_socket, &QTcpSocket::readyRead, this, &TcpClientThread::processData);
-    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred),
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    connect(m_socket, &QTcpSocket::errorOccurred, this, &TcpClientThread::onError);
+#else
+    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
             this, &TcpClientThread::onError);
+#endif
     connect(m_socket, &QTcpSocket::disconnected, this, &TcpClientThread::onDisconnected);
 
     m_socket->connectToHost(m_host, m_port);
 }
 
-// 把收到的数据追加到缓冲区
-void TcpClientThread::processData() {
-    m_recvBuffer.append(m_socket->readAll());
-
-    while(m_recvBuffer.size() >= 12) {
-        // quint32 packetSize = qFromBigEndian<quint32>(m_recvBuffer.left(4));
-        // if(m_recvBuffer.size() < packetSize + 4) break;
-
-        // QByteArray packet = m_recvBuffer.mid(0, packetSize);
-        // m_recvBuffer.remove(0, packetSize);
-
-        emit dataReceived(m_recvBuffer);
-        m_recvBuffer.clear();
-    }
+void TcpClientThread::onConnected()
+{
+    // 禁用 Nagle 算法，减少小包合并，降低发送延迟。
+    // Nagle 算法:小包先攒一攒,再一起发
+    m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+    m_reconnectAttempts = 0;
+    emit connectionStatusChanged(true);
 }
 
-void TcpClientThread::scheduleReconnect() {
+void TcpClientThread::onError(QAbstractSocket::SocketError error)
+{
+    if (m_socket)
+        qWarning() << "TcpClientThread socket error:" << error << m_socket->errorString();
+    emit sigErrorOccurred(error);
+    if (m_autoReconnect)
+        scheduleReconnect();
+}
+
+void TcpClientThread::onDisconnected()
+{
+    emit connectionStatusChanged(false);
+}
+
+void TcpClientThread::processData()
+{
+    if (!m_socket)
+        return;
+    const QByteArray chunk = m_socket->readAll();
+    if (!chunk.isEmpty())
+        emit dataReceived(chunk);
+}
+
+void TcpClientThread::scheduleReconnect()
+{
     const int maxAttempts = 2;
     if (m_reconnectAttempts >= maxAttempts) {
-        qWarning() << "Reconnect failed after" << maxAttempts << "attempts. Stop retrying.";
+        qWarning() << "TcpClientThread: reconnect stopped after" << maxAttempts << "attempts";
         return;
     }
-
-    const int maxDelay = 30000; // 最大重试间隔30秒
-    int delay = qMin(1000 * (1 << m_reconnectAttempts), maxDelay);
+    const int maxDelay = 30000;
+    const int delay = qMin(1000 * (1 << m_reconnectAttempts), maxDelay);
     m_reconnectTimer->start(delay);
-    m_reconnectAttempts++;
-    qInfo() << "Will reconnect in" << delay << "ms";
+    ++m_reconnectAttempts;
+    qInfo() << "TcpClientThread: reconnect in" << delay << "ms";
 }
 
 TcpClient::TcpClient(QObject *parent)
@@ -96,33 +149,71 @@ TcpClient::TcpClient(QObject *parent)
     m_worker = new TcpClientThread;
     m_worker->moveToThread(m_thread);
 
-    connect(m_thread, &QThread::finished, m_worker, &QObject::deleteLater);
-    connect(this, &TcpClient::startSignal, m_worker, &TcpClientThread::start);
-    connect(this, &TcpClient::stopSignal, m_worker, &TcpClientThread::stop);
-    connect(this, &TcpClient::sendDataSignal, m_worker, &TcpClientThread::sendData);
+    connect(this, &TcpClient::startSignal, m_worker, &TcpClientThread::start, Qt::QueuedConnection);
+    connect(this, &TcpClient::stopSignal, m_worker, &TcpClientThread::stop, Qt::QueuedConnection);
+    connect(this, &TcpClient::sendDataSignal, m_worker, &TcpClientThread::sendData, Qt::QueuedConnection);
     connect(m_worker, &TcpClientThread::dataReceived, this, &TcpClient::dataReceived);
-    connect(m_worker, &TcpClientThread::connectionStatusChanged, this, &TcpClient::sigconnectStatusChanged);
+    connect(m_worker, &TcpClientThread::connectionStatusChanged, this, [this](bool c) {
+        m_connected = c;
+        emit sigconnectStatusChanged(c);
+    });
     connect(m_worker, &TcpClientThread::sigErrorOccurred, this, &TcpClient::sigconnectError);
-    
+
     m_thread->start();
 }
 
-TcpClient::~TcpClient() {
-    emit stopSignal();
-    m_thread->quit();
-    m_thread->wait();
+TcpClient::~TcpClient()
+{
+    m_shuttingDown = true;
+    // 先断开 worker -> TcpClient，避免线程里 emit 的 QueuedConnection 槽在对象析构后投递到主线程
+    if (m_worker) {
+        QObject::disconnect(m_worker, nullptr, this, nullptr);
+        QObject::disconnect(this, nullptr, m_worker, nullptr);
+        QMetaObject::invokeMethod(m_worker, "stop", Qt::BlockingQueuedConnection);
+    }
+    if (m_thread) {
+        m_thread->quit();
+        m_thread->wait(10000);
+    }
+    delete m_worker;
+    m_worker = nullptr;
     delete m_thread;
+    m_thread = nullptr;
 }
 
-void TcpClient::connectToHost(const QString& host, quint16 port) {
-    m_worker->setServerInfo(host, port);
+void TcpClient::setHeartbeatEnabled(bool on)
+{
+    m_heartbeat = on;
+    QMetaObject::invokeMethod(m_worker, "setOptions", Qt::QueuedConnection,
+                              Q_ARG(bool, m_heartbeat), Q_ARG(bool, m_autoReconnect));
+}
+
+void TcpClient::setAutoReconnect(bool on)
+{
+    m_autoReconnect = on;
+    QMetaObject::invokeMethod(m_worker, "setOptions", Qt::QueuedConnection,
+                              Q_ARG(bool, m_heartbeat), Q_ARG(bool, m_autoReconnect));
+}
+
+void TcpClient::connectToHost(const QString& host, quint16 port)
+{
+    QMetaObject::invokeMethod(m_worker, "applyHostPort", Qt::BlockingQueuedConnection,
+                              Q_ARG(QString, host), Q_ARG(quint16, port));
     emit startSignal();
 }
 
-void TcpClient::disconnectFromHost() {
+void TcpClient::disconnectFromHost()
+{
+    if (m_shuttingDown)
+        return;
+    // 不在此读取 m_connected：退出/析构阶段可能与 worker 上的状态短暂不一致。
+    // stop() 在 worker 上对未连接状态是安全的，应始终投递。
+    if (!m_worker || !m_thread)
+        return;
     emit stopSignal();
 }
 
-void TcpClient::send(const QByteArray& data) {
+void TcpClient::send(const QByteArray& data)
+{
     emit sendDataSignal(data);
 }

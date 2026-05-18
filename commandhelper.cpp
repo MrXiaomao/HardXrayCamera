@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-07 14:03:16
+ * @LastEditTime: 2026-05-18 11:30:17
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -16,6 +16,8 @@ CommandHelper::CommandHelper(QObject *parent)
     
     client_det1 = new TcpClient(this); //FPGA板1
     client_det2 = new TcpClient(this); //FPGA板2
+    client_arm1 = new TcpClient(this); //ARM设备1
+    client_arm2 = new TcpClient(this); //ARM设备2
     client_relay = new TcpClient(this); //继电器
     
     //状态改变
@@ -41,6 +43,30 @@ CommandHelper::CommandHelper(QObject *parent)
         }
     });
 
+    connect(client_arm1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+        if(connected){
+            qInfo() << "ARM设备1连接成功";
+            emit sigAppendMsg("ARM设备1连接成功\n", QtInfoMsg);
+            emit sigARM1Status(true);
+        } else {
+            qWarning() << "ARM设备1断开连接";
+            emit sigAppendMsg("ARM设备1断开连接\n", QtWarningMsg);
+            emit sigARM1Status(false);
+        }
+    });
+
+    connect(client_arm2, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+        if(connected){
+            qInfo() << "ARM设备2连接成功";
+            emit sigAppendMsg("ARM设备2连接成功\n", QtInfoMsg);
+            emit sigARM2Status(true);
+        } else {
+            qWarning() << "ARM设备2断开连接";
+            emit sigAppendMsg("ARM设备2断开连接\n", QtWarningMsg);
+            emit sigARM2Status(false);
+        }
+    });
+
     connect(client_relay, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
             //查询继电器状态指令
@@ -54,7 +80,15 @@ CommandHelper::CommandHelper(QObject *parent)
     });
 
     connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData);
-
+    connect(client_det1, &TcpClient::dataReceived, this, &CommandHelper::handleDet1Data);
+    connect(client_det2, &TcpClient::dataReceived, this, &CommandHelper::handleDet2Data);
+    connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data);
+    connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data);
+    
+    connect(client_relay, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+        emit sigRelayConnectError(error);
+    });
+    
     // 连接失败
     connect(client_det1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
         // qWarning() << "FPGA板1连接失败:" << error;
@@ -68,22 +102,41 @@ CommandHelper::CommandHelper(QObject *parent)
         emit sigDetector2Fault();
     });
 
-    connect(client_relay, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        emit sigRelayConnectError(error);
+    connect(client_arm1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+        Q_UNUSED(error)
+        emit sigARM1Fault();
+    });
+
+    connect(client_arm2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+        Q_UNUSED(error)
+        emit sigARM2Fault();
     });
 }
 
-void CommandHelper::openDetector()
+void CommandHelper::connectDetector()
 {
     loadIPConfig(); //确保使用最新的网络配置
     client_det1->connectToHost(ip_det1, port_det1);
-    // client_det2->connectToHost(ip_det2, port_det2);
+    client_det2->connectToHost(ip_det2, port_det2);
 }
 
-void CommandHelper::closeDetector()
+void CommandHelper::disconnectDetector()
 {
     client_det1->disconnectFromHost();
-    // client_det2->disconnectFromHost();
+    client_det2->disconnectFromHost();
+}
+
+void CommandHelper::connectARM()
+{
+    loadIPConfig(); //确保使用最新的网络配置
+    client_arm1->connectToHost(ip_arm1, port_arm1);
+    client_arm2->connectToHost(ip_arm2, port_arm2);
+}
+
+void CommandHelper::disconnectARM()
+{
+    client_arm1->disconnectFromHost();
+    client_arm2->disconnectFromHost();
 }
 
 void CommandHelper::connectRelay()
@@ -138,10 +191,14 @@ void CommandHelper::loadIPConfig()
     // 网络配置读取
     ip_det1 = settings->getValueByPath("network/ip1").toString();
     ip_det2 = settings->getValueByPath("network/ip2").toString();
+    ip_arm1 = settings->getValueByPath("network/ip_arm1").toString();
+    ip_arm2 = settings->getValueByPath("network/ip_arm2").toString();
     ip_relay = settings->getValueByPath("network/ip_relay").toString();
 
     port_det1 = settings->getValueByPath("network/port_det1").toUInt();
     port_det2 = settings->getValueByPath("network/port_det2").toUInt();
+    port_arm1 = settings->getValueByPath("network/port_arm1").toUInt();
+    port_arm2 = settings->getValueByPath("network/port_arm2").toUInt();
     port_relay = settings->getValueByPath("network/port_relay").toUInt();
 }
 
@@ -164,4 +221,26 @@ void CommandHelper::handleRelayData(const QByteArray &binaryData)
     } else if (relayOn) {
         emit sigRelayPowerStatus(true);
     }
+}
+
+void CommandHelper::handleDet1Data(const QByteArray &binaryData)
+{
+    // 处理FPGA板1的数据
+    qDebug() << "Received data from Detector 1:" << binaryData.toHex(' '); 
+}
+
+void CommandHelper::handleDet2Data(const QByteArray &binaryData)
+{
+    // 处理FPGA板2的数据
+    qDebug() << "Received data from Detector 2:" << binaryData.toHex(' '); 
+}
+
+void CommandHelper::handleARM1Data(const QByteArray &binaryData)
+{
+    qDebug() << "Received data from ARM 1:" << binaryData.toHex(' ');
+}
+
+void CommandHelper::handleARM2Data(const QByteArray &binaryData)
+{
+    qDebug() << "Received data from ARM 2:" << binaryData.toHex(' ');
 }

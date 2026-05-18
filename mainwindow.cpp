@@ -80,7 +80,7 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError error){
+    connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError){
         qWarning() << "继电器网络连接失败";
     });
 

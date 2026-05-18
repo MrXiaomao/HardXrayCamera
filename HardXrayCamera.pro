@@ -20,6 +20,7 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     offlinewindow.cpp \
+    order.cpp \
     qcustomplot.cpp \
     tcpclient.cpp \
     trendplotwidget.cpp
@@ -32,6 +33,7 @@ HEADERS += \
     ipaddress.h \
     mainwindow.h \
     offlinewindow.h \
+    order.h \
     qcustomplot.h \
     tcpclient.h \
     trendplotwidget.h
