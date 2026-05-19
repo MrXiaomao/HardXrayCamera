@@ -108,7 +108,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QSpinBox" name="spinBox_5">
+               <widget class="QSpinBox" name="spb_channel">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -167,6 +167,23 @@
                 </property>
                 <property name="singleStep">
                  <number>10</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_2">
+                <property name="text">
+                 <string>图片编号</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spb_specID">
+                <property name="minimumSize">
+                 <size>
+                  <width>60</width>
+                  <height>0</height>
+                 </size>
                 </property>
                </widget>
               </item>

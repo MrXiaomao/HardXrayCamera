@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 11:37:46
+ * @LastEditTime: 2026-05-19 15:26:11
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -507,21 +507,18 @@ bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& pac
     const quint32 channelMask = readUInt32BE(packet.constData() + 8);
     const int channelNumber = spectrumChannelFromMask(channelMask);
 
-    QVector<double> channels;
-    QVector<double> counts;
-    channels.reserve(SpectrumChannelCount);
+    QVector<quint32> counts;
     counts.reserve(SpectrumChannelCount);
 
     const char* spectrumData = packet.constData() + 12;
     for (int i = 0; i < SpectrumChannelCount; ++i) {
-        channels.append(i + 1);
         counts.append(readUInt32BE(spectrumData + i * 4));
     }
 
     qInfo() << "Spectrum packet parsed. Detector:" << detectorIndex
             << "Channel:" << (channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "Unknown")
             << "Time(ms):" << timeMs;
-    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, channelMask, channels, counts);
+    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
     return true;
 }
 

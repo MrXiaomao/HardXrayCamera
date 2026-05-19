@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 11:20:29
+ * @LastEditTime: 2026-05-19 15:27:05
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -125,18 +125,39 @@ MainWindow::MainWindow(QWidget *parent)
         qWarning() << "FPGA板2连接失败";
     });
 
+    m_spectrumByChannel.resize(kSpectrumChannelCount);
+
     connect(commandHelper, &CommandHelper::sigSpectrumData, this,
-            [=](int detectorIndex, int channelNumber, quint32 timeMs, quint32 channelMask,
-                const QVector<double>& channels, const QVector<double>& counts){
-        const QString channelText = channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "未知通道";
-        ui->plotSpec->setTitle(QString("能谱 Det%1 %2 t=%3ms mask=0x%4")
-                                   .arg(detectorIndex)
-                                   .arg(channelText)
-                                   .arg(timeMs)
-                                   .arg(channelMask, 8, 16, QLatin1Char('0')));
-        ui->plotSpec->setData(channels, counts);
-        ui->plotSpec->refreshPlot();
+            [=](int detectorIndex, int channelNumber, quint32 timeMs, 
+                const QVector<quint32>& counts){
+        const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+        appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+
+        const int currentChannel = ui->spb_channel->value();
+        if (logicalChannel != currentChannel)
+            return;
+
+        const int specCount = m_spectrumByChannel.at(currentChannel - 1).size();
+        ui->spb_specID->blockSignals(true);
+        ui->spb_specID->setValue(specCount - 1);
+        ui->spb_specID->blockSignals(false);
+        updateSpecIdSpinBoxRange();
+
+        if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
+            return;
+        spectrumPlotThrottle.restart();
+        refreshSpectrumPlot();
     });
+
+    connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
+        updateSpecIdSpinBoxRange();
+        refreshSpectrumPlot();
+    });
+    connect(ui->spb_specID, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
+        refreshSpectrumPlot();
+    });
+    ui->spb_specID->setMinimum(0);
+    updateSpecIdSpinBoxRange();
 }
 
 MainWindow::~MainWindow()
@@ -187,9 +208,105 @@ void MainWindow::on_btn_relayNetClose_clicked()
     commandHelper->disconnectRelay();
 }
 
+int MainWindow::logicalChannelNumber(int detectorIndex, int channelNumber) const
+{
+    if (channelNumber < 1 || channelNumber > kChannelsPerDetector)
+        return 0;
+    if (detectorIndex == 2)
+        return channelNumber + kDetector2ChannelOffset;
+    if (detectorIndex == 1)
+        return channelNumber;
+    return 0;
+}
+
+void MainWindow::clearSpectrumData()
+{
+    for (auto &channelSpectra : m_spectrumByChannel)
+        channelSpectra.clear();
+
+    ui->spb_specID->blockSignals(true);
+    ui->spb_specID->setValue(0);
+    ui->spb_specID->blockSignals(false);
+    updateSpecIdSpinBoxRange();
+    ui->plotSpec->clearData();
+    ui->plotSpec->refreshPlot();
+}
+
+void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
+                                    const QVector<quint32> &counts)
+{
+    const int storageChannel = logicalChannelNumber(detectorIndex, channelNumber);
+    if (storageChannel < 1 || storageChannel > m_spectrumByChannel.size())
+        return;
+
+    SpectrumEntry entry;
+    entry.detectorIndex = detectorIndex;
+    entry.timeMs = timeMs;
+    entry.counts = counts;
+    m_spectrumByChannel[storageChannel - 1].append(entry);
+}
+
+void MainWindow::ensureSpectrumBinAddresses(int binCount)
+{
+    if (m_spectrumBinAddresses.size() == binCount)
+        return;
+
+    m_spectrumBinAddresses.resize(binCount);
+    for (int i = 0; i < binCount; ++i)
+        m_spectrumBinAddresses[i] = i + 1;
+}
+
+void MainWindow::updateSpecIdSpinBoxRange()
+{
+    const int channel = ui->spb_channel->value();
+    const int specCount = (channel >= 1 && channel <= m_spectrumByChannel.size())
+                              ? m_spectrumByChannel.at(channel - 1).size()
+                              : 0;
+    const int maxSpecId = qMax(0, specCount - 1);
+
+    ui->spb_specID->blockSignals(true);
+    ui->spb_specID->setMaximum(maxSpecId);
+    if (ui->spb_specID->value() > maxSpecId)
+        ui->spb_specID->setValue(maxSpecId);
+    ui->spb_specID->blockSignals(false);
+}
+
+void MainWindow::refreshSpectrumPlot()
+{
+    const int channel = ui->spb_channel->value();
+    const int specId = ui->spb_specID->value();
+    if (channel < 1 || channel > m_spectrumByChannel.size()) {
+        ui->plotSpec->clearData();
+        ui->plotSpec->refreshPlot();
+        return;
+    }
+
+    const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(channel - 1);
+    if (specId < 0 || specId >= spectra.size()) {
+        ui->plotSpec->clearData();
+        ui->plotSpec->setTitle(QString("能谱 CH%1 #%2 (无数据)").arg(channel).arg(specId));
+        ui->plotSpec->refreshPlot();
+        return;
+    }
+
+    const SpectrumEntry &entry = spectra.at(specId);
+    ui->plotSpec->setTitle(QString("能谱 Det%1 CH%2 #%3 t=%4ms")
+                               .arg(entry.detectorIndex)
+                               .arg(channel)
+                               .arg(specId)
+                               .arg(entry.timeMs)
+                               );
+    ensureSpectrumBinAddresses(entry.counts.size());
+    ui->plotSpec->setData(m_spectrumBinAddresses, entry.counts);
+    ui->plotSpec->refreshPlot();
+}
+
 // 开始测量
 void MainWindow::on_btn_startMeasure_clicked()
 {
+    clearSpectrumData();
+    spectrumPlotThrottle.invalidate();
+
     DetParameter detPara = {};
     //触发模式：外触发、软件触发
     detPara.trigMode = Order::TriggerMode::SoftwareTrigger; //先固定位软件触发

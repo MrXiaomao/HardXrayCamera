@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 11:19:39
+ * @LastEditTime: 2026-05-19 15:21:40
  * @Description: 请填写简介
  */
 #ifndef COMMANDHELPER_H
@@ -107,8 +107,8 @@ signals:
     void sigARM2Fault();
 
     // 能谱数据
-    void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs, quint32 channelMask,
-                         const QVector<double>& channels, const QVector<double>& counts);
+    void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
+                         const QVector<quint32>& counts);
 
 public slots:
     // 继电器数据处理
