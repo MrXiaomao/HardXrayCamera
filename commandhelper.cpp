@@ -2,11 +2,64 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-18 11:30:17
+ * @LastEditTime: 2026-05-19 11:37:46
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
 #include "globalsettings.h"
+#include "order.h"
+#include <QFile>
+
+namespace {
+constexpr int SpectrumPacketSize = 2064;
+constexpr int SpectrumChannelCount = 512;
+const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb 00 00");
+const QByteArray SpectrumTail = QByteArray::fromHex("cc dd 00 00");
+
+QString transferModeText(Order::TransferMode mode)
+{
+    switch (mode) {
+    case Order::Spectrum512:
+        return "512道能谱";
+    case Order::Spectrum16:
+        return "16道能谱";
+    case Order::Waveform:
+        return "波形";
+    }
+    return QString("未知模式(%1)").arg(static_cast<int>(mode));
+}
+
+QString triggerModeText(Order::TriggerMode mode)
+{
+    switch (mode) {
+    case Order::Stop:
+        return "停止";
+    case Order::SoftwareTrigger:
+        return "软件触发";
+    case Order::HardwareTrigger:
+        return "硬件触发";
+    }
+    return QString("未知触发(%1)").arg(static_cast<int>(mode));
+}
+
+quint32 readUInt32BE(const char* data)
+{
+    const uchar* p = reinterpret_cast<const uchar*>(data);
+    return (static_cast<quint32>(p[0]) << 24)
+        | (static_cast<quint32>(p[1]) << 16)
+        | (static_cast<quint32>(p[2]) << 8)
+        | static_cast<quint32>(p[3]);
+}
+
+int spectrumChannelFromMask(quint32 channelMask)
+{
+    for (int bit = 0; bit < 16; ++bit) {
+        if (channelMask & (1u << bit))
+            return bit + 1;
+    }
+    return 0;
+}
+}
 
 CommandHelper::CommandHelper(QObject *parent)
     : QObject{parent}
@@ -71,7 +124,7 @@ CommandHelper::CommandHelper(QObject *parent)
         if(connected){
             //查询继电器状态指令
             QByteArray cmdStatusQuery = QByteArray::fromHex("48 3a 01 53 00 00 00 00 00 00 00 00 d6 45 44"); 
-            client_relay->send(cmdStatusQuery);
+            sendCommand(client_relay, cmdStatusQuery, "继电器状态查询", "查询吸合状态");
 
             emit sigRelayStatus(true);
         } else {
@@ -90,13 +143,13 @@ CommandHelper::CommandHelper(QObject *parent)
     });
     
     // 连接失败
-    connect(client_det1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+    connect(client_det1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError ){
         // qWarning() << "FPGA板1连接失败:" << error;
         // emit sigAppendMsg(QString("FPGA板1连接失败: %1\n").arg(error), QtWarningMsg);
         emit sigDetector1Fault();
     });
 
-    connect(client_det2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+    connect(client_det2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError){
         // qWarning() << "FPGA板2连接失败:" << error;
         // emit sigAppendMsg(QString("FPGA板2连接失败: %1\n").arg(error), QtWarningMsg);
         emit sigDetector2Fault();
@@ -155,7 +208,7 @@ void CommandHelper::PowerOnRelay()
 {
     if (client_relay) {
         QByteArray cmdPowerOn = QByteArray::fromHex("48 3a 01 57 01 01 00 00 00 00 00 00 dc 45 44"); 
-        client_relay->send(cmdPowerOn);
+        sendCommand(client_relay, cmdPowerOn, "继电器电源控制", "开启");
     }
 }
 
@@ -164,14 +217,14 @@ void CommandHelper::PowerOffRelay()
 {
     if (client_relay) {
         QByteArray cmdPowerOff = QByteArray::fromHex("48 3a 01 57 00 00 00 00 00 00 00 00 da 45 44"); 
-        client_relay->send(cmdPowerOff);
+        sendCommand(client_relay, cmdPowerOff, "继电器电源控制", "关闭");
     }
 }
 
 void CommandHelper::testSend()
 {
     QByteArray data = QByteArray::fromHex("12 34 00 0A DA 11");
-    client_relay->send(data);
+    sendCommand(client_relay, data, "测试指令", "继电器测试发送");
 }
 
 void CommandHelper::initCommand()
@@ -179,6 +232,167 @@ void CommandHelper::initCommand()
     // 初始化常用指令
     cmdSoftTrigger = QByteArray::fromHex("12 34 00 0A DA 11");
     cmdPool.append(CommandItem("软件触发", cmdSoftTrigger));
+}
+
+// FPGA板1的初始化指令
+void CommandHelper::initFPGA1Commands()
+{
+    //传输模式设置指令
+    QByteArray cmdSetTransferMode = Order::setTransferMode(Order::TransferMode::Spectrum512);
+    sendCommand(client_det1, cmdSetTransferMode, "传输模式设置", "FPGA1 512道能谱");
+    
+}
+
+void CommandHelper::initFPGA2Commands()
+{
+    // FPGA板2的初始化指令
+    // 这里可以添加更多针对FPGA板2的常用指令
+}
+
+void CommandHelper::startMeasure(DetParameter detPara)
+{
+    m_detPara = detPara;
+    //分为波形模式和能谱模式发送指令
+    if(m_detPara.transferMode == Order::TransferMode::Waveform){// 发送波形模式相关指令
+        // 传输模式设置
+        sendCommand(client_det1, Order::setTransferMode(Order::TransferMode::Waveform),
+                    "传输模式设置", "FPGA1 波形");
+        sendCommand(client_det2, Order::setTransferMode(Order::TransferMode::Waveform),
+                    "传输模式设置", "FPGA2 波形");
+
+        // 波形触发阈值，两个FPGA各16通道
+        QVector<quint16> thresholdsDet1;
+        QVector<quint16> thresholdsDet2;
+        thresholdsDet1.reserve(16);
+        thresholdsDet2.reserve(16);
+        for (int channel = 0; channel < 16; ++channel) {
+            thresholdsDet1.append(static_cast<quint16>(m_detPara.waveformTriggerThreshold[channel]));
+            thresholdsDet2.append(static_cast<quint16>(m_detPara.waveformTriggerThreshold[channel + 16]));
+        }
+
+        const QVector<QByteArray> thresholdCommandsDet1 = Order::setWaveThresholds(thresholdsDet1);
+        const QVector<QByteArray> thresholdCommandsDet2 = Order::setWaveThresholds(thresholdsDet2);
+        for (int i = 0; i < thresholdCommandsDet1.size(); ++i) {
+            const int firstChannel = i * 2 + 1;
+            const int secondChannel = firstChannel + 1;
+            sendCommand(client_det1, thresholdCommandsDet1.at(i), "波形触发阈值",
+                        QString("FPGA1 CH%1=%2, CH%3=%4")
+                            .arg(firstChannel)
+                            .arg(thresholdsDet1.at(i * 2))
+                            .arg(secondChannel)
+                            .arg(thresholdsDet1.at(i * 2 + 1)));
+        }
+        for (int i = 0; i < thresholdCommandsDet2.size(); ++i) {
+            const int firstChannel = i * 2 + 17;
+            const int secondChannel = firstChannel + 1;
+            sendCommand(client_det2, thresholdCommandsDet2.at(i), "波形触发阈值",
+                        QString("FPGA2 CH%1=%2, CH%3=%4")
+                            .arg(firstChannel)
+                            .arg(thresholdsDet2.at(i * 2))
+                            .arg(secondChannel)
+                            .arg(thresholdsDet2.at(i * 2 + 1)));
+        }
+
+        // 发送软件触发指令，开始测量
+        sendCommand(client_det1, Order::controlWaveform(Order::TriggerMode::SoftwareTrigger),
+                    "波形测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+        sendCommand(client_det2, Order::controlWaveform(Order::TriggerMode::SoftwareTrigger),
+                    "波形测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+
+        qInfo() << "Measurement started with parameters:" << m_detPara.measureTime 
+                << "ms, TransferMode:" << m_detPara.transferMode;
+        //打印触发阈值，通道号和对应的阈值，一行打印两个通道的阈值
+        for (int channel = 0; channel < 32; channel += 2) {
+            qInfo() << QString("Threshold: CH%1=%2, CH%3=%4")
+                .arg(channel + 1)
+                .arg(m_detPara.waveformTriggerThreshold[channel])
+                .arg(channel + 2)
+                .arg(m_detPara.waveformTriggerThreshold[channel + 1]);
+        }
+    } else {// 发送能谱模式相关指令
+        // 传输模式设置
+        sendCommand(client_det1, Order::setTransferMode(m_detPara.transferMode),
+                    "传输模式设置", QString("FPGA1 %1").arg(transferModeText(m_detPara.transferMode)));
+        sendCommand(client_det2, Order::setTransferMode(m_detPara.transferMode),
+                    "传输模式设置", QString("FPGA2 %1").arg(transferModeText(m_detPara.transferMode)));
+        // 能谱刷新时间,ms
+        sendCommand(client_det1, Order::setSpectrumRefreshTime(m_detPara.spectrumRefreshInterval),
+                    "能谱刷新时间", QString("FPGA1 %1 ms").arg(m_detPara.spectrumRefreshInterval));
+        sendCommand(client_det2, Order::setSpectrumRefreshTime(m_detPara.spectrumRefreshInterval),
+                    "能谱刷新时间", QString("FPGA2 %1 ms").arg(m_detPara.spectrumRefreshInterval));
+        // 能谱触发阈值
+        sendCommand(client_det1, Order::setSpectrumTriggerThreshold(m_detPara.spectrumTriggerThreshold),
+                    "能谱触发阈值", QString("FPGA1 %1 LSB").arg(m_detPara.spectrumTriggerThreshold));
+        sendCommand(client_det2, Order::setSpectrumTriggerThreshold(m_detPara.spectrumTriggerThreshold),
+                    "能谱触发阈值", QString("FPGA2 %1 LSB").arg(m_detPara.spectrumTriggerThreshold));
+        // 能谱死时间,单位*16ns
+        const int deadTime16ns = m_detPara.spectrumDeadTime / 16;
+        sendCommand(client_det1, Order::setSpectrumDeadTime(deadTime16ns),
+                    "能谱死时间", QString("FPGA1 %1 ns, %2*16ns").arg(m_detPara.spectrumDeadTime).arg(deadTime16ns));
+        sendCommand(client_det2, Order::setSpectrumDeadTime(deadTime16ns),
+                    "能谱死时间", QString("FPGA2 %1 ns, %2*16ns").arg(m_detPara.spectrumDeadTime).arg(deadTime16ns));
+
+        // 发送软件触发指令，开始测量
+        sendCommand(client_det1, Order::controlSpectrum(Order::SoftwareTrigger),
+                    "能谱测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+        sendCommand(client_det2, Order::controlSpectrum(Order::SoftwareTrigger),
+                    "能谱测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+            
+        //打印测量基本参数
+        qInfo() << "Measurement started with parameters:" << m_detPara.measureTime 
+                << "ms, TransferMode:" << m_detPara.transferMode
+                << "SpectrumRefreshInterval:" << m_detPara.spectrumRefreshInterval
+                << "SpectrumTriggerThreshold:" << m_detPara.spectrumTriggerThreshold
+                << "SpectrumDeadTime(ns):" << m_detPara.spectrumDeadTime;
+    }
+    
+    // 文件名格式：保存路径/DetX_时间戳_测量时长.扩展名
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    mfileNameDet1 = QString("%1/Det1_%2_%3.%4")
+        .arg(mSavePath)
+        .arg(timestamp)
+        .arg(m_detPara.measureTime)
+        .arg(mfileFormat == Binary ? "dat" : "txt");
+    mfileNameDet2 = QString("%1/Det2_%2_%3.%4")
+        .arg(mSavePath)
+        .arg(timestamp)
+        .arg(m_detPara.measureTime)
+        .arg(mfileFormat == Binary ? "dat" : "txt");
+}
+
+void CommandHelper::stopMeasure()
+{
+    // 发送停止指令
+    if(m_detPara.transferMode == Order::Waveform){
+        // 发送停止波形传输指令
+        sendCommand(client_det1, Order::controlWaveform(Order::Stop),
+                    "波形测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::Stop)));
+        sendCommand(client_det2, Order::controlWaveform(Order::Stop),
+                    "波形测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::Stop)));
+    } else {
+        // 发送停止能谱传输指令
+        sendCommand(client_det1, Order::controlSpectrum(Order::Stop),
+                    "能谱测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::Stop)));
+        sendCommand(client_det2, Order::controlSpectrum(Order::Stop),
+                    "能谱测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::Stop)));
+    }
+    qDebug() << "Measurement stopped.";
+}
+
+void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
+                                const QString& name, const QString& parameter)
+{
+    if (!client)
+        return;
+
+    client->send(command);
+
+    const QString detail = parameter.isEmpty()
+        ? name
+        : QString("%1：%2").arg(name, parameter);
+    qDebug().noquote() << QString("Send HEX: %1[%2]")
+        .arg(QString(command.toHex(' ')))
+        .arg(detail);
 }
 
 // 读取网络配置，IP和port
@@ -225,14 +439,90 @@ void CommandHelper::handleRelayData(const QByteArray &binaryData)
 
 void CommandHelper::handleDet1Data(const QByteArray &binaryData)
 {
+    //存储数据到mfileNameDet1文件中。
+    QFile file(mfileNameDet1);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        file.write(binaryData);
+        file.close();
+    }
+    else {
+        qWarning() << "Failed to write data to file:" << mfileNameDet1;
+    }
     // 处理FPGA板1的数据
-    qDebug() << "Received data from Detector 1:" << binaryData.toHex(' '); 
+    processDetectorData(1, m_det1Buffer, binaryData);
 }
 
 void CommandHelper::handleDet2Data(const QByteArray &binaryData)
 {
+    //存储数据到mfileNameDet2文件中。
+    QFile file(mfileNameDet2);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        file.write(binaryData);
+        file.close();
+    }
+    else {
+        qWarning() << "Failed to write data to file:" << mfileNameDet2;
+    }
     // 处理FPGA板2的数据
-    qDebug() << "Received data from Detector 2:" << binaryData.toHex(' '); 
+    processDetectorData(2, m_det2Buffer, binaryData);
+}
+
+void CommandHelper::processDetectorData(int detectorIndex, QByteArray& buffer, const QByteArray& data)
+{
+    buffer.append(data);
+
+    while (buffer.size() >= SpectrumHeader.size()) {
+        const int headerIndex = buffer.indexOf(SpectrumHeader);
+        if (headerIndex < 0) {
+            buffer.clear();
+            return;
+        }
+
+        if (headerIndex > 0)
+            buffer.remove(0, headerIndex);
+
+        if (buffer.size() < SpectrumPacketSize)
+            return;
+
+        const QByteArray packet = buffer.left(SpectrumPacketSize);
+        if (packet.mid(SpectrumPacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
+            buffer.remove(0, SpectrumHeader.size());
+            qWarning() << "Invalid spectrum packet tail from detector" << detectorIndex;
+            continue;
+        }
+
+        parseSpectrumPacket(detectorIndex, packet);
+        buffer.remove(0, SpectrumPacketSize);
+    }
+}
+
+bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& packet)
+{
+    if (packet.size() != SpectrumPacketSize)
+        return false;
+    if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
+        return false;
+
+    const quint32 timeMs = readUInt32BE(packet.constData() + 4);
+    const quint32 channelMask = readUInt32BE(packet.constData() + 8);
+    const int channelNumber = spectrumChannelFromMask(channelMask);
+
+    QVector<double> channels;
+    QVector<double> counts;
+    channels.reserve(SpectrumChannelCount);
+    counts.reserve(SpectrumChannelCount);
+
+    const char* spectrumData = packet.constData() + 12;
+    for (int i = 0; i < SpectrumChannelCount; ++i) {
+        channels.append(i + 1);
+        counts.append(readUInt32BE(spectrumData + i * 4));
+    }
+
+    qInfo() << "Spectrum packet parsed. Detector:" << detectorIndex
+            << "Channel:" << (channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "Unknown")
+            << "Time(ms):" << timeMs;
+    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, channelMask, channels, counts);
+    return true;
 }
 
 void CommandHelper::handleARM1Data(const QByteArray &binaryData)

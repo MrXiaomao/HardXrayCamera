@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QDir>
+#include "order.h"
 class JsonSettings : public QObject{
     Q_OBJECT
 public:
@@ -861,4 +862,27 @@ private:
     QFileSystemWatcher *mConfigurationFileWatch = nullptr;
 };
 
+//探测器参数设置
+typedef struct DetectorParameter{
+    //触发模式
+    Order::TriggerMode trigMode;
+    
+    //传输模式
+    Order::TransferMode transferMode;
+
+    //测量时长,单位ms
+    int measureTime;
+    
+    //---------能谱相关指令---------
+    //能谱刷新时间间隔（ms）
+    int spectrumRefreshInterval;
+    //能谱触发阈值
+    int spectrumTriggerThreshold;
+    //能谱死时间(单位:*16ns)
+    int spectrumDeadTime;
+    // 分时能谱区间设置，暂时不考虑（采用FPGA内部默认值），后续如果需要可以添加相关指令
+
+    // 波形触发阈值设置
+    int waveformTriggerThreshold[32];
+} DetParameter;
 #endif // GLOBALSETTINGS_H

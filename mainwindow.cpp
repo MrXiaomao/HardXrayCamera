@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-07 14:51:00
+ * @LastEditTime: 2026-05-19 11:20:29
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -15,11 +15,20 @@
 
 #include "detectorsetting.h"
 #include "commandhelper.h"
+#include "globalsettings.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    measureTimer = new QTimer(this);
+    connect(measureTimer, &QTimer::timeout, this, [=](){
+        if (commandHelper) {
+            commandHelper->stopMeasure();
+            measureTimer->stop();
+            qInfo() << "定时测量已停止";
+        }
+    });
     ui->setupUi(this);
 
     QAction *action = ui->le_savePath->addAction(QIcon(":/resource/open.png"), QLineEdit::TrailingPosition);
@@ -46,9 +55,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotWave->setXRange(0,10000);
 
     ui->plotSpec->setTitle("分时能谱");
-    ui->plotSpec->setXAxisLabel("能量/keV");
+    ui->plotSpec->setXAxisLabel("道址");
     ui->plotSpec->setYAxisLabel("计数");
-    ui->plotSpec->setXRange(0,100);
+    ui->plotSpec->setXRange(1,512);
 
     ui->plotProfile->setTitle("剖面图");
     ui->plotProfile->setXAxisLabel("z轴位置");
@@ -115,6 +124,19 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigDetector2Fault, this, [=](){
         qWarning() << "FPGA板2连接失败";
     });
+
+    connect(commandHelper, &CommandHelper::sigSpectrumData, this,
+            [=](int detectorIndex, int channelNumber, quint32 timeMs, quint32 channelMask,
+                const QVector<double>& channels, const QVector<double>& counts){
+        const QString channelText = channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "未知通道";
+        ui->plotSpec->setTitle(QString("能谱 Det%1 %2 t=%3ms mask=0x%4")
+                                   .arg(detectorIndex)
+                                   .arg(channelText)
+                                   .arg(timeMs)
+                                   .arg(channelMask, 8, 16, QLatin1Char('0')));
+        ui->plotSpec->setData(channels, counts);
+        ui->plotSpec->refreshPlot();
+    });
 }
 
 MainWindow::~MainWindow()
@@ -165,10 +187,54 @@ void MainWindow::on_btn_relayNetClose_clicked()
     commandHelper->disconnectRelay();
 }
 
-
+// 开始测量
 void MainWindow::on_btn_startMeasure_clicked()
 {
-    commandHelper->testSend();
+    DetParameter detPara = {};
+    //触发模式：外触发、软件触发
+    detPara.trigMode = Order::TriggerMode::SoftwareTrigger; //先固定位软件触发
+
+    //能谱模式
+    int mode = ui->cmb_transferMode->currentIndex();
+    if(mode == 0){
+        detPara.transferMode = Order::TransferMode::Spectrum512;
+    } else if(mode == 1){
+        detPara.transferMode = Order::TransferMode::Waveform;
+    } else if(mode == 2){
+        detPara.transferMode = Order::TransferMode::Spectrum16;
+    }
+    
+    //测量时长，ms
+    detPara.measureTime = ui->spb_measureTime->value();
+
+    JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+
+    //能谱相关参数，和 DetectorSetting::loadSettings() 使用同一组配置项
+    detPara.spectrumRefreshInterval = settings->getValueByPath("FPGA/spec_refash_time").toInt();
+    detPara.spectrumTriggerThreshold = settings->getValueByPath("FPGA/threshold").toInt();
+    detPara.spectrumDeadTime = settings->getValueByPath("FPGA/deadTime").toInt();
+
+    //波形触发阈值，CH1~CH32
+    for (int channel = 1; channel <= 32; ++channel) {
+        detPara.waveformTriggerThreshold[channel - 1] =
+            settings->getValueByPath(QString("FPGA/wave/threshold%1").arg(channel), 50).toInt();
+    }
+
+    // 文件名产生：存储路径+炮号+测量时间
+    QString savePath = ui->le_savePath->text();
+    if (savePath.isEmpty()){
+        qWarning() << "请先选择数据保存路径";
+        return;
+    }
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+
+    // 设置存储文件格式
+    commandHelper->setSaveFileFormat(ui->cmb_saveFormat->currentIndex() == 0 ? Binary : Text);
+    commandHelper->setSavePath(savePath);
+    commandHelper->startMeasure(detPara);
+    measureTimer->start(detPara.measureTime);
+    qInfo() << "定时测量已开始，测量时长:" << detPara.measureTime << "ms";
 }
 
 //打开探测器供电电源，通过继电器进行控制探测器的电源

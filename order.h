@@ -8,9 +8,9 @@ class Order
 {
 public:
     enum TransferMode : quint8 {
-        Spectrum512 = 0,
-        Spectrum16 = 3,
-        Waveform = 5
+        Spectrum512 = 0, //512道能谱
+        Waveform = 5, //波形图
+        Spectrum16 = 3, //16道能谱
     };
 
     enum TriggerMode : quint32 {
