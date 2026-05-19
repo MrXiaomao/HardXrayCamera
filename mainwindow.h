@@ -45,6 +45,10 @@ private slots:
 
     void on_bt_powerOff_clicked();
 
+    void on_bt_connectDet_clicked();
+
+    void on_bt_disconnectDet_clicked();
+
 private:
     struct SpectrumEntry {
         int detectorIndex = 0;
@@ -59,7 +63,7 @@ private:
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
     void appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
-                            const QVector<double> &counts);
+                            const QVector<quint32> &counts);
     void ensureSpectrumBinAddresses(int binCount);
     void updateSpecIdSpinBoxRange();
     void refreshSpectrumPlot();

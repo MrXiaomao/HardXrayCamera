@@ -328,7 +328,7 @@ void MainWindow::on_btn_startMeasure_clicked()
     ScopedFileLock lock(settings);
 
     //能谱相关参数，和 DetectorSetting::loadSettings() 使用同一组配置项
-    detPara.spectrumRefreshInterval = settings->getValueByPath("FPGA/spec_refash_time").toInt();
+    detPara.spectrumRefreshInterval = ui->spb_specRefashTime->value();
     detPara.spectrumTriggerThreshold = settings->getValueByPath("FPGA/threshold").toInt();
     detPara.spectrumDeadTime = settings->getValueByPath("FPGA/deadTime").toInt();
 
@@ -364,5 +364,17 @@ void MainWindow::on_bt_powerOn_clicked()
 void MainWindow::on_bt_powerOff_clicked()
 {
     commandHelper->PowerOffRelay();
+}
+
+//连接探测器网络
+void MainWindow::on_bt_connectDet_clicked()
+{
+    commandHelper->connectDetector();
+}
+
+//断开探测器网络
+void MainWindow::on_bt_disconnectDet_clicked()
+{
+    commandHelper->disconnectDetector();
 }
 

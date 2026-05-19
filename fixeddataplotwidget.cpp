@@ -88,6 +88,23 @@ void FixedDataPlotWidget::setData(const QVector<double>& x, const QVector<double
     }
 }
 
+void FixedDataPlotWidget::setData(const QVector<quint32>& x, const QVector<quint32>& y)
+{
+    if (m_plot) {
+        m_xData.resize(x.size());
+        for (int i = 0; i < x.size(); ++i) {
+            m_xData[i] = static_cast<double>(x[i]);
+        }
+
+        m_yData.resize(y.size());
+        for (int i = 0; i < y.size(); ++i) {
+            m_yData[i] = static_cast<double>(y[i]);
+        }
+
+        m_graph->setData(m_xData, m_yData);
+    }
+}
+
 void FixedDataPlotWidget::clearData()
 {
     if (m_plot) {

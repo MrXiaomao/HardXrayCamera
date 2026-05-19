@@ -76,46 +76,40 @@ CommandHelper::CommandHelper(QObject *parent)
     //状态改变
     connect(client_det1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            qInfo() << "FPGA板1连接成功";
-            emit sigAppendMsg("FPGA板1连接成功\n", QtInfoMsg);
+            // qInfo() << "FPGA板1连接成功";
             emit sigDetector1Status(true);
         } else {
-            qWarning() << "FPGA板1断开连接";
-            emit sigAppendMsg("FPGA板1断开连接\n", QtWarningMsg);
+            // qInfo() << "FPGA板1断开连接";
+            emit sigDetector1Status(false);
         }
     });
 
     connect(client_det2, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            qInfo() << "FPGA板2连接成功";
-            emit sigAppendMsg("FPGA板2连接成功\n", QtInfoMsg);
+            // qInfo() << "FPGA板2连接成功";
             emit sigDetector2Status(true);
         } else {
-            qWarning() << "FPGA板2断开连接";
-            emit sigAppendMsg("FPGA板2断开连接\n", QtWarningMsg);
+            // qInfo() << "FPGA板2断开连接";
+            emit sigDetector2Status(false);
         }
     });
 
     connect(client_arm1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            qInfo() << "ARM设备1连接成功";
-            emit sigAppendMsg("ARM设备1连接成功\n", QtInfoMsg);
+            // qInfo() << "ARM设备1连接成功";
             emit sigARM1Status(true);
         } else {
-            qWarning() << "ARM设备1断开连接";
-            emit sigAppendMsg("ARM设备1断开连接\n", QtWarningMsg);
+            // qInfo() << "ARM设备1断开连接";
             emit sigARM1Status(false);
         }
     });
 
     connect(client_arm2, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            qInfo() << "ARM设备2连接成功";
-            emit sigAppendMsg("ARM设备2连接成功\n", QtInfoMsg);
+            // qInfo() << "ARM设备2连接成功";
             emit sigARM2Status(true);
         } else {
-            qWarning() << "ARM设备2断开连接";
-            emit sigAppendMsg("ARM设备2断开连接\n", QtWarningMsg);
+            qInfo() << "ARM设备2断开连接";
             emit sigARM2Status(false);
         }
     });
@@ -515,9 +509,9 @@ bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& pac
         counts.append(readUInt32BE(spectrumData + i * 4));
     }
 
-    qInfo() << "Spectrum packet parsed. Detector:" << detectorIndex
-            << "Channel:" << (channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "Unknown")
-            << "Time(ms):" << timeMs;
+    // qInfo() << "Spectrum packet parsed. Detector:" << detectorIndex
+    //         << "Channel:" << (channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "Unknown")
+    //         << "Time(ms):" << timeMs;
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
     return true;
 }

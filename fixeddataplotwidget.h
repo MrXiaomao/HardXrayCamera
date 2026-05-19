@@ -20,6 +20,7 @@ public:
     void setYAxisLabel(const QString& text);
     void setXRange(double min, double max);
     void setData(const QVector<double>& x, const QVector<double>& y);
+    void setData(const QVector<quint32>& x, const QVector<quint32>& y);
     void clearData();
     void refreshPlot();
 
