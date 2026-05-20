@@ -126,6 +126,31 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
+    m_waveformByChannel.resize(kSpectrumChannelCount);
+
+    waveformPlotTimer = new QTimer(this);
+    waveformPlotTimer->setInterval(200); // 每200ms刷新一次波形
+    connect(waveformPlotTimer, &QTimer::timeout, this, [=]() {
+        const int channel = ui->spb_channel->value();
+        if (channel < 1 || channel > m_waveformByChannel.size()) {
+            return;
+        }
+        const QVector<quint16> &samples = m_waveformByChannel.at(channel - 1);
+        if (samples.isEmpty())
+            return;
+
+        const int n = samples.size();
+        QVector<double> xs(n), ys(n);
+        // 使用默认采样间隔 10us，x 轴单位为微秒
+        for (int i = 0; i < n; ++i) {
+            xs[i] = static_cast<double>(i) * 10.0;
+            ys[i] = static_cast<double>(samples.at(i));
+        }
+        ui->plotWave->setData(xs, ys);
+        ui->plotWave->setTitle(QString("波形图 - 通道 %1").arg(channel));
+        ui->plotWave->refreshPlot();
+    });
+    // waveformPlotTimer starts only when waveform measurement begins.
 
     connect(commandHelper, &CommandHelper::sigSpectrumData, this,
             [=](int detectorIndex, int channelNumber, quint32 timeMs, 
@@ -147,6 +172,15 @@ MainWindow::MainWindow(QWidget *parent)
             return;
         spectrumPlotThrottle.restart();
         refreshSpectrumPlot();
+    });
+
+    connect(commandHelper, &CommandHelper::sigWaveformData, this,
+            [=](int detectorIndex, int channelNumber, quint32 timeUnits,
+                const QVector<quint16>& samples){
+        const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+        if (logicalChannel < 1 || logicalChannel > m_waveformByChannel.size())
+            return;
+        m_waveformByChannel[logicalChannel - 1] = samples; // 覆盖最新一帧
     });
 
     connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
@@ -336,6 +370,12 @@ void MainWindow::on_btn_startMeasure_clicked()
     for (int channel = 1; channel <= 32; ++channel) {
         detPara.waveformTriggerThreshold[channel - 1] =
             settings->getValueByPath(QString("FPGA/wave/threshold%1").arg(channel), 50).toInt();
+    }
+
+    if (detPara.transferMode == Order::TransferMode::Waveform) {
+        waveformPlotTimer->start();
+    } else {
+        waveformPlotTimer->stop();
     }
 
     // 文件名产生：存储路径+炮号+测量时间

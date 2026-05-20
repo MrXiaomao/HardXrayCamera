@@ -83,8 +83,14 @@ private:
     void sendCommand(TcpClient* client, const QByteArray& command,
                      const QString& name, const QString& parameter = QString());
 
-    void processDetectorData(int detectorIndex, QByteArray& buffer, const QByteArray& data);
+    void processSpec512Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
+    void processWaveformData(int detectorIndex, QByteArray& buffer, const QByteArray& data);
     bool parseSpectrumPacket(int detectorIndex, const QByteArray& packet);
+
+signals:
+    // 波形数据: timeUnits 单位为 500us, samples 为 1024 个采样点
+    void sigWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
+                         const QVector<quint16>& samples);
 
 signals:
     //更新界面日志

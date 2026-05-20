@@ -16,6 +16,11 @@ constexpr int SpectrumChannelCount = 512;
 const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb 00 00");
 const QByteArray SpectrumTail = QByteArray::fromHex("cc dd 00 00");
 
+// Waveform packet constants
+constexpr int WaveformPacketSize = 520;
+const QByteArray WaveformHeader = QByteArray::fromHex("aa bb");
+const QByteArray WaveformTail = QByteArray::fromHex("cc dd");
+
 QString transferModeText(Order::TransferMode mode)
 {
     switch (mode) {
@@ -51,7 +56,14 @@ quint32 readUInt32BE(const char* data)
         | static_cast<quint32>(p[3]);
 }
 
-int spectrumChannelFromMask(quint32 channelMask)
+quint16 readUInt16BE(const char* data)
+{
+    const uchar* p = reinterpret_cast<const uchar*>(data);
+    return (static_cast<quint16>(p[0]) << 8) | static_cast<quint16>(p[1]);
+}
+
+
+int channelNumberFromMask(quint32 channelMask)
 {
     for (int bit = 0; bit < 16; ++bit) {
         if (channelMask & (1u << bit))
@@ -59,7 +71,8 @@ int spectrumChannelFromMask(quint32 channelMask)
     }
     return 0;
 }
-}
+
+} // end anonymous namespace
 
 CommandHelper::CommandHelper(QObject *parent)
     : QObject{parent}
@@ -245,6 +258,8 @@ void CommandHelper::initFPGA2Commands()
 
 void CommandHelper::startMeasure(DetParameter detPara)
 {
+    m_det1Buffer.clear();
+    m_det2Buffer.clear();
     m_detPara = detPara;
     //分为波形模式和能谱模式发送指令
     if(m_detPara.transferMode == Order::TransferMode::Waveform){// 发送波形模式相关指令
@@ -288,10 +303,10 @@ void CommandHelper::startMeasure(DetParameter detPara)
         }
 
         // 发送软件触发指令，开始测量
-        sendCommand(client_det1, Order::controlWaveform(Order::TriggerMode::SoftwareTrigger),
-                    "波形测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::SoftwareTrigger)));
-        sendCommand(client_det2, Order::controlWaveform(Order::TriggerMode::SoftwareTrigger),
-                    "波形测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+        sendCommand(client_det1, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
+                    "波形测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::HardwareTrigger)));
+        sendCommand(client_det2, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
+                    "波形测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::HardwareTrigger)));
 
         qInfo() << "Measurement started with parameters:" << m_detPara.measureTime 
                 << "ms, TransferMode:" << m_detPara.transferMode;
@@ -442,10 +457,15 @@ void CommandHelper::handleDet1Data(const QByteArray &binaryData)
     else {
         qWarning() << "Failed to write data to file:" << mfileNameDet1;
     }
-    // 处理FPGA板1的数据
-    processDetectorData(1, m_det1Buffer, binaryData);
+    // 处理FPGA板1的数据，根据当前传输模式选择解析器
+    if (m_detPara.transferMode == Order::TransferMode::Waveform) {
+        processWaveformData(1, m_det1Buffer, binaryData);
+    } else {
+        processSpec512Data(1, m_det1Buffer, binaryData);
+    }
 }
 
+// 处理FPGA板2的数据
 void CommandHelper::handleDet2Data(const QByteArray &binaryData)
 {
     //存储数据到mfileNameDet2文件中。
@@ -457,11 +477,16 @@ void CommandHelper::handleDet2Data(const QByteArray &binaryData)
     else {
         qWarning() << "Failed to write data to file:" << mfileNameDet2;
     }
-    // 处理FPGA板2的数据
-    processDetectorData(2, m_det2Buffer, binaryData);
+    // 处理FPGA板2的数据，根据当前传输模式选择解析器
+    if (m_detPara.transferMode == Order::TransferMode::Waveform) {
+        // processWaveformData(2, m_det2Buffer, binaryData);
+    } else {
+        processSpec512Data(2, m_det2Buffer, binaryData);
+    }
 }
 
-void CommandHelper::processDetectorData(int detectorIndex, QByteArray& buffer, const QByteArray& data)
+// 处理512道能谱数据，按照协议解析出时间戳、通道号和计数，并通过信号发送给界面更新
+void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, const QByteArray& data)
 {
     buffer.append(data);
 
@@ -499,7 +524,7 @@ bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& pac
 
     const quint32 timeMs = readUInt32BE(packet.constData() + 4);
     const quint32 channelMask = readUInt32BE(packet.constData() + 8);
-    const int channelNumber = spectrumChannelFromMask(channelMask);
+    const int channelNumber = channelNumberFromMask(channelMask);
 
     QVector<quint32> counts;
     counts.reserve(SpectrumChannelCount);
@@ -514,6 +539,48 @@ bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& pac
     //         << "Time(ms):" << timeMs;
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
     return true;
+}
+
+void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, const QByteArray& data)
+{
+    buffer.append(data);
+
+    while (buffer.size() >= WaveformHeader.size()) {
+        const int headerIndex = buffer.indexOf(WaveformHeader);
+        if (headerIndex < 0) {
+            buffer.clear();
+            return;
+        }
+
+        if (headerIndex > 0)
+            buffer.remove(0, headerIndex);
+
+        if (buffer.size() < WaveformPacketSize)
+            return;
+
+        const QByteArray packet = buffer.left(WaveformPacketSize);
+        if (packet.mid(WaveformPacketSize - WaveformTail.size(), WaveformTail.size()) != WaveformTail) {
+            buffer.remove(0, WaveformHeader.size());
+            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex;
+            continue;
+        }
+
+        // parse
+        const char* p = packet.constData();
+        const quint32 timeUnits = readUInt32BE(p + WaveformHeader.size());
+        const quint32 channelMask = readUInt32BE(p + WaveformHeader.size() + 4);
+        const int channelNumber = channelNumberFromMask(channelMask);
+
+        QVector<quint16> samples;
+        samples.reserve(254);
+        const char* sampleData = p + WaveformHeader.size() + 8;
+        for (int i = 0; i < 254; ++i) {
+            samples.append(readUInt16BE(sampleData + i * 2));
+        }
+
+        emit sigWaveformData(detectorIndex, channelNumber, timeUnits, samples);
+        buffer.remove(0, WaveformPacketSize);
+    }
 }
 
 void CommandHelper::handleARM1Data(const QByteArray &binaryData)

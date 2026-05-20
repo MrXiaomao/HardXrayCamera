@@ -76,5 +76,8 @@ private:
     // 按逻辑通道(1~32)存储：探测器1为1~16，探测器2为17~32
     QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
     QVector<quint32> m_spectrumBinAddresses; // 统一道址 1..N，绘图时复用
+    // 波形按逻辑通道存储的最新一帧数据（覆盖式存储）
+    QVector<QVector<quint16>> m_waveformByChannel;
+    QTimer* waveformPlotTimer = nullptr;
 };
 #endif // MAINWINDOW_H
