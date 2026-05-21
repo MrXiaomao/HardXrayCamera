@@ -111,6 +111,8 @@ signals:
     void sigARM2Status(bool on);
     void sigARM1Fault();//故障，一般指网络不通
     void sigARM2Fault();
+    void sigArm1SensorData(float, float, float);//ARM1传感器数据
+    void sigArm2SensorData(float, float, float);//ARM2传感器数据
 
     // 能谱数据
     void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
@@ -153,6 +155,8 @@ private:
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
+
+    bool measure_started = false;
 };
 
 #endif // COMMANDHELPER_H

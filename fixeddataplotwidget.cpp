@@ -117,6 +117,9 @@ void FixedDataPlotWidget::clearData()
 void FixedDataPlotWidget::refreshPlot()
 {
     if (m_plot) {
-        m_plot->replot();
+        m_plot->xAxis->rescale(true);
+        m_plot->yAxis->rescale(true);
+        //m_plot->yAxis->setRange(0, m_yMaxData * 1.2);
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }

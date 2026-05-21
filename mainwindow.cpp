@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
@@ -12,6 +12,9 @@
 #include <QAction>
 #include <QTextCharFormat>
 #include <QTextCursor>
+#include <QTimer>
+#include <QDir>
+#include <QMessageBox>
 
 #include "detectorsetting.h"
 #include "commandhelper.h"
@@ -50,7 +53,7 @@ MainWindow::MainWindow(QWidget *parent)
     qRegisterMetaType<QtMsgType>("QtMsgType");
     
     ui->plotWave->setTitle("波形");
-    ui->plotWave->setXAxisLabel("时间(us)");
+    ui->plotWave->setXAxisLabel("时间(ns)");
     ui->plotWave->setYAxisLabel("幅值");
     ui->plotWave->setXRange(0,10000);
 
@@ -67,17 +70,17 @@ MainWindow::MainWindow(QWidget *parent)
     // ui->plotVoltage->setTitle("电压曲线");
     ui->plotVoltage->setXAxisLabel("时间");
     ui->plotVoltage->setYAxisLabel("电压 (V)");
-    ui->plotVoltage->setTimeWindow(300);
+    ui->plotVoltage->setTimeWindow(180);
 
     // ui->plotCurrent->setTitle("电流曲线");
     ui->plotCurrent->setXAxisLabel("时间");
     ui->plotCurrent->setYAxisLabel("电流 (A)");
-    ui->plotCurrent->setTimeWindow(300);
+    ui->plotCurrent->setTimeWindow(180);
 
     // ui->plotTemp->setTitle("温度曲线");
     ui->plotTemp->setXAxisLabel("时间");
     ui->plotTemp->setYAxisLabel("温度 (℃)");
-    ui->plotTemp->setTimeWindow(300);
+    ui->plotTemp->setTimeWindow(180);
 
     commandHelper = new CommandHelper();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
@@ -96,33 +99,96 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, [=](bool on){
         if (on){
             qInfo() << "继电器控制的电源状态: 已开启";
+            replayPowerOn = true;
         } else {
             qInfo() << "继电器控制的电源状态: 已关闭";
+            replayPowerOn = false;
+
+            detectOnline[0] = false;
+            detectOnline[1] = false;
+            armSensorOnline[0] = false;
+            armSensorOnline[1] = false;
         }
     });
 
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, [=](bool on){
         if (on){
             qInfo() << "FPGA板1状态: 已连接";
+            detectOnline[0] = true;
         } else {
             qInfo() << "FPGA板1状态: 已断开";
+            detectOnline[0] = false;
         }
     });
 
     connect(commandHelper, &CommandHelper::sigDetector2Status, this, [=](bool on){
         if (on){
             qInfo() << "FPGA板2状态: 已连接";
+            detectOnline[1] = true;
         } else {
             qInfo() << "FPGA板2状态: 已断开";
+            detectOnline[1] = false;
         }
     });
 
     connect(commandHelper, &CommandHelper::sigDetector1Fault, this, [=](){
         qWarning() << "FPGA板1连接失败";
+        detectOnline[0] = false;
     });
 
     connect(commandHelper, &CommandHelper::sigDetector2Fault, this, [=](){
         qWarning() << "FPGA板2连接失败";
+        detectOnline[1] = false;
+    });
+
+    connect(commandHelper, &CommandHelper::sigARM1Status, this, [=](bool on){
+        if (on){
+            qInfo() << ("ARM传感器设备1状态：已连接");
+            armSensorOnline[0] = true;
+        } else {
+            qInfo() << ("ARM传感器设备1状态：已断开");
+            armSensorOnline[0] = false;
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigARM2Status, this, [=](bool on){
+        if (on){
+            qInfo() << ("ARM传感器设备2状态：已连接");
+            armSensorOnline[1] = true;
+        } else {
+            qInfo() << ("ARM传感器设备2状态：已断开");
+            armSensorOnline[1] = false;
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigArm1SensorData, this, [=](float temp, float voltage, float current){
+        ui->plotTemp->appendPoint(0, temp);
+        ui->plotVoltage->appendPoint(0, voltage);
+        ui->plotCurrent->appendPoint(0, current);
+
+        ui->plotTemp->refreshPlot();
+        ui->plotVoltage->refreshPlot();
+        ui->plotCurrent->refreshPlot();
+
+        if (temp>ui->doubleSpinBox_temp->value() || voltage>ui->doubleSpinBox_voltage->value() || current>ui->doubleSpinBox_current->value()){
+            // 超出阈值，切断电源
+            if (detectOnline[0]){
+                commandHelper->PowerOffRelay();
+            }
+        }
+    });
+
+    connect(commandHelper, &CommandHelper::sigArm2SensorData, this, [=](float temp, float voltage, float current){
+        ui->plotTemp->appendPoint(0, temp);
+        ui->plotVoltage->appendPoint(0, voltage);
+        ui->plotCurrent->appendPoint(0, current);
+
+        if (temp>ui->doubleSpinBox_temp->value() || voltage>ui->doubleSpinBox_voltage->value() || current>ui->doubleSpinBox_current->value()){
+            // 超出阈值，切断电源
+            if (detectOnline[1]){
+                commandHelper->PowerOffRelay();
+            }
+        }
     });
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
@@ -141,9 +207,9 @@ MainWindow::MainWindow(QWidget *parent)
 
         const int n = samples.size();
         QVector<double> xs(n), ys(n);
-        // 使用默认采样间隔 10us，x 轴单位为微秒
+        // 使用默认采样间隔 16ns，x 轴单位为微秒
         for (int i = 0; i < n; ++i) {
-            xs[i] = static_cast<double>(i) * 10.0;
+            xs[i] = static_cast<double>(i) * 16.0;
             ys[i] = static_cast<double>(samples.at(i));
         }
         ui->plotWave->setData(xs, ys);
@@ -170,9 +236,10 @@ MainWindow::MainWindow(QWidget *parent)
 
         if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
             return;
+
         spectrumPlotThrottle.restart();
         refreshSpectrumPlot();
-    });
+    }, Qt::QueuedConnection/*子线程转到主线程来执行*/);
 
     connect(commandHelper, &CommandHelper::sigWaveformData, this,
             [=](int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -181,7 +248,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (logicalChannel < 1 || logicalChannel > m_waveformByChannel.size())
             return;
         m_waveformByChannel[logicalChannel - 1] = samples; // 覆盖最新一帧
-    });
+    }, Qt::QueuedConnection/*子线程转到主线程来执行*/);
 
     connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
         updateSpecIdSpinBoxRange();
@@ -192,6 +259,16 @@ MainWindow::MainWindow(QWidget *parent)
     });
     ui->spb_specID->setMinimum(0);
     updateSpecIdSpinBoxRange();
+
+    sysTimer = new QTimer(this);
+    sysTimer->setInterval(1000);
+    connect(sysTimer, &QTimer::timeout, this, &MainWindow::onSysTimerTimeout);
+    sysTimer->start();
+
+    // 开机自动最大化窗口
+    QTimer::singleShot(0, this, [=]{
+        this->showMaximized();
+    });
 }
 
 MainWindow::~MainWindow()
@@ -338,6 +415,8 @@ void MainWindow::refreshSpectrumPlot()
 // 开始测量
 void MainWindow::on_btn_startMeasure_clicked()
 {
+    ui->plotWave->clearData();
+    ui->plotWave->refreshPlot();
     clearSpectrumData();
     spectrumPlotThrottle.invalidate();
 
@@ -381,14 +460,25 @@ void MainWindow::on_btn_startMeasure_clicked()
     // 文件名产生：存储路径+炮号+测量时间
     QString savePath = ui->le_savePath->text();
     if (savePath.isEmpty()){
-        qWarning() << "请先选择数据保存路径";
+        QMessageBox::information(this, "请先选择数据保存路径", "提示");
         return;
     }
+
+    QDir dir;
+    if (!dir.exists(savePath))
+    {
+        if (!dir.mkpath(savePath))
+        {
+            QMessageBox::information(this, "请先选择数据保存路径", "提示");
+            return ;
+        }
+    }
+
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
 
     // 设置存储文件格式
     commandHelper->setSaveFileFormat(ui->cmb_saveFormat->currentIndex() == 0 ? Binary : Text);
-    commandHelper->setSavePath(savePath);
+    commandHelper->setSavePath(QDir::toNativeSeparators(QFileInfo(savePath).absoluteFilePath()));
     commandHelper->startMeasure(detPara);
     measureTimer->start(detPara.measureTime);
     qInfo() << "定时测量已开始，测量时长:" << detPara.measureTime << "ms";
@@ -409,12 +499,79 @@ void MainWindow::on_bt_powerOff_clicked()
 //连接探测器网络
 void MainWindow::on_bt_connectDet_clicked()
 {
+    commandHelper->connectARM();
     commandHelper->connectDetector();
 }
 
 //断开探测器网络
 void MainWindow::on_bt_disconnectDet_clicked()
 {
+    commandHelper->disconnectARM();
     commandHelper->disconnectDetector();
+}
+
+
+void MainWindow::on_pushButton_clearSysLog_clicked()
+{
+    ui->plainTextEdit_log->clear();
+}
+
+
+void MainWindow::on_pushButton_clearNetLog_clicked()
+{
+    ui->tbLog_UDP->clear();
+}
+
+using namespace std;
+
+// 随机数生成器（全局复用，避免重复初始化）
+static mt19937 gen(chrono::steady_clock::now().time_since_epoch().count());
+
+// 生成带平滑波动的数值
+double generateValue(double base, double maxDelta, double& lastValue) {
+    // 生成小幅度正态分布波动（波动幅度为最大范围的1/5，模拟连续变化）
+    normal_distribution<double> dist(0, maxDelta / 5.0);
+    double delta = dist(gen);
+
+    // 限制单次波动幅度不超过最大范围的1/3，避免跳变
+    delta = max(-maxDelta/3, min(delta, maxDelta/3));
+
+    // 计算新值并限制在允许范围内
+    double newValue = lastValue + delta;
+    newValue = max(base - maxDelta, min(newValue, base + maxDelta));
+
+    // 更新上一次值
+    lastValue = newValue;
+    return newValue;
+}
+
+void MainWindow::onSysTimerTimeout()
+{
+    // 基准值和波动范围
+    const double baseTemp = 57.0;
+    const double tempDelta = 1.0;
+    const double baseVolt = 5.0;
+    const double voltDelta = 0.02;
+    const double baseCurr = 1.1;
+    const double currDelta = 0.05;
+
+    // 上一次值，初始为基准值
+    static double lastTemp = baseTemp;
+    static double lastVolt = baseVolt;
+    static double lastCurr = baseCurr;
+
+    double temp = generateValue(baseTemp, tempDelta, lastTemp);
+    double volt = generateValue(baseVolt, voltDelta, lastVolt);
+    double curr = generateValue(baseCurr, currDelta, lastCurr);
+
+    if (armSensorOnline[0])
+        commandHelper->sigArm1SensorData(temp, volt, curr);
+}
+
+void MainWindow::on_btn_stopMeasure_clicked()
+{
+    commandHelper->stopMeasure();
+    measureTimer->stop();
+    qInfo() << "手动停止测量";
 }
 

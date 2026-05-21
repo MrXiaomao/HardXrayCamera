@@ -121,6 +121,8 @@ void TcpClientThread::processData()
 {
     if (!m_socket)
         return;
+
+    // 这里是主线程
     const QByteArray chunk = m_socket->readAll();
     if (!chunk.isEmpty())
         emit dataReceived(chunk);
@@ -152,7 +154,7 @@ TcpClient::TcpClient(QObject *parent)
     connect(this, &TcpClient::startSignal, m_worker, &TcpClientThread::start, Qt::QueuedConnection);
     connect(this, &TcpClient::stopSignal, m_worker, &TcpClientThread::stop, Qt::QueuedConnection);
     connect(this, &TcpClient::sendDataSignal, m_worker, &TcpClientThread::sendData, Qt::QueuedConnection);
-    connect(m_worker, &TcpClientThread::dataReceived, this, &TcpClient::dataReceived);
+    connect(m_worker, &TcpClientThread::dataReceived, this, &TcpClient::dataReceived, Qt::DirectConnection);
     connect(m_worker, &TcpClientThread::connectionStatusChanged, this, [this](bool c) {
         m_connected = c;
         emit sigconnectStatusChanged(c);

@@ -36,6 +36,7 @@ private:
     QCustomPlot *m_plot;
     QVector<double> m_xData;
     QVector<double> m_yData;
+    double m_yMaxData = 0;
     QCPTextElement* m_title = nullptr;
     QCPGraph* m_graph = nullptr;
     int m_timeWindowSeconds = 300;

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
@@ -33,6 +33,8 @@ signals:
 
 private slots:
     void on_action_setting_triggered();
+    void onSysTimerTimeout();
+
     void slotAppendMsg(const QString &msg, QtMsgType msgType);
 
     void on_btn_relayNetOpen_clicked();
@@ -48,6 +50,12 @@ private slots:
     void on_bt_connectDet_clicked();
 
     void on_bt_disconnectDet_clicked();
+
+    void on_pushButton_clearSysLog_clicked();
+
+    void on_pushButton_clearNetLog_clicked();
+
+    void on_btn_stopMeasure_clicked();
 
 private:
     struct SpectrumEntry {
@@ -79,5 +87,15 @@ private:
     // 波形按逻辑通道存储的最新一帧数据（覆盖式存储）
     QVector<QVector<quint16>> m_waveformByChannel;
     QTimer* waveformPlotTimer = nullptr;
+
+    // 继电器电源开关状态
+    bool replayPowerOn = false;
+    // 探测器在线状态
+    bool detectOnline[2] = {false, false};
+
+    //系统时钟，目前用来随机产生arm传感器数据
+    QTimer* sysTimer = nullptr;
+    bool armSensorOnline[2] = {false, false};
+
 };
 #endif // MAINWINDOW_H

@@ -269,7 +269,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QDoubleSpinBox" name="doubleSpinBox_3">
+               <widget class="QDoubleSpinBox" name="doubleSpinBox_temp">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -304,7 +304,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QDoubleSpinBox" name="doubleSpinBox">
+               <widget class="QDoubleSpinBox" name="doubleSpinBox_voltage">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -336,7 +336,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QDoubleSpinBox" name="doubleSpinBox_2">
+               <widget class="QDoubleSpinBox" name="doubleSpinBox_current">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -647,6 +647,9 @@
                 <height>0</height>
                </size>
               </property>
+              <property name="text">
+               <string>./数据保存路径</string>
+              </property>
              </widget>
             </item>
             <item row="5" column="0">
@@ -862,10 +865,23 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btn_startMeasure">
-         <property name="text">
-          <string>开始测量</string>
-         </property>
+        <widget class="QWidget" name="widget_3" native="true">
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QPushButton" name="btn_startMeasure">
+            <property name="text">
+             <string>开始测量</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btn_stopMeasure">
+            <property name="text">
+             <string>停止测量</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
        <item>
@@ -882,7 +898,7 @@
             <widget class="QPlainTextEdit" name="plainTextEdit_log"/>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_8">
+            <widget class="QPushButton" name="pushButton_clearSysLog">
              <property name="text">
               <string>清空日志</string>
              </property>
@@ -899,7 +915,7 @@
             <widget class="QTextBrowser" name="tbLog_UDP"/>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_9">
+            <widget class="QPushButton" name="pushButton_clearNetLog">
              <property name="text">
               <string>清空日志</string>
              </property>
@@ -920,7 +936,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>21</height>
+     <height>17</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

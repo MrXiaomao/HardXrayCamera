@@ -122,7 +122,7 @@ CommandHelper::CommandHelper(QObject *parent)
             // qInfo() << "ARM设备2连接成功";
             emit sigARM2Status(true);
         } else {
-            qInfo() << "ARM设备2断开连接";
+            // qInfo() << "ARM设备2断开连接";
             emit sigARM2Status(false);
         }
     });
@@ -140,8 +140,8 @@ CommandHelper::CommandHelper(QObject *parent)
     });
 
     connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData);
-    connect(client_det1, &TcpClient::dataReceived, this, &CommandHelper::handleDet1Data);
-    connect(client_det2, &TcpClient::dataReceived, this, &CommandHelper::handleDet2Data);
+    connect(client_det1, &TcpClient::dataReceived, this, &CommandHelper::handleDet1Data, Qt::DirectConnection);
+    connect(client_det2, &TcpClient::dataReceived, this, &CommandHelper::handleDet2Data, Qt::DirectConnection);
     connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data);
     connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data);
     
@@ -189,8 +189,19 @@ void CommandHelper::disconnectDetector()
 void CommandHelper::connectARM()
 {
     loadIPConfig(); //确保使用最新的网络配置
-    client_arm1->connectToHost(ip_arm1, port_arm1);
-    client_arm2->connectToHost(ip_arm2, port_arm2);
+
+    if (ip_arm1 == "192.168.0.58" && port_arm1 == 1024)
+        client_arm1->sigconnectStatusChanged(true);
+    else
+        client_arm1->sigconnectStatusChanged(false);
+
+    if (ip_arm1 == "192.168.0.59" && port_arm1 == 1024)
+        client_arm2->sigconnectStatusChanged(true);
+    else
+        client_arm2->sigconnectStatusChanged(false);
+
+    //client_arm1->connectToHost(ip_arm1, port_arm1);
+    //client_arm2->connectToHost(ip_arm2, port_arm2);
 }
 
 void CommandHelper::disconnectARM()
@@ -354,6 +365,8 @@ void CommandHelper::startMeasure(DetParameter detPara)
                 << "SpectrumTriggerThreshold:" << m_detPara.spectrumTriggerThreshold
                 << "SpectrumDeadTime(ns):" << m_detPara.spectrumDeadTime;
     }
+
+    measure_started = true;
     
     // 文件名格式：保存路径/DetX_时间戳_测量时长.扩展名
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
@@ -385,6 +398,8 @@ void CommandHelper::stopMeasure()
         sendCommand(client_det2, Order::controlSpectrum(Order::Stop),
                     "能谱测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::Stop)));
     }
+
+    measure_started = false;
     qDebug() << "Measurement stopped.";
 }
 
@@ -448,6 +463,11 @@ void CommandHelper::handleRelayData(const QByteArray &binaryData)
 
 void CommandHelper::handleDet1Data(const QByteArray &binaryData)
 {
+    if (!measure_started){
+        // 测量未开始不应该进入到这里，可能是上次未点击停止测量
+        return ;
+    }
+
     //存储数据到mfileNameDet1文件中。
     QFile file(mfileNameDet1);
     if (file.open(QIODevice::WriteOnly | QIODevice::Append)) {
@@ -468,6 +488,12 @@ void CommandHelper::handleDet1Data(const QByteArray &binaryData)
 // 处理FPGA板2的数据
 void CommandHelper::handleDet2Data(const QByteArray &binaryData)
 {
+    if (!measure_started){
+        // 测量未开始不应该进入到这里，可能是上次未点击停止测量
+        stopMeasure();
+        return ;
+    }
+
     //存储数据到mfileNameDet2文件中。
     QFile file(mfileNameDet2);
     if (file.open(QIODevice::WriteOnly | QIODevice::Append)) {
@@ -479,7 +505,7 @@ void CommandHelper::handleDet2Data(const QByteArray &binaryData)
     }
     // 处理FPGA板2的数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Waveform) {
-        // processWaveformData(2, m_det2Buffer, binaryData);
+        processWaveformData(2, m_det2Buffer, binaryData);
     } else {
         processSpec512Data(2, m_det2Buffer, binaryData);
     }
@@ -505,6 +531,7 @@ void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, co
 
         const QByteArray packet = buffer.left(SpectrumPacketSize);
         if (packet.mid(SpectrumPacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
+            // 包尾不对，继续寻找下一个包头
             buffer.remove(0, SpectrumHeader.size());
             qWarning() << "Invalid spectrum packet tail from detector" << detectorIndex;
             continue;
@@ -561,7 +588,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
         const QByteArray packet = buffer.left(WaveformPacketSize);
         if (packet.mid(WaveformPacketSize - WaveformTail.size(), WaveformTail.size()) != WaveformTail) {
             buffer.remove(0, WaveformHeader.size());
-            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex;
+            //qWarning() << "Invalid waveform packet tail from detector" << detectorIndex;
             continue;
         }
 

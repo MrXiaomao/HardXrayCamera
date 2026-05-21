@@ -100,6 +100,8 @@ void TrendPlotWidget::appendPoint(double x, double y)
     m_graph->addData(now, y);
     m_graph->data()->removeBefore(now - m_timeWindowSeconds);
     m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
+
+    m_yMaxData = std::max<double>(m_yMaxData, y);
 }
 
 void TrendPlotWidget::clearData()
@@ -116,6 +118,8 @@ void TrendPlotWidget::refreshPlot()
 {
     if(m_plot)
     {
-        m_plot->replot();
+        m_plot->yAxis->rescale(false);
+        m_plot->yAxis->setRange(0, m_yMaxData * 1.2);
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
