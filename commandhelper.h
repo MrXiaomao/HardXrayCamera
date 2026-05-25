@@ -9,6 +9,8 @@
 #define COMMANDHELPER_H
 
 #include <QObject>
+#include <QMutex>
+#include <QMutexLocker>
 #include "tcpclient.h"
 #include "globalsettings.h"
 struct CommandItem
@@ -30,6 +32,7 @@ class CommandHelper : public QObject
     Q_OBJECT
 public:
     explicit CommandHelper(QObject *parent = nullptr);
+    ~CommandHelper() override;
 
     void testSend();
     
@@ -59,9 +62,17 @@ public:
     void stopMeasure();
     
     // 文件存储格式
-    void setSaveFileFormat(saveFileFormat format) { mfileFormat = format; }
+    void setSaveFileFormat(saveFileFormat format)
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        mfileFormat = format;
+    }
 
-    void setSavePath(const QString& path) { mSavePath = path; }
+    void setSavePath(const QString& path)
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        mSavePath = path;
+    }
 
 private:
     // 初始化常用指令
@@ -157,6 +168,14 @@ private:
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
 
     bool measure_started = false;
+
+    QFile m_det1File;
+    QFile m_det2File;
+
+    mutable QMutex m_measurementMutex;
+
+    void closeMeasurementFiles();
+    void closeMeasurementFilesLocked();
 };
 
 #endif // COMMANDHELPER_H
