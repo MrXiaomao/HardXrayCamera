@@ -75,6 +75,11 @@ private:
     void ensureSpectrumBinAddresses(int binCount);
     void updateSpecIdSpinBoxRange();
     void refreshSpectrumPlot();
+    void refreshWaveformPlot();
+    void resetWaveformCounters();
+    void resetSpectrumSequenceTracking();
+    void printWaveformCollectionSummary() const;
+    void printSpectrumSequenceSummary() const;
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
@@ -84,8 +89,17 @@ private:
     // 按逻辑通道(1~32)存储：探测器1为1~16，探测器2为17~32
     QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
     QVector<quint32> m_spectrumBinAddresses; // 统一道址 1..N，绘图时复用
+    QVector<QVector<quint32>> m_spectrumSequenceNumbersByChannel;
+    QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
+    QVector<quint32> m_lastSpectrumSequenceByChannel;
+    QVector<bool> m_hasSpectrumSequenceByChannel;
     // 波形按逻辑通道存储的最新一帧数据（覆盖式存储）
     QVector<QVector<quint16>> m_waveformByChannel;
+    QVector<int> m_waveformCountByChannel;
+    QVector<QVector<quint32>> m_waveformSequenceNumbersByChannel;
+    QVector<QVector<quint32>> m_missingWaveformNumbersByChannel;
+    QVector<quint32> m_lastWaveformSequenceByChannel;
+    QVector<bool> m_hasWaveformSequenceByChannel;
     QTimer* waveformPlotTimer = nullptr;
 
     // 继电器电源开关状态

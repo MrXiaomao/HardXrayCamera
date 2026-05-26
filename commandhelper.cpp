@@ -359,11 +359,11 @@ void CommandHelper::startMeasure(DetParameter detPara)
         sendCommand(client_det2, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
                     "波形测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::HardwareTrigger)));
 
-        qInfo() << "Measurement started with parameters:" << measurement.measureTime 
+        qDebug() << "Measurement started with parameters:" << measurement.measureTime 
                 << "ms, TransferMode:" << measurement.transferMode;
         //打印触发阈值，通道号和对应的阈值，一行打印两个通道的阈值
         for (int channel = 0; channel < 32; channel += 2) {
-            qInfo() << QString("Threshold: CH%1=%2, CH%3=%4")
+            qDebug() << QString("Threshold: CH%1=%2, CH%3=%4")
                 .arg(channel + 1)
                 .arg(measurement.waveformTriggerThreshold[channel])
                 .arg(channel + 2)
@@ -642,7 +642,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
             const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
             const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2);
             const int channelNumber = channelNumberFromMask(channelMask);
-            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+            qDebug() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
         }
 

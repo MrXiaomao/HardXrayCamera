@@ -15,6 +15,7 @@
 #include <QTimer>
 #include <QDir>
 #include <QMessageBox>
+#include <algorithm>
 
 #include "detectorsetting.h"
 #include "commandhelper.h"
@@ -27,7 +28,10 @@ MainWindow::MainWindow(QWidget *parent)
     measureTimer = new QTimer(this);
     connect(measureTimer, &QTimer::timeout, this, [=](){
         if (commandHelper) {
+            waveformPlotTimer->stop();
             commandHelper->stopMeasure();
+            printWaveformCollectionSummary();
+            printSpectrumSequenceSummary();
             measureTimer->stop();
             qInfo() << "定时测量已停止";
         }
@@ -192,29 +196,21 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
+    m_spectrumSequenceNumbersByChannel.resize(kSpectrumChannelCount);
+    m_missingSpectrumNumbersByChannel.resize(kSpectrumChannelCount);
+    m_lastSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
+    m_hasSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
     m_waveformByChannel.resize(kSpectrumChannelCount);
+    m_waveformCountByChannel.resize(kSpectrumChannelCount);
+    m_waveformSequenceNumbersByChannel.resize(kSpectrumChannelCount);
+    m_missingWaveformNumbersByChannel.resize(kSpectrumChannelCount);
+    m_lastWaveformSequenceByChannel.resize(kSpectrumChannelCount);
+    m_hasWaveformSequenceByChannel.resize(kSpectrumChannelCount);
 
     waveformPlotTimer = new QTimer(this);
     waveformPlotTimer->setInterval(200); // 每200ms刷新一次波形
     connect(waveformPlotTimer, &QTimer::timeout, this, [=]() {
-        const int channel = ui->spb_channel->value();
-        if (channel < 1 || channel > m_waveformByChannel.size()) {
-            return;
-        }
-        const QVector<quint16> &samples = m_waveformByChannel.at(channel - 1);
-        if (samples.isEmpty())
-            return;
-
-        const int n = samples.size();
-        QVector<double> xs(n), ys(n);
-        // 使用默认采样间隔 16ns，x 轴单位为微秒
-        for (int i = 0; i < n; ++i) {
-            xs[i] = static_cast<double>(i) * 16.0;
-            ys[i] = static_cast<double>(samples.at(i));
-        }
-        ui->plotWave->setData(xs, ys);
-        ui->plotWave->setTitle(QString("波形图 - 通道 %1").arg(channel));
-        ui->plotWave->refreshPlot();
+        refreshWaveformPlot();
     });
     // waveformPlotTimer starts only when waveform measurement begins.
 
@@ -222,7 +218,25 @@ MainWindow::MainWindow(QWidget *parent)
             [=](int detectorIndex, int channelNumber, quint32 timeMs, 
                 const QVector<quint32>& counts){
         const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+        if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
+            return;
+
+        const int channelIndex = logicalChannel - 1;
         appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+
+        const quint32 spectrumSequence = timeMs;
+        m_spectrumSequenceNumbersByChannel[channelIndex].append(spectrumSequence);
+        if (!m_hasSpectrumSequenceByChannel[channelIndex]) {
+            m_hasSpectrumSequenceByChannel[channelIndex] = true;
+            m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
+        } else if (spectrumSequence > m_lastSpectrumSequenceByChannel[channelIndex]) {
+            for (quint32 missingSequence = m_lastSpectrumSequenceByChannel[channelIndex] + 1;
+                 missingSequence < spectrumSequence;
+                 ++missingSequence) {
+                m_missingSpectrumNumbersByChannel[channelIndex].append(missingSequence);
+            }
+            m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
+        }
 
         const int currentChannel = ui->spb_channel->value();
         if (logicalChannel != currentChannel)
@@ -247,12 +261,32 @@ MainWindow::MainWindow(QWidget *parent)
         const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
         if (logicalChannel < 1 || logicalChannel > m_waveformByChannel.size())
             return;
-        m_waveformByChannel[logicalChannel - 1] = samples; // 覆盖最新一帧
+        const int channelIndex = logicalChannel - 1;
+        m_waveformByChannel[channelIndex] = samples; // 覆盖最新一帧
+        ++m_waveformCountByChannel[channelIndex];
+
+        const quint32 waveformSequence = timeUnits;
+        m_waveformSequenceNumbersByChannel[channelIndex].append(waveformSequence);
+        if (!m_hasWaveformSequenceByChannel[channelIndex]) {
+            m_hasWaveformSequenceByChannel[channelIndex] = true;
+            m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
+            return;
+        }
+
+        if (waveformSequence > m_lastWaveformSequenceByChannel[channelIndex]) {
+            for (quint32 missingSequence = m_lastWaveformSequenceByChannel[channelIndex] + 1;
+                 missingSequence < waveformSequence;
+                 ++missingSequence) {
+                m_missingWaveformNumbersByChannel[channelIndex].append(missingSequence);
+            }
+        }
+        m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
     }, Qt::QueuedConnection/*子线程转到主线程来执行*/);
 
     connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
         updateSpecIdSpinBoxRange();
         refreshSpectrumPlot();
+        refreshWaveformPlot();
     });
     connect(ui->spb_specID, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
         refreshSpectrumPlot();
@@ -328,6 +362,65 @@ int MainWindow::logicalChannelNumber(int detectorIndex, int channelNumber) const
     if (detectorIndex == 1)
         return channelNumber;
     return 0;
+}
+
+void MainWindow::resetWaveformCounters()
+{
+    std::fill(m_waveformCountByChannel.begin(), m_waveformCountByChannel.end(), 0);
+    std::fill(m_lastWaveformSequenceByChannel.begin(), m_lastWaveformSequenceByChannel.end(), 0);
+    std::fill(m_hasWaveformSequenceByChannel.begin(), m_hasWaveformSequenceByChannel.end(), false);
+    for (auto &samples : m_waveformByChannel)
+        samples.clear();
+    for (auto &sequenceNumbers : m_waveformSequenceNumbersByChannel)
+        sequenceNumbers.clear();
+    for (auto &missingSequenceNumbers : m_missingWaveformNumbersByChannel)
+        missingSequenceNumbers.clear();
+}
+
+void MainWindow::resetSpectrumSequenceTracking()
+{
+    std::fill(m_lastSpectrumSequenceByChannel.begin(), m_lastSpectrumSequenceByChannel.end(), 0);
+    std::fill(m_hasSpectrumSequenceByChannel.begin(), m_hasSpectrumSequenceByChannel.end(), false);
+    for (auto &sequenceNumbers : m_spectrumSequenceNumbersByChannel)
+        sequenceNumbers.clear();
+    for (auto &missingSequenceNumbers : m_missingSpectrumNumbersByChannel)
+        missingSequenceNumbers.clear();
+}
+
+void MainWindow::printWaveformCollectionSummary() const
+{
+    for (int channel = 1; channel <= m_missingWaveformNumbersByChannel.size(); ++channel) {
+        const QVector<quint32> &missingSequences = m_missingWaveformNumbersByChannel.at(channel - 1);
+        if (missingSequences.isEmpty())
+            continue;
+
+        QStringList missingLabels;
+        missingLabels.reserve(missingSequences.size());
+        for (quint32 missingSequence : missingSequences)
+            missingLabels << QString::number(missingSequence);
+
+        qInfo() << QString("通道%1缺失波形序号: %2")
+            .arg(channel)
+            .arg(missingLabels.join(", "));
+    }
+}
+
+void MainWindow::printSpectrumSequenceSummary() const
+{
+    for (int channel = 1; channel <= m_missingSpectrumNumbersByChannel.size(); ++channel) {
+        const QVector<quint32> &missingSequences = m_missingSpectrumNumbersByChannel.at(channel - 1);
+        if (missingSequences.isEmpty())
+            continue;
+
+        QStringList missingLabels;
+        missingLabels.reserve(missingSequences.size());
+        for (quint32 missingSequence : missingSequences)
+            missingLabels << QString::number(missingSequence);
+
+        qInfo() << QString("通道%1缺失能谱序号: %2")
+            .arg(channel)
+            .arg(missingLabels.join(", "));
+    }
 }
 
 void MainWindow::clearSpectrumData()
@@ -412,12 +505,43 @@ void MainWindow::refreshSpectrumPlot()
     ui->plotSpec->refreshPlot();
 }
 
+void MainWindow::refreshWaveformPlot()
+{
+    const int channel = ui->spb_channel->value();
+    if (channel < 1 || channel > m_waveformByChannel.size()) {
+        ui->plotWave->clearData();
+        ui->plotWave->refreshPlot();
+        return;
+    }
+
+    const QVector<quint16> &samples = m_waveformByChannel.at(channel - 1);
+    if (samples.isEmpty()) {
+        ui->plotWave->clearData();
+        ui->plotWave->setTitle(QString("波形图 - 通道 %1 (无数据)").arg(channel));
+        ui->plotWave->refreshPlot();
+        return;
+    }
+
+    const int n = samples.size();
+    QVector<double> xs(n), ys(n);
+    for (int i = 0; i < n; ++i) {
+        xs[i] = static_cast<double>(i) * 16.0;
+        ys[i] = static_cast<double>(samples.at(i));
+    }
+
+    ui->plotWave->setData(xs, ys);
+    ui->plotWave->setTitle(QString("波形图 - 通道 %1").arg(channel));
+    ui->plotWave->refreshPlot();
+}
+
 // 开始测量
 void MainWindow::on_btn_startMeasure_clicked()
 {
     ui->plotWave->clearData();
     ui->plotWave->refreshPlot();
     clearSpectrumData();
+    resetWaveformCounters();
+    resetSpectrumSequenceTracking();
     spectrumPlotThrottle.invalidate();
 
     DetParameter detPara = {};
@@ -570,7 +694,10 @@ void MainWindow::onSysTimerTimeout()
 
 void MainWindow::on_btn_stopMeasure_clicked()
 {
+    waveformPlotTimer->stop();
     commandHelper->stopMeasure();
+    printWaveformCollectionSummary();
+    printSpectrumSequenceSummary();
     measureTimer->stop();
     qInfo() << "手动停止测量";
 }
