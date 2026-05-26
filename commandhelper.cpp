@@ -19,7 +19,7 @@ const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb 00 00");
 const QByteArray SpectrumTail = QByteArray::fromHex("cc dd 00 00");
 
 // Waveform packet constants
-constexpr int WaveformPacketSize = 520;
+constexpr int WaveformPacketSize = 2056;
 const QByteArray WaveformHeader = QByteArray::fromHex("aa bb");
 const QByteArray WaveformTail = QByteArray::fromHex("cc dd");
 
@@ -637,20 +637,25 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
         const QByteArray packet = buffer.left(WaveformPacketSize);
         if (packet.mid(WaveformPacketSize - WaveformTail.size(), WaveformTail.size()) != WaveformTail) {
             buffer.remove(0, WaveformHeader.size());
-            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex;
+            //打印通道号和时间戳
+            const char* p = packet.constData();
+            const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
+            const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2);
+            const int channelNumber = channelNumberFromMask(channelMask);
+            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
         }
 
         // parse
         const char* p = packet.constData();
-        const quint32 timeUnits = readUInt32BE(p + WaveformHeader.size());
-        const quint32 channelMask = readUInt32BE(p + WaveformHeader.size() + 4);
+        const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
+        const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2);
         const int channelNumber = channelNumberFromMask(channelMask);
 
         QVector<quint16> samples;
-        samples.reserve(254);
-        const char* sampleData = p + WaveformHeader.size() + 8;
-        for (int i = 0; i < 254; ++i) {
+        samples.reserve(1024);
+        const char* sampleData = p + WaveformHeader.size() + 4;
+        for (int i = 0; i < 1024; ++i) {
             samples.append(readUInt16BE(sampleData + i * 2));
         }
 

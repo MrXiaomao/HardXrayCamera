@@ -28,8 +28,8 @@ n = length(rawData);
 % 向量化查找所有包头（170=0xAA, 187=0xBB）和包尾（204=0xCC, 221=0xDD）
 headerPositions = find(rawData(1:end-1) == 170 & rawData(2:end) == 187);
 footerPositions = find(rawData(1:end-1) == 204 & rawData(2:end) == 221);
-cnt_CCDD0000AABB= find(rawData(1:end-5) == 204 &rawData(2:end-4) == 221&rawData(3:end-3) == 0&rawData(4:end-2) == 0&rawData(5:end-1) == 170&rawData(6:end) == 187);%包尾接包头的数量
-cnt_CCDDAABB= find(rawData(1:end-5) == 204 &rawData(2:end-4) == 221&rawData(5:end-1) == 170&rawData(6:end) == 187);%包尾接包头的数量
+cnt_CCDD0000AABB = find(rawData(1:end-5) == 204 &rawData(2:end-4) == 221&rawData(3:end-3) == 0&rawData(4:end-2) == 0&rawData(5:end-1) == 170&rawData(6:end) == 187);%包尾接包头的数量
+cnt_CCDDAABB = find(rawData(1:end-5) == 204 &rawData(2:end-4) == 221&rawData(5:end-1) == 170&rawData(6:end) == 187);%包尾接包头的数量
 % 匹配包头和包尾，提取完整数据包
 maxPossiblePackets = min(length(headerPositions), length(footerPositions));
 extractedPackets = cell(maxPossiblePackets, 1);
