@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 15:27:05
+ * @LastEditTime: 2026-05-27 09:53:12
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -26,26 +26,17 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     measureTimer = new QTimer(this);
-    connect(measureTimer, &QTimer::timeout, this, [=](){
-        if (commandHelper) {
-            waveformPlotTimer->stop();
-            commandHelper->stopMeasure();
-            printWaveformCollectionSummary();
-            printSpectrumSequenceSummary();
-            measureTimer->stop();
-            qInfo() << "定时测量已停止";
-        }
-    });
+    connect(measureTimer, &QTimer::timeout, this, &MainWindow::onMeasureTimerTimeout);
     ui->setupUi(this);
 
     QAction *action = ui->le_savePath->addAction(QIcon(":/resource/open.png"), QLineEdit::TrailingPosition);
     QToolButton* button = qobject_cast<QToolButton*>(action->associatedWidgets().last());
     button->setCursor(QCursor(Qt::PointingHandCursor));
-    connect(button, &QToolButton::pressed, this, [=](){
-        QString cacheDir = QFileDialog::getExistingDirectory(this);
-        if (!cacheDir.isEmpty()){
+    // 保存路径选择：仅初始化时绑定一次，逻辑简单保留 lambda
+    connect(button, &QToolButton::pressed, this, [=]() {
+        const QString cacheDir = QFileDialog::getExistingDirectory(this);
+        if (!cacheDir.isEmpty())
             ui->le_savePath->setText(cacheDir);
-        }
     });
     
     // 获取当前时间
@@ -88,112 +79,24 @@ MainWindow::MainWindow(QWidget *parent)
 
     commandHelper = new CommandHelper();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
-    connect(commandHelper, &CommandHelper::sigRelayStatus, this, [=](bool on){
-        if (on){
-            qInfo() << "继电器网络状态: 已连接";
-        } else {
-            qInfo() << "继电器网络状态: 已断开";
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError){
+    connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
+    connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
         qWarning() << "继电器网络连接失败";
     });
-
-    connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, [=](bool on){
-        if (on){
-            qInfo() << "继电器控制的电源状态: 已开启";
-            replayPowerOn = true;
-        } else {
-            qInfo() << "继电器控制的电源状态: 已关闭";
-            replayPowerOn = false;
-
-            detectOnline[0] = false;
-            detectOnline[1] = false;
-            armSensorOnline[0] = false;
-            armSensorOnline[1] = false;
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigDetector1Status, this, [=](bool on){
-        if (on){
-            qInfo() << "FPGA板1状态: 已连接";
-            detectOnline[0] = true;
-        } else {
-            qInfo() << "FPGA板1状态: 已断开";
-            detectOnline[0] = false;
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigDetector2Status, this, [=](bool on){
-        if (on){
-            qInfo() << "FPGA板2状态: 已连接";
-            detectOnline[1] = true;
-        } else {
-            qInfo() << "FPGA板2状态: 已断开";
-            detectOnline[1] = false;
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigDetector1Fault, this, [=](){
-        qWarning() << "FPGA板1连接失败";
-        detectOnline[0] = false;
-    });
-
-    connect(commandHelper, &CommandHelper::sigDetector2Fault, this, [=](){
-        qWarning() << "FPGA板2连接失败";
-        detectOnline[1] = false;
-    });
-
-    connect(commandHelper, &CommandHelper::sigARM1Status, this, [=](bool on){
-        if (on){
-            qInfo() << ("ARM传感器设备1状态：已连接");
-            armSensorOnline[0] = true;
-        } else {
-            qInfo() << ("ARM传感器设备1状态：已断开");
-            armSensorOnline[0] = false;
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigARM2Status, this, [=](bool on){
-        if (on){
-            qInfo() << ("ARM传感器设备2状态：已连接");
-            armSensorOnline[1] = true;
-        } else {
-            qInfo() << ("ARM传感器设备2状态：已断开");
-            armSensorOnline[1] = false;
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigArm1SensorData, this, [=](float temp, float voltage, float current){
-        ui->plotTemp->appendPoint(0, temp);
-        ui->plotVoltage->appendPoint(0, voltage);
-        ui->plotCurrent->appendPoint(0, current);
-
-        ui->plotTemp->refreshPlot();
-        ui->plotVoltage->refreshPlot();
-        ui->plotCurrent->refreshPlot();
-
-        if (temp>ui->doubleSpinBox_temp->value() || voltage>ui->doubleSpinBox_voltage->value() || current>ui->doubleSpinBox_current->value()){
-            // 超出阈值，切断电源
-            if (detectOnline[0]){
-                commandHelper->PowerOffRelay();
-            }
-        }
-    });
-
-    connect(commandHelper, &CommandHelper::sigArm2SensorData, this, [=](float temp, float voltage, float current){
-        ui->plotTemp->appendPoint(0, temp);
-        ui->plotVoltage->appendPoint(0, voltage);
-        ui->plotCurrent->appendPoint(0, current);
-
-        if (temp>ui->doubleSpinBox_temp->value() || voltage>ui->doubleSpinBox_voltage->value() || current>ui->doubleSpinBox_current->value()){
-            // 超出阈值，切断电源
-            if (detectOnline[1]){
-                commandHelper->PowerOffRelay();
-            }
-        }
-    });
+    connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
+    connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
+    connect(commandHelper, &CommandHelper::sigDetector2Status, this, &MainWindow::onDetector2StatusChanged);
+    connect(commandHelper, &CommandHelper::sigDetector1Fault, this, &MainWindow::onDetector1ConnectFault);
+    connect(commandHelper, &CommandHelper::sigDetector2Fault, this, &MainWindow::onDetector2ConnectFault);
+    connect(commandHelper, &CommandHelper::sigARM1Status, this, &MainWindow::onArm1StatusChanged);
+    connect(commandHelper, &CommandHelper::sigARM2Status, this, &MainWindow::onArm2StatusChanged);
+    connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData);
+    connect(commandHelper, &CommandHelper::sigArm2SensorData, this, &MainWindow::onArm2SensorData);
+    // 能谱/波形数据由工作线程发出，排队到主线程处理
+    connect(commandHelper, &CommandHelper::sigSpectrumData, this,
+        &MainWindow::onSpectrumDataReceived, Qt::QueuedConnection);
+    connect(commandHelper, &CommandHelper::sigWaveformData, this,
+        &MainWindow::onWaveformDataReceived, Qt::QueuedConnection);
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
     m_spectrumSequenceNumbersByChannel.resize(kSpectrumChannelCount);
@@ -209,88 +112,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     waveformPlotTimer = new QTimer(this);
     waveformPlotTimer->setInterval(200); // 每200ms刷新一次波形
-    connect(waveformPlotTimer, &QTimer::timeout, this, [=]() {
-        refreshWaveformPlot();
-    });
-    // waveformPlotTimer starts only when waveform measurement begins.
+    connect(waveformPlotTimer, &QTimer::timeout, this, &MainWindow::refreshWaveformPlot);
+    // waveformPlotTimer 仅在波形测量模式下启动
 
-    connect(commandHelper, &CommandHelper::sigSpectrumData, this,
-            [=](int detectorIndex, int channelNumber, quint32 timeMs, 
-                const QVector<quint32>& counts){
-        const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
-        if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
-            return;
-
-        const int channelIndex = logicalChannel - 1;
-        appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
-
-        const quint32 spectrumSequence = timeMs;
-        m_spectrumSequenceNumbersByChannel[channelIndex].append(spectrumSequence);
-        if (!m_hasSpectrumSequenceByChannel[channelIndex]) {
-            m_hasSpectrumSequenceByChannel[channelIndex] = true;
-            m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
-        } else if (spectrumSequence > m_lastSpectrumSequenceByChannel[channelIndex]) {
-            for (quint32 missingSequence = m_lastSpectrumSequenceByChannel[channelIndex] + 1;
-                 missingSequence < spectrumSequence;
-                 ++missingSequence) {
-                m_missingSpectrumNumbersByChannel[channelIndex].append(missingSequence);
-            }
-            m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
-        }
-
-        const int currentChannel = ui->spb_channel->value();
-        if (logicalChannel != currentChannel)
-            return;
-
-        const int specCount = m_spectrumByChannel.at(currentChannel - 1).size();
-        ui->spb_specID->blockSignals(true);
-        ui->spb_specID->setValue(specCount - 1);
-        ui->spb_specID->blockSignals(false);
-        updateSpecIdSpinBoxRange();
-
-        if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
-            return;
-
-        spectrumPlotThrottle.restart();
-        refreshSpectrumPlot();
-    }, Qt::QueuedConnection/*子线程转到主线程来执行*/);
-
-    connect(commandHelper, &CommandHelper::sigWaveformData, this,
-            [=](int detectorIndex, int channelNumber, quint32 timeUnits,
-                const QVector<quint16>& samples){
-        const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
-        if (logicalChannel < 1 || logicalChannel > m_waveformByChannel.size())
-            return;
-        const int channelIndex = logicalChannel - 1;
-        m_waveformByChannel[channelIndex] = samples; // 覆盖最新一帧
-        ++m_waveformCountByChannel[channelIndex];
-
-        const quint32 waveformSequence = timeUnits;
-        m_waveformSequenceNumbersByChannel[channelIndex].append(waveformSequence);
-        if (!m_hasWaveformSequenceByChannel[channelIndex]) {
-            m_hasWaveformSequenceByChannel[channelIndex] = true;
-            m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
-            return;
-        }
-
-        if (waveformSequence > m_lastWaveformSequenceByChannel[channelIndex]) {
-            for (quint32 missingSequence = m_lastWaveformSequenceByChannel[channelIndex] + 1;
-                 missingSequence < waveformSequence;
-                 ++missingSequence) {
-                m_missingWaveformNumbersByChannel[channelIndex].append(missingSequence);
-            }
-        }
-        m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
-    }, Qt::QueuedConnection/*子线程转到主线程来执行*/);
-
-    connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
-        updateSpecIdSpinBoxRange();
-        refreshSpectrumPlot();
-        refreshWaveformPlot();
-    });
-    connect(ui->spb_specID, QOverload<int>::of(&QSpinBox::valueChanged), this, [=](int) {
-        refreshSpectrumPlot();
-    });
+    connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onChannelSpinBoxChanged);
+    connect(ui->spb_specID, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::refreshSpectrumPlot);
     ui->spb_specID->setMinimum(0);
     updateSpecIdSpinBoxRange();
 
@@ -299,15 +127,217 @@ MainWindow::MainWindow(QWidget *parent)
     connect(sysTimer, &QTimer::timeout, this, &MainWindow::onSysTimerTimeout);
     sysTimer->start();
 
-    // 开机自动最大化窗口
-    QTimer::singleShot(0, this, [=]{
-        this->showMaximized();
-    });
+    // 开机自动最大化：一次性延迟调用，保留 lambda
+    QTimer::singleShot(0, this, [this] { showMaximized(); });
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::onMeasureTimerTimeout()
+{
+    if (!commandHelper)
+        return;
+
+    waveformPlotTimer->stop();
+    commandHelper->stopMeasure();
+    printWaveformCollectionSummary();
+    printSpectrumSequenceSummary();
+    measureTimer->stop();
+    qInfo() << "定时测量已停止";
+}
+
+void MainWindow::onRelayStatusChanged(bool on)
+{
+    if (on)
+        qInfo() << "继电器网络状态: 已连接";
+    else
+        qInfo() << "继电器网络状态: 已断开";
+}
+
+void MainWindow::onRelayPowerStatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "继电器控制的电源状态: 已开启";
+        replayPowerOn = true;
+    } else {
+        qInfo() << "继电器控制的电源状态: 已关闭";
+        replayPowerOn = false;
+        // 断电后清除各设备在线标记
+        detectOnline[0] = false;
+        detectOnline[1] = false;
+        armSensorOnline[0] = false;
+        armSensorOnline[1] = false;
+    }
+}
+
+void MainWindow::onDetector1StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "FPGA板1状态: 已连接";
+        detectOnline[0] = true;
+    } else {
+        qInfo() << "FPGA板1状态: 已断开";
+        detectOnline[0] = false;
+    }
+}
+
+void MainWindow::onDetector2StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "FPGA板2状态: 已连接";
+        detectOnline[1] = true;
+    } else {
+        qInfo() << "FPGA板2状态: 已断开";
+        detectOnline[1] = false;
+    }
+}
+
+void MainWindow::onDetector1ConnectFault()
+{
+    qWarning() << "FPGA板1连接失败";
+    detectOnline[0] = false;
+}
+
+void MainWindow::onDetector2ConnectFault()
+{
+    qWarning() << "FPGA板2连接失败";
+    detectOnline[1] = false;
+}
+
+void MainWindow::onArm1StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "ARM传感器设备1状态：已连接";
+        armSensorOnline[0] = true;
+    } else {
+        qInfo() << "ARM传感器设备1状态：已断开";
+        armSensorOnline[0] = false;
+    }
+}
+
+void MainWindow::onArm2StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "ARM传感器设备2状态：已连接";
+        armSensorOnline[1] = true;
+    } else {
+        qInfo() << "ARM传感器设备2状态：已断开";
+        armSensorOnline[1] = false;
+    }
+}
+
+void MainWindow::onArm1SensorData(float temp, float voltage, float current)
+{
+    ui->plotTemp->appendPoint(0, temp);
+    ui->plotVoltage->appendPoint(0, voltage);
+    ui->plotCurrent->appendPoint(0, current);
+    ui->plotTemp->refreshPlot();
+    ui->plotVoltage->refreshPlot();
+    ui->plotCurrent->refreshPlot();
+
+    // 超出阈值且探测器在线时，通过继电器切断电源
+    if (temp > ui->doubleSpinBox_temp->value()
+        || voltage > ui->doubleSpinBox_voltage->value()
+        || current > ui->doubleSpinBox_current->value()) {
+        if (detectOnline[0])
+            commandHelper->PowerOffRelay();
+    }
+}
+
+void MainWindow::onArm2SensorData(float temp, float voltage, float current)
+{
+    ui->plotTemp->appendPoint(0, temp);
+    ui->plotVoltage->appendPoint(0, voltage);
+    ui->plotCurrent->appendPoint(0, current);
+
+    if (temp > ui->doubleSpinBox_temp->value()
+        || voltage > ui->doubleSpinBox_voltage->value()
+        || current > ui->doubleSpinBox_current->value()) {
+        if (detectOnline[1])
+            commandHelper->PowerOffRelay();
+    }
+}
+
+void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
+                                        const QVector<quint32> &counts)
+{
+    const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+    if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
+        return;
+
+    const int channelIndex = logicalChannel - 1;
+    appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+
+    // 以能谱刷新间隔为单位的序列号，用于检测丢帧
+    const quint32 spectrumSequence = timeMs / mdetPara.spectrumRefreshInterval;
+    m_spectrumSequenceNumbersByChannel[channelIndex].append(spectrumSequence);
+    if (!m_hasSpectrumSequenceByChannel[channelIndex]) {
+        m_hasSpectrumSequenceByChannel[channelIndex] = true;
+        m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
+    } else if (spectrumSequence > m_lastSpectrumSequenceByChannel[channelIndex]) {
+        for (quint32 missingSequence = m_lastSpectrumSequenceByChannel[channelIndex] + 1;
+             missingSequence < spectrumSequence;
+             ++missingSequence) {
+            m_missingSpectrumNumbersByChannel[channelIndex].append(missingSequence);
+        }
+        m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
+    }
+
+    const int currentChannel = ui->spb_channel->value();
+    if (logicalChannel != currentChannel)
+        return;
+
+    const int specCount = m_spectrumByChannel.at(currentChannel - 1).size();
+    ui->spb_specID->blockSignals(true);
+    ui->spb_specID->setValue(specCount - 1);
+    ui->spb_specID->blockSignals(false);
+    updateSpecIdSpinBoxRange();
+
+    // 限流刷新，避免高频能谱拖慢 UI
+    if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
+        return;
+
+    spectrumPlotThrottle.restart();
+    refreshSpectrumPlot();
+}
+
+void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
+                                        const QVector<quint16> &samples)
+{
+    const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+    if (logicalChannel < 1 || logicalChannel > m_waveformByChannel.size())
+        return;
+
+    const int channelIndex = logicalChannel - 1;
+    m_waveformByChannel[channelIndex] = samples; // 覆盖最新一帧
+    ++m_waveformCountByChannel[channelIndex];
+
+    const quint32 waveformSequence = timeUnits;
+    m_waveformSequenceNumbersByChannel[channelIndex].append(waveformSequence);
+    if (!m_hasWaveformSequenceByChannel[channelIndex]) {
+        m_hasWaveformSequenceByChannel[channelIndex] = true;
+        m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
+        return;
+    }
+
+    if (waveformSequence > m_lastWaveformSequenceByChannel[channelIndex]) {
+        for (quint32 missingSequence = m_lastWaveformSequenceByChannel[channelIndex] + 1;
+             missingSequence < waveformSequence;
+             ++missingSequence) {
+            m_missingWaveformNumbersByChannel[channelIndex].append(missingSequence);
+        }
+    }
+    m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
+}
+
+void MainWindow::onChannelSpinBoxChanged(int /*value*/)
+{
+    updateSpecIdSpinBoxRange();
+    refreshSpectrumPlot();
+    refreshWaveformPlot();
 }
 
 void MainWindow::on_action_setting_triggered()
@@ -587,7 +617,9 @@ void MainWindow::on_btn_startMeasure_clicked()
         QMessageBox::information(this, "请先选择数据保存路径", "提示");
         return;
     }
-
+    // 将测量参数保存到成员变量，以便在测量过程中使用
+    mdetPara = detPara;
+    
     QDir dir;
     if (!dir.exists(savePath))
     {

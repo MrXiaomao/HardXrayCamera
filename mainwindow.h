@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 15:27:23
+ * @LastEditTime: 2026-05-27 09:39:05
  * @Description: 请填写简介
  */
 #ifndef MAINWINDOW_H
@@ -57,16 +57,38 @@ private slots:
 
     void on_btn_stopMeasure_clicked();
 
+    // 测量定时器到时自动停止
+    void onMeasureTimerTimeout();
+
+    // CommandHelper 设备状态与数据回调
+    void onRelayStatusChanged(bool on);
+    void onRelayPowerStatusChanged(bool on);
+    void onDetector1StatusChanged(bool on);
+    void onDetector2StatusChanged(bool on);
+    void onDetector1ConnectFault();
+    void onDetector2ConnectFault();
+    void onArm1StatusChanged(bool on);
+    void onArm2StatusChanged(bool on);
+    void onArm1SensorData(float temp, float voltage, float current);
+    void onArm2SensorData(float temp, float voltage, float current);
+    void onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
+                                const QVector<quint32> &counts);
+    void onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
+                                const QVector<quint16> &samples);
+
+    // 能谱/波形显示控件联动
+    void onChannelSpinBoxChanged(int value);
+
 private:
     struct SpectrumEntry {
         int detectorIndex = 0;
-        quint32 timeMs = 0;
+        quint32 timeMs = 0; //单位，ms
         QVector<quint32> counts;
     };
 
     static constexpr int kChannelsPerDetector = 16;
     static constexpr int kSpectrumChannelCount = 32; // 探测器1: 1~16，探测器2: 17~32
-    static constexpr int kDetector2ChannelOffset = 16;
+    static constexpr int kDetector2ChannelOffset = 16; // 探测器2的逻辑通道号相对于物理通道的偏移
 
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
@@ -83,6 +105,7 @@ private:
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
+    DetParameter mdetPara; //测量参数，包含触发模式、传输模式、测量时长等
     // 定时测量定时器
     QTimer* measureTimer = nullptr;
     QElapsedTimer spectrumPlotThrottle;
