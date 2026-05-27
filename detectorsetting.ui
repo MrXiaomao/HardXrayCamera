@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>391</width>
-    <height>704</height>
+    <width>702</width>
+    <height>755</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -256,6 +256,12 @@
       </item>
       <item row="5" column="1">
        <widget class="IPAddress" name="widget_relayIP" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -476,21 +482,42 @@
       </item>
       <item row="7" column="0">
        <widget class="QLabel" name="label_12">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="minimumSize">
          <size>
-          <width>100</width>
-          <height>0</height>
+          <width>110</width>
+          <height>21</height>
          </size>
         </property>
         <property name="text">
          <string>统一阈值设置：</string>
         </property>
+        <property name="alignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+        </property>
        </widget>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_8">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>110</width>
+          <height>21</height>
+         </size>
+        </property>
         <property name="text">
-         <string>能谱触发阈值</string>
+         <string>能谱触发阈值：</string>
         </property>
        </widget>
       </item>
@@ -509,8 +536,20 @@
       </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label_7">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>110</width>
+          <height>21</height>
+         </size>
+        </property>
         <property name="text">
-         <string>能谱刷新时间/ms</string>
+         <string>能谱刷新时间/ms：</string>
         </property>
        </widget>
       </item>
@@ -546,8 +585,55 @@
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="label_9">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>110</width>
+          <height>21</height>
+         </size>
+        </property>
         <property name="text">
-         <string>死时间/ns</string>
+         <string>死时间/ns：</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_10">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>16道能谱区间设置：</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1" colspan="2">
+       <widget class="QLineEdit" name="lineEdit_csvPath"/>
+      </item>
+      <item row="3" column="3">
+       <widget class="QPushButton" name="bt_selectCsv">
+        <property name="text">
+         <string>选择文件</string>
         </property>
        </widget>
       </item>

@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QVector>
+#include "globalsettings.h"
 class CommandHelper;
 
 QT_BEGIN_NAMESPACE

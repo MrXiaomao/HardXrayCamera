@@ -811,7 +811,12 @@
              <widget class="QComboBox" name="cmb_transferMode">
               <item>
                <property name="text">
-                <string>能谱</string>
+                <string>512能谱</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>16道能谱</string>
                </property>
               </item>
               <item>

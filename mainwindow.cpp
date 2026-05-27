@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-27 09:53:12
+ * @LastEditTime: 2026-05-27 09:57:18
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -583,9 +583,9 @@ void MainWindow::on_btn_startMeasure_clicked()
     if(mode == 0){
         detPara.transferMode = Order::TransferMode::Spectrum512;
     } else if(mode == 1){
-        detPara.transferMode = Order::TransferMode::Waveform;
-    } else if(mode == 2){
         detPara.transferMode = Order::TransferMode::Spectrum16;
+    } else if(mode == 2){
+        detPara.transferMode = Order::TransferMode::Waveform;
     }
     
     //测量时长，ms
