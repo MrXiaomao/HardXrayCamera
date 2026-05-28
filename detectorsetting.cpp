@@ -286,6 +286,44 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
     return true;
 }
 
+bool DetectorSetting::load16SpecEnWindowCsv(const QString& filePath,
+                                            QVector<QVector<quint16>>& channelBoundaries,
+                                            QString* errorMessage)
+{
+    channelBoundaries.clear();
+    if (!validate16SpecEnWindowCsv(filePath, errorMessage))
+        return false;
+
+    const QStringList lines = readCsvLines(filePath, errorMessage);
+    if (lines.size() != kCsvTotalLineCount) {
+        if (errorMessage) {
+            *errorMessage = tr("CSV 行数必须为 %1 行（当前 %2 行）")
+                                .arg(kCsvTotalLineCount)
+                                .arg(lines.size());
+        }
+        return false;
+    }
+
+    channelBoundaries.reserve(kCsvTotalLineCount - 1);
+    for (int lineIndex = 1; lineIndex < kCsvTotalLineCount; ++lineIndex) {
+        const QStringList fields = parseCsvFields(lines.at(lineIndex));
+        QVector<quint16> boundaries;
+        boundaries.reserve(kCsvValueColLast - kCsvValueColFirst + 1);
+        for (int col = kCsvValueColFirst; col <= kCsvValueColLast; ++col)
+            boundaries.append(static_cast<quint16>(fields.at(col - 1).toInt()));
+        channelBoundaries.append(boundaries);
+    }
+
+    if (channelBoundaries.size() != 32) {
+        if (errorMessage)
+            *errorMessage = tr("CSV 数据通道数必须为 32（当前 %1）").arg(channelBoundaries.size());
+        channelBoundaries.clear();
+        return false;
+    }
+
+    return true;
+}
+
 void DetectorSetting::onSelectCsvFile()
 {
     const QString filePath = QFileDialog::getOpenFileName(

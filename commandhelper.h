@@ -11,6 +11,7 @@
 #include <QObject>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QVector>
 #include "tcpclient.h"
 #include "globalsettings.h"
 struct CommandItem
@@ -95,8 +96,15 @@ private:
                      const QString& name, const QString& parameter = QString());
 
     void processSpec512Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
+    void processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
     void processWaveformData(int detectorIndex, QByteArray& buffer, const QByteArray& data);
-    bool parseSpectrumPacket(int detectorIndex, const QByteArray& packet);
+    bool parseSpectrum512Packet(int detectorIndex, const QByteArray& packet);
+    bool parseSpectrum16Packet(int detectorIndex, const QByteArray& packet);
+
+    // 16 道能谱：按 CSV 向单块 FPGA 下发 144 条能窗指令（16 通道×9 条/通道）
+    void send16SpecEnergyWindowCommands(TcpClient* client, const QString& fpgaLabel,
+                                        const QVector<QVector<quint16>>& channelBoundaries,
+                                        int csvChannelOffset);
 
 signals:
     // 波形数据: timeUnits 单位为 500us, samples 为 1024 个采样点

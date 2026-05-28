@@ -8,13 +8,16 @@
 #include "commandhelper.h"
 #include "globalsettings.h"
 #include "order.h"
+#include "detectorsetting.h"
 #include <QFile>
 #include <QDir>
 #include <QMutexLocker>
 
 namespace {
-constexpr int SpectrumPacketSize = 2064;
-constexpr int SpectrumChannelCount = 512;
+constexpr int Spectrum512PacketSize = 2064;
+constexpr int Spectrum512BinCount = 512;
+constexpr int Spectrum16PacketSize = 80; // 4+4+4+16*4+4
+constexpr int Spectrum16BinCount = 16;
 const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb 00 00");
 const QByteArray SpectrumTail = QByteArray::fromHex("cc dd 00 00");
 
@@ -312,6 +315,8 @@ void CommandHelper::startMeasure(DetParameter detPara)
         }
     }
 
+    bool spectrum16Ready = true;
+
     //分为波形模式和能谱模式发送指令
     if(measurement.transferMode == Order::TransferMode::Waveform){// 发送波形模式相关指令
         // 传输模式设置
@@ -392,6 +397,30 @@ void CommandHelper::startMeasure(DetParameter detPara)
         sendCommand(client_det2, Order::setSpectrumDeadTime(deadTime16ns),
                     "能谱死时间", QString("FPGA2 %1 ns, %2*16ns").arg(measurement.spectrumDeadTime).arg(deadTime16ns));
 
+        if (measurement.transferMode == Order::TransferMode::Spectrum16) {
+            JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
+            ScopedFileLock lock(settings);
+            const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
+
+            QVector<QVector<quint16>> channelBoundaries;
+            QString csvError;
+            if (!DetectorSetting::load16SpecEnWindowCsv(csvPath, channelBoundaries, &csvError)) {
+                qWarning() << "16道能谱能窗CSV加载失败:" << csvError;
+                emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
+                spectrum16Ready = false;
+            } else {
+                send16SpecEnergyWindowCommands(client_det1, QStringLiteral("FPGA1"), channelBoundaries, 0);
+                send16SpecEnergyWindowCommands(client_det2, QStringLiteral("FPGA2"), channelBoundaries, 16);
+            }
+        }
+
+        if (!spectrum16Ready) {
+            QMutexLocker locker(&m_measurementMutex);
+            measure_started = false;
+            closeMeasurementFilesLocked();
+            return;
+        }
+
         // 发送软件触发指令，开始测量
         sendCommand(client_det1, Order::controlSpectrum(Order::SoftwareTrigger),
                     "能谱测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::SoftwareTrigger)));
@@ -453,6 +482,33 @@ void CommandHelper::closeMeasurementFilesLocked()
 CommandHelper::~CommandHelper()
 {
     closeMeasurementFiles();
+}
+
+void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QString& fpgaLabel,
+                                                 const QVector<QVector<quint16>>& channelBoundaries,
+                                                 int csvChannelOffset)
+{
+    for (int channel = 0; channel < 16; ++channel) {
+        const int csvIndex = csvChannelOffset + channel;
+        if (csvIndex < 0 || csvIndex >= channelBoundaries.size())
+            continue;
+
+        const QVector<quint16>& boundaries = channelBoundaries.at(csvIndex);
+        const QVector<QByteArray> commands =
+            Order::setTimeSpectrumRangeChannel(static_cast<quint8>(channel), boundaries);
+        for (int cmd = 0; cmd < commands.size(); ++cmd) {
+            const quint8 commandIndex = static_cast<quint8>(channel * 9 + cmd);
+            const int firstIndex = cmd * 2;
+            const int secondIndex = qMin(firstIndex + 1, 16);
+            sendCommand(client, commands.at(cmd), QStringLiteral("分时能谱能窗"),
+                        QStringLiteral("%1 逻辑CH%2 序号0x%3 道址%4-%5")
+                            .arg(fpgaLabel)
+                            .arg(channel + 1)
+                            .arg(commandIndex, 2, 16, QChar('0'))
+                            .arg(boundaries.at(firstIndex))
+                            .arg(boundaries.at(secondIndex)));
+        }
+    }
 }
 
 void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
@@ -531,6 +587,8 @@ void CommandHelper::handleDet1Data(const QByteArray &binaryData)
     // 处理FPGA板1的数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Waveform) {
         processWaveformData(1, m_det1Buffer, binaryData);
+    } else if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
+        processSpec16Data(1, m_det1Buffer, binaryData);
     } else {
         processSpec512Data(1, m_det1Buffer, binaryData);
     }
@@ -555,6 +613,8 @@ void CommandHelper::handleDet2Data(const QByteArray &binaryData)
     // 处理FPGA板2的数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Waveform) {
         processWaveformData(2, m_det2Buffer, binaryData);
+    } else if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
+        processSpec16Data(2, m_det2Buffer, binaryData);
     } else {
         processSpec512Data(2, m_det2Buffer, binaryData);
     }
@@ -575,25 +635,25 @@ void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, co
         if (headerIndex > 0)
             buffer.remove(0, headerIndex);
 
-        if (buffer.size() < SpectrumPacketSize)
+        if (buffer.size() < Spectrum512PacketSize)
             return;
 
-        const QByteArray packet = buffer.left(SpectrumPacketSize);
-        if (packet.mid(SpectrumPacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
+        const QByteArray packet = buffer.left(Spectrum512PacketSize);
+        if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             // 包尾不对，继续寻找下一个包头
             buffer.remove(0, SpectrumHeader.size());
-            qWarning() << "Invalid spectrum packet tail from detector" << detectorIndex;
+            qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
             continue;
         }
 
-        parseSpectrumPacket(detectorIndex, packet);
-        buffer.remove(0, SpectrumPacketSize);
+        parseSpectrum512Packet(detectorIndex, packet);
+        buffer.remove(0, Spectrum512PacketSize);
     }
 }
 
-bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& packet)
+bool CommandHelper::parseSpectrum512Packet(int detectorIndex, const QByteArray& packet)
 {
-    if (packet.size() != SpectrumPacketSize)
+    if (packet.size() != Spectrum512PacketSize)
         return false;
     if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
         return false;
@@ -603,16 +663,76 @@ bool CommandHelper::parseSpectrumPacket(int detectorIndex, const QByteArray& pac
     const int channelNumber = channelNumberFromMask(channelMask);
 
     QVector<quint32> counts;
-    counts.reserve(SpectrumChannelCount);
+    counts.reserve(Spectrum512BinCount);
 
     const char* spectrumData = packet.constData() + 12;
-    for (int i = 0; i < SpectrumChannelCount; ++i) {
+    for (int i = 0; i < Spectrum512BinCount; ++i) {
         counts.append(readUInt32BE(spectrumData + i * 4));
     }
 
-    // qInfo() << "Spectrum packet parsed. Detector:" << detectorIndex
-    //         << "Channel:" << (channelNumber > 0 ? QString("CH%1").arg(channelNumber) : "Unknown")
-    //         << "Time(ms):" << timeMs;
+    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+    return true;
+}
+
+// 16道能谱：包头(4) + 时间(4) + 通道号(4) + 16道计数(64) + 包尾(4) = 80 字节
+void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data)
+{
+    buffer.append(data);
+
+    while (buffer.size() >= SpectrumHeader.size()) {
+        const int headerIndex = buffer.indexOf(SpectrumHeader);
+        if (headerIndex < 0) {
+            buffer.clear();
+            return;
+        }
+
+        if (headerIndex > 0)
+            buffer.remove(0, headerIndex);
+
+        if (buffer.size() < Spectrum16PacketSize)
+            return;
+
+        const QByteArray packet = buffer.left(Spectrum16PacketSize);
+        if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
+            buffer.remove(0, SpectrumHeader.size());
+            qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+            continue;
+        }
+
+        parseSpectrum16Packet(detectorIndex, packet);
+        buffer.remove(0, Spectrum16PacketSize);
+    }
+}
+
+bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& packet)
+{
+    if (packet.size() != Spectrum16PacketSize)
+        return false;
+    if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
+        return false;
+
+    const quint32 timeMs = readUInt32BE(packet.constData() + 4);
+    const quint32 channelRaw = readUInt32BE(packet.constData() + 8);
+    int channelNumber = 0;
+    if (channelRaw >= 1 && channelRaw <= 16) {
+        channelNumber = static_cast<int>(channelRaw);
+    } else {
+        channelNumber = channelNumberFromMask(channelRaw);
+    }
+    if (channelNumber < 1 || channelNumber > 16) {
+        qWarning() << "Invalid 16-bin spectrum channel from detector" << detectorIndex
+                   << "raw:" << channelRaw;
+        return false;
+    }
+
+    QVector<quint32> counts;
+    counts.reserve(Spectrum16BinCount);
+
+    const char* spectrumData = packet.constData() + 12;
+    for (int i = 0; i < Spectrum16BinCount; ++i) {
+        counts.append(readUInt32BE(spectrumData + i * 4));
+    }
+
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
     return true;
 }

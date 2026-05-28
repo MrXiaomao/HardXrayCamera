@@ -67,6 +67,33 @@ QByteArray Order::setTimeSpectrumRange(quint8 index, quint16 start, quint16 end)
     return makeCommand(0xFB, index, start, end);
 }
 
+QVector<QByteArray> Order::setTimeSpectrumRangeChannel(quint8 channelIndex,
+                                                       const QVector<quint16>& boundaries)
+{
+    QVector<QByteArray> commands;
+    if (channelIndex > 15 || boundaries.size() < 17)
+        return commands;
+
+    auto clampBin = [](quint16 value) -> quint16 {
+        if (value < 1)
+            return 1;
+        if (value > 512)
+            return 512;
+        return value;
+    };
+
+    commands.reserve(9);
+    for (int cmd = 0; cmd < 9; ++cmd) {
+        const int firstIndex = cmd * 2;
+        const int secondIndex = qMin(firstIndex + 1, 16);
+        const quint8 commandIndex = static_cast<quint8>(channelIndex * 9 + cmd);
+        commands.append(setTimeSpectrumRange(commandIndex,
+                                           clampBin(boundaries.at(firstIndex)),
+                                           clampBin(boundaries.at(secondIndex))));
+    }
+    return commands;
+}
+
 QVector<QByteArray> Order::setTimeSpectrumRanges(const QVector<quint16>& points)
 {
     QVector<QByteArray> commands;

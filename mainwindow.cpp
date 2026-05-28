@@ -609,6 +609,11 @@ void MainWindow::on_btn_startMeasure_clicked()
         waveformPlotTimer->start();
     } else {
         waveformPlotTimer->stop();
+        if (detPara.transferMode == Order::TransferMode::Spectrum16) {
+            ui->plotSpec->setXRange(1, 16);
+        } else {
+            ui->plotSpec->setXRange(1, 512);
+        }
     }
 
     // 文件名产生：存储路径+炮号+测量时间
