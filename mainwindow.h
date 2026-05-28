@@ -14,6 +14,7 @@
 #include <QVector>
 #include "globalsettings.h"
 class CommandHelper;
+class UdpShotReceiver;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -80,6 +81,17 @@ private slots:
     // 能谱/波形显示控件联动
     void onChannelSpinBoxChanged(int value);
 
+    void onUdpDatagramReceived(const QString &asciiText, const QString &senderInfo);
+    void onUdpShotNumberChanged(const QString &shotNumber);
+    void onUdpBindStateChanged(bool bound, const QString &message);
+    quint16 udpBroadcastPort() const;
+    void startUdpListening();
+    void stopUdpListening();
+
+    bool startMeasureInternal();
+    void saveShotNumberFile(const QString &shotNumber) const;
+    void appendUdpLog(const QString &line);
+
 private:
     struct SpectrumEntry {
         int detectorIndex = 0;
@@ -97,6 +109,7 @@ private:
                             const QVector<quint32> &counts);
     void ensureSpectrumBinAddresses(int binCount);
     void updateSpecIdSpinBoxRange();
+    void updateSpectrumRefreshIntervalRange();
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
     void resetWaveformCounters();
@@ -106,6 +119,9 @@ private:
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
+    UdpShotReceiver *m_udpShotReceiver = nullptr;
+    QString m_currentShotNumber;
+    bool m_udpListening = false;
     DetParameter mdetPara; //测量参数，包含触发模式、传输模式、测量时长等
     // 定时测量定时器
     QTimer* measureTimer = nullptr;

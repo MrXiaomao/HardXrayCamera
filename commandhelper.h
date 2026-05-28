@@ -75,6 +75,12 @@ public:
         mSavePath = path;
     }
 
+    void setShotNumber(const QString& shotNumber)
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        mShotNumber = shotNumber;
+    }
+
 private:
     // 初始化常用指令
     void initCommand(); 
@@ -166,6 +172,7 @@ private:
     //文件存储格式，.dat(二进制)或者.txt(文本)，默认.dat
     saveFileFormat mfileFormat = Binary;
     QString mSavePath = "data"; //默认保存路径
+    QString mShotNumber; // 当前炮号，用于数据文件命名
     QString mfileNameDet1; //当前测量的文件名，包含路径
     QString mfileNameDet2; //当前测量的文件名，包含路径
     DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等

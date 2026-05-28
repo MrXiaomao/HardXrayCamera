@@ -19,6 +19,9 @@ public:
 
     void loadSettings();
 
+    // 开机监听 UDP 期间禁止修改端口
+    void setUdpPortEditable(bool editable);
+
     // 校验 16 道能谱能窗 CSV，供本类及其他模块直接调用：DetectorSetting::validate16SpecEnWindowCsv(path)
     static bool validate16SpecEnWindowCsv(const QString& filePath, QString* errorMessage = nullptr);
     // 解析 CSV 为 32 通道×17 个道址边界；须先通过 validate16SpecEnWindowCsv

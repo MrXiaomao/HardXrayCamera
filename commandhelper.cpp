@@ -284,14 +284,17 @@ void CommandHelper::startMeasure(DetParameter detPara)
         measure_started = true;
         m_detPara = measurement;
 
+        const QString shotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
         QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-        mfileNameDet1 = QString("%1/Det1_%2_%3.%4")
+        mfileNameDet1 = QString("%1/Det1_%2_%3_%4.%5")
             .arg(mSavePath)
+            .arg(shotTag)
             .arg(timestamp)
             .arg(m_detPara.measureTime)
             .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameDet2 = QString("%1/Det2_%2_%3.%4")
+        mfileNameDet2 = QString("%1/Det2_%2_%3_%4.%5")
             .arg(mSavePath)
+            .arg(shotTag)
             .arg(timestamp)
             .arg(m_detPara.measureTime)
             .arg(mfileFormat == Binary ? "dat" : "txt");

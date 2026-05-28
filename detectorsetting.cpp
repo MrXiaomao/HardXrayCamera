@@ -139,6 +139,10 @@ void DetectorSetting::loadSettings()
     ui->spinBox_armPort2->setValue(settings->getValueByPath("network/port_arm2").toInt());
     ui->spinBox_portRelay->setValue(settings->getValueByPath("network/port_relay").toInt());
 
+    JsonSettings *runSettings = GlobalSettings::instance()->mRunSettings;
+    ScopedFileLock runLock(runSettings);
+    ui->spb_udpPort->setValue(runSettings->getValueByPath("Network/udpBroadcastPort", 6000).toInt());
+
     // 硬件参数读取
     ui->spb_specRefashTime->setValue(settings->getValueByPath("FPGA/spec_refash_time").toInt());
     ui->spb_threshold->setValue(settings->getValueByPath("FPGA/threshold").toInt());
@@ -203,6 +207,18 @@ void DetectorSetting::on_btn_ok_accepted()
     settings->setValueByPath("FPGA/16SpecEnWindow_csv_path", m_csvFilePath);
 
     settings->save();
+
+    if (ui->spb_udpPort->isEnabled()) {
+        JsonSettings *runSettings = GlobalSettings::instance()->mRunSettings;
+        ScopedFileLock runLock(runSettings);
+        runSettings->setValueByPath("Network/udpBroadcastPort", ui->spb_udpPort->value());
+        runSettings->save();
+    }
+}
+
+void DetectorSetting::setUdpPortEditable(bool editable)
+{
+    ui->spb_udpPort->setEnabled(editable);
 }
 
 bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString* errorMessage)

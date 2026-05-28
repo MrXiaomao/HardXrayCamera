@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-27 09:57:18
+ * @LastEditTime: 2026-05-28 11:37:33
  * @Description: 请填写简介
  */
 #include "mainwindow.h"
@@ -20,6 +20,8 @@
 #include "detectorsetting.h"
 #include "commandhelper.h"
 #include "globalsettings.h"
+#include "udpshotreceiver.h"
+#include <QFile>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -122,6 +124,20 @@ MainWindow::MainWindow(QWidget *parent)
     ui->spb_specID->setMinimum(0);
     updateSpecIdSpinBoxRange();
 
+    connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::updateSpectrumRefreshIntervalRange);
+    updateSpectrumRefreshIntervalRange();
+
+    m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
+
+    m_udpShotReceiver = new UdpShotReceiver(this);
+    connect(m_udpShotReceiver, &UdpShotReceiver::datagramReceived,
+            this, &MainWindow::onUdpDatagramReceived);
+    connect(m_udpShotReceiver, &UdpShotReceiver::shotNumberChanged,
+            this, &MainWindow::onUdpShotNumberChanged);
+    connect(m_udpShotReceiver, &UdpShotReceiver::bindStateChanged,
+            this, &MainWindow::onUdpBindStateChanged);
+
     sysTimer = new QTimer(this);
     sysTimer->setInterval(1000);
     connect(sysTimer, &QTimer::timeout, this, &MainWindow::onSysTimerTimeout);
@@ -165,6 +181,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
     } else {
         qInfo() << "继电器控制的电源状态: 已关闭";
         replayPowerOn = false;
+        stopUdpListening();
         // 断电后清除各设备在线标记
         detectOnline[0] = false;
         detectOnline[1] = false;
@@ -341,9 +358,10 @@ void MainWindow::onChannelSpinBoxChanged(int /*value*/)
 }
 
 void MainWindow::on_action_setting_triggered()
-{   
-    DetectorSetting* settDialog = new DetectorSetting();
+{
+    DetectorSetting *settDialog = new DetectorSetting();
     settDialog->setAttribute(Qt::WA_DeleteOnClose);
+    settDialog->setUdpPortEditable(!m_udpListening);
     settDialog->exec();
 }
 
@@ -505,6 +523,17 @@ void MainWindow::updateSpecIdSpinBoxRange()
     ui->spb_specID->blockSignals(false);
 }
 
+void MainWindow::updateSpectrumRefreshIntervalRange()
+{
+    // 传输模式：0=512道能谱(min 10ms)，1=16道能谱(min 1ms)，2=波形(min 10ms)
+    const int mode = ui->cmb_transferMode->currentIndex();
+    const int minMs = (mode == 1) ? 1 : 10;
+
+    ui->spb_specRefashTime->setMinimum(minMs);
+    if (ui->spb_specRefashTime->value() < minMs)
+        ui->spb_specRefashTime->setValue(minMs);
+}
+
 void MainWindow::refreshSpectrumPlot()
 {
     const int channel = ui->spb_channel->value();
@@ -564,8 +593,101 @@ void MainWindow::refreshWaveformPlot()
     ui->plotWave->refreshPlot();
 }
 
-// 开始测量
-void MainWindow::on_btn_startMeasure_clicked()
+void MainWindow::appendUdpLog(const QString &line)
+{
+    const QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+    ui->tbLog_UDP->append(QStringLiteral("[%1] %2").arg(ts, line));
+}
+
+void MainWindow::onUdpDatagramReceived(const QString &asciiText, const QString &senderInfo)
+{
+    appendUdpLog(QStringLiteral("RECV from %1: %2").arg(senderInfo, asciiText));
+}
+
+void MainWindow::onUdpBindStateChanged(bool bound, const QString &message)
+{
+    appendUdpLog(message);
+    if (bound)
+        qInfo() << message;
+    else
+        qWarning() << message;
+}
+
+quint16 MainWindow::udpBroadcastPort() const
+{
+    JsonSettings *runSettings = GlobalSettings::instance()->mRunSettings;
+    ScopedFileLock lock(runSettings);
+    return static_cast<quint16>(runSettings->getValueByPath("Network/udpBroadcastPort", 6000).toInt());
+}
+
+void MainWindow::startUdpListening()
+{
+    if (m_udpListening)
+        return;
+
+    if (!m_udpShotReceiver->startListening(udpBroadcastPort()))
+        return;
+
+    m_udpListening = true;
+}
+
+void MainWindow::stopUdpListening()
+{
+    if (!m_udpListening && !m_udpShotReceiver->isListening())
+        return;
+
+    m_udpShotReceiver->stopListening();
+    m_udpListening = false;
+}
+
+void MainWindow::saveShotNumberFile(const QString &shotNumber) const
+{
+    const QString savePath = ui->le_savePath->text().trimmed();
+    if (savePath.isEmpty())
+        return;
+
+    QDir dir(savePath);
+    if (!dir.exists() && !dir.mkpath("."))
+        return;
+
+    const QString filePath = dir.filePath(QStringLiteral("ShotNumber.txt"));
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return;
+
+    QByteArray payload = shotNumber.toUtf8();
+    payload.append('\n');
+    file.write(payload);
+}
+
+void MainWindow::onUdpShotNumberChanged(const QString &shotNumber)
+{
+    if (shotNumber == m_currentShotNumber)
+        return;
+
+    m_currentShotNumber = shotNumber;
+    ui->lineEdit_shotID->setText(shotNumber);
+    saveShotNumberFile(shotNumber);
+
+    const QString info = tr("炮号已刷新：%1").arg(shotNumber);
+    qInfo() << info;
+    appendUdpLog(info);
+
+    // 自动测量：收到新炮号后自动开始一次测量
+    const int measureMode = ui->comboBox_2->currentIndex();
+    if (measureMode != 1)
+        return;
+
+    if (measureTimer->isActive())
+        on_btn_stopMeasure_clicked();
+
+    QTimer::singleShot(100, this, [this]() {
+        if (!startMeasureInternal())
+            qWarning() << "UDP 触发自动测量失败";
+    });
+}
+
+bool MainWindow::startMeasureInternal()
 {
     ui->plotWave->clearData();
     ui->plotWave->refreshPlot();
@@ -575,31 +697,26 @@ void MainWindow::on_btn_startMeasure_clicked()
     spectrumPlotThrottle.invalidate();
 
     DetParameter detPara = {};
-    //触发模式：外触发、软件触发
-    detPara.trigMode = Order::TriggerMode::SoftwareTrigger; //先固定位软件触发
+    detPara.trigMode = Order::TriggerMode::SoftwareTrigger;
 
-    //能谱模式
-    int mode = ui->cmb_transferMode->currentIndex();
-    if(mode == 0){
+    const int mode = ui->cmb_transferMode->currentIndex();
+    if (mode == 0) {
         detPara.transferMode = Order::TransferMode::Spectrum512;
-    } else if(mode == 1){
+    } else if (mode == 1) {
         detPara.transferMode = Order::TransferMode::Spectrum16;
-    } else if(mode == 2){
+    } else if (mode == 2) {
         detPara.transferMode = Order::TransferMode::Waveform;
     }
-    
-    //测量时长，ms
+
     detPara.measureTime = ui->spb_measureTime->value();
 
-    JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
+    JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
     ScopedFileLock lock(settings);
 
-    //能谱相关参数，和 DetectorSetting::loadSettings() 使用同一组配置项
     detPara.spectrumRefreshInterval = ui->spb_specRefashTime->value();
     detPara.spectrumTriggerThreshold = settings->getValueByPath("FPGA/threshold").toInt();
     detPara.spectrumDeadTime = settings->getValueByPath("FPGA/deadTime").toInt();
 
-    //波形触发阈值，CH1~CH32
     for (int channel = 1; channel <= 32; ++channel) {
         detPara.waveformTriggerThreshold[channel - 1] =
             settings->getValueByPath(QString("FPGA/wave/threshold%1").arg(channel), 50).toInt();
@@ -616,44 +733,49 @@ void MainWindow::on_btn_startMeasure_clicked()
         }
     }
 
-    // 文件名产生：存储路径+炮号+测量时间
-    QString savePath = ui->le_savePath->text();
-    if (savePath.isEmpty()){
-        QMessageBox::information(this, "请先选择数据保存路径", "提示");
-        return;
+    const QString savePath = ui->le_savePath->text();
+    if (savePath.isEmpty()) {
+        QMessageBox::information(this, tr("提示"), tr("请先选择数据保存路径"));
+        return false;
     }
-    // 将测量参数保存到成员变量，以便在测量过程中使用
+
     mdetPara = detPara;
-    
+
     QDir dir;
-    if (!dir.exists(savePath))
-    {
-        if (!dir.mkpath(savePath))
-        {
-            QMessageBox::information(this, "请先选择数据保存路径", "提示");
-            return ;
-        }
+    if (!dir.exists(savePath) && !dir.mkpath(savePath)) {
+        QMessageBox::information(this, tr("提示"), tr("请先选择数据保存路径"));
+        return false;
     }
 
-    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    const QString shotNumber = ui->lineEdit_shotID->text().trimmed();
+    m_currentShotNumber = shotNumber;
 
-    // 设置存储文件格式
     commandHelper->setSaveFileFormat(ui->cmb_saveFormat->currentIndex() == 0 ? Binary : Text);
     commandHelper->setSavePath(QDir::toNativeSeparators(QFileInfo(savePath).absoluteFilePath()));
+    commandHelper->setShotNumber(shotNumber);
     commandHelper->startMeasure(detPara);
     measureTimer->start(detPara.measureTime);
-    qInfo() << "定时测量已开始，测量时长:" << detPara.measureTime << "ms";
+    qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+    return true;
+}
+
+// 开始测量
+void MainWindow::on_btn_startMeasure_clicked()
+{
+    startMeasureInternal();
 }
 
 //打开探测器供电电源，通过继电器进行控制探测器的电源
 void MainWindow::on_bt_powerOn_clicked()
 {
+    startUdpListening();
     commandHelper->PowerOnRelay();
 }
 
 //关闭探测器供电电源，通过继电器进行控制探测器的电源
 void MainWindow::on_bt_powerOff_clicked()
 {
+    stopUdpListening();
     commandHelper->PowerOffRelay();
 }
 

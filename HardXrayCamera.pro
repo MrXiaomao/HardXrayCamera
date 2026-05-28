@@ -13,6 +13,7 @@ CONFIG += c++17
 
 SOURCES += \
     commandhelper.cpp \
+    udpshotreceiver.cpp \
     detectorsetting.cpp \
     fixeddataplotwidget.cpp \
     globalsettings.cpp \
@@ -27,6 +28,7 @@ SOURCES += \
 
 HEADERS += \
     commandhelper.h \
+    udpshotreceiver.h \
     detectorsetting.h \
     fixeddataplotwidget.h \
     globalsettings.h \
