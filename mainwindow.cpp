@@ -79,7 +79,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotTemp->setYAxisLabel("温度 (℃)");
     ui->plotTemp->setTimeWindow(180);
 
-    commandHelper = new CommandHelper();
+    commandHelper = CommandHelper::instance();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
@@ -859,5 +859,23 @@ void MainWindow::on_btn_stopMeasure_clicked()
     printSpectrumSequenceSummary();
     measureTimer->stop();
     qInfo() << "手动停止测量";
+}
+
+
+void MainWindow::on_action_hardwareSetting_triggered()
+{
+    // 硬件参数设置
+
+}
+
+#include "otaupgradewindow.h"
+void MainWindow::on_actionFPGA_triggered()
+{
+    // FPGA远程更新
+    OTAUpgradeWindow *w = new OTAUpgradeWindow(this);
+    w->setAttribute(Qt::WA_DeleteOnClose, true);
+    w->setWindowFlags(Qt::WindowCloseButtonHint|Qt::Dialog);
+    w->setWindowModality(Qt::ApplicationModal);
+    w->showNormal();
 }
 

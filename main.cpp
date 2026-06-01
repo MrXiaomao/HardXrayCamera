@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QTextCodec>
+#include <QStyleFactory>
 
 #include <log4qt/log4qt.h>
 #include <log4qt/logger.h>
@@ -73,6 +74,7 @@ int main(int argc, char *argv[])
 
     //全局代码都采用该编码方式。
     QTextCodec::setCodecForLocale(QTextCodec::codecForMib(106));/* Utf8 */
+    QApplication::setStyle(QStyleFactory::create("fusion"));//WindowsVista fusion windows
 
     // 启用新的日子记录类
     QString sConfFilename = "./log4qt.conf";

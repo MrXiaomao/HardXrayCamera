@@ -262,8 +262,7 @@ void CommandHelper::initFPGA1Commands()
 {
     //传输模式设置指令
     QByteArray cmdSetTransferMode = Order::setTransferMode(Order::TransferMode::Spectrum512);
-    sendCommand(client_det1, cmdSetTransferMode, "传输模式设置", "FPGA1 512道能谱");
-    
+    sendCommand(client_det1, cmdSetTransferMode, "传输模式设置", "FPGA1 512道能谱");    
 }
 
 void CommandHelper::initFPGA2Commands()
@@ -795,4 +794,37 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
 void CommandHelper::handleARM2Data(const QByteArray &binaryData)
 {
     qDebug() << "Received data from ARM 2:" << binaryData.toHex(' ');
+}
+
+void CommandHelper::startOTAUpgrade(quint8 index)
+{
+    TcpClient* client = nullptr;
+    if (1 == index)
+        client = client_det1;
+    else
+        client = client_det2;
+
+    //client->send();
+}
+
+void CommandHelper::endOTAUpgrade(quint8 index)
+{
+    TcpClient* client = nullptr;
+    if (1 == index)
+        client = client_det1;
+    else
+        client = client_det2;
+
+    //client->send();
+}
+
+bool CommandHelper::sendOTAUpgradeData(quint8 index, const QByteArray& data)
+{
+    TcpClient* client = nullptr;
+    if (1 == index)
+        client = client_det1;
+    else
+        client = client_det2;
+
+    client->send(data);
 }

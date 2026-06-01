@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
@@ -34,6 +34,11 @@ class CommandHelper : public QObject
 public:
     explicit CommandHelper(QObject *parent = nullptr);
     ~CommandHelper() override;
+
+    static CommandHelper *instance() {
+        static CommandHelper commHelper;
+        return &commHelper;
+    }
 
     void testSend();
     
@@ -80,6 +85,11 @@ public:
         QMutexLocker locker(&m_measurementMutex);
         mShotNumber = shotNumber;
     }
+
+    // OTA升级
+    void startOTAUpgrade(quint8 index);
+    bool sendOTAUpgradeData(quint8 index, const QByteArray& data);
+    void endOTAUpgrade(quint8 index);
 
 private:
     // 初始化常用指令

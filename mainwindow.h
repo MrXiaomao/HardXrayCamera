@@ -92,6 +92,10 @@ private slots:
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
 
+    void on_action_hardwareSetting_triggered();
+
+    void on_actionFPGA_triggered();
+
 private:
     struct SpectrumEntry {
         int detectorIndex = 0;

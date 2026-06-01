@@ -419,19 +419,15 @@
           <set>Qt::AlignCenter</set>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
+          <property name="leftMargin">
+           <number>6</number>
+          </property>
+          <property name="topMargin">
+           <number>6</number>
+          </property>
+          <property name="rightMargin">
+           <number>6</number>
+          </property>
           <item>
            <layout class="QGridLayout" name="gridLayout">
             <item row="2" column="1">
@@ -544,19 +540,6 @@
           <set>Qt::AlignCenter</set>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <item>
-           <spacer name="horizontalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
           <item>
            <layout class="QGridLayout" name="gridLayout_2">
             <property name="verticalSpacing">
@@ -944,7 +927,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>21</height>
+     <height>17</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">
@@ -958,7 +941,7 @@
      <string>配置</string>
     </property>
     <addaction name="action_setting"/>
-    <addaction name="action_2"/>
+    <addaction name="action_hardwareSetting"/>
    </widget>
    <widget class="QMenu" name="menu_3">
     <property name="title">
@@ -983,7 +966,7 @@
     <string>网络配置</string>
    </property>
   </action>
-  <action name="action_2">
+  <action name="action_hardwareSetting">
    <property name="text">
     <string>硬件参数配置</string>
    </property>
