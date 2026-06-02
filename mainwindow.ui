@@ -805,11 +805,6 @@
                 <string>16道能谱</string>
                </property>
               </item>
-              <item>
-               <property name="text">
-                <string>波形</string>
-               </property>
-              </item>
              </widget>
             </item>
             <item row="8" column="0">
@@ -927,7 +922,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>17</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">
@@ -961,6 +956,23 @@
    <addaction name="menu_3"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="action_relayNetOpen"/>
+   <addaction name="action_relayNetClose"/>
+   <addaction name="action_powerOn"/>
+   <addaction name="action_powerOff"/>
+   <addaction name="action_connectDet"/>
+   <addaction name="action_disconnectDet"/>
+  </widget>
   <action name="action_setting">
    <property name="text">
     <string>网络配置</string>
@@ -984,6 +996,70 @@
   <action name="actionFPGA">
    <property name="text">
     <string>FPGA程序远程更新</string>
+   </property>
+  </action>
+  <action name="action_relayNetOpen">
+   <property name="text">
+    <string>网络连接</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_relayNetClose">
+   <property name="text">
+    <string>网络断开</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_powerOn">
+   <property name="text">
+    <string>电源开启</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_powerOff">
+   <property name="text">
+    <string>电源关闭</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_connectDet">
+   <property name="text">
+    <string>开机</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_disconnectDet">
+   <property name="text">
+    <string>关机</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_startMeasure">
+   <property name="text">
+    <string>开始测量</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_stopMeasure">
+   <property name="text">
+    <string>停止测量</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
    </property>
   </action>
  </widget>

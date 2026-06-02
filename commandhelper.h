@@ -140,6 +140,10 @@ signals:
     void sigDetector2Status(bool on);
     void sigDetector1Fault();//故障，一般指网络不通
     void sigDetector2Fault();
+    void sigDetector3Status(bool on);
+    void sigDetector4Status(bool on);
+    void sigDetector3Fault();//故障，一般指网络不通
+    void sigDetector4Fault();
 
     // ARM状态
     void sigARM1Status(bool on);
@@ -158,23 +162,31 @@ public slots:
     void handleRelayData(const QByteArray &binaryData);
     void handleDet1Data(const QByteArray &binaryData);
     void handleDet2Data(const QByteArray &binaryData);
+    void handleDet3Data(const QByteArray &binaryData);
+    void handleDet4Data(const QByteArray &binaryData);
     void handleARM1Data(const QByteArray &binaryData);
     void handleARM2Data(const QByteArray &binaryData);
 
 private:
     TcpClient* client_det1; //FPGA板1
     TcpClient* client_det2; //FPGA板2
+    TcpClient* client_det3; //FPGA板3
+    TcpClient* client_det4; //FPGA板4
     TcpClient* client_arm1; //ARM设备1
     TcpClient* client_arm2; //ARM设备2
     TcpClient* client_relay; //继电器
 
     QString ip_det1;
     QString ip_det2;
+    QString ip_det3;
+    QString ip_det4;
     QString ip_arm1;
     QString ip_arm2;
     QString ip_relay;
     quint16 port_det1;
     quint16 port_det2;
+    quint16 port_det3;
+    quint16 port_det4;
     quint16 port_arm1;
     quint16 port_arm2;
     quint16 port_relay;
@@ -183,11 +195,15 @@ private:
     saveFileFormat mfileFormat = Binary;
     QString mSavePath = "data"; //默认保存路径
     QString mShotNumber; // 当前炮号，用于数据文件命名
-    QString mfileNameDet1; //当前测量的文件名，包含路径
-    QString mfileNameDet2; //当前测量的文件名，包含路径
+    QString mfileNameDet1; //当前测量的能谱文件名，包含路径
+    QString mfileNameDet2; //当前测量的能谱文件名，包含路径
+    QString mfileNameDet3; //当前测量的波形文件名，包含路径
+    QString mfileNameDet4; //当前测量的波形文件名，包含路径
     DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等
     QByteArray m_det1Buffer;
     QByteArray m_det2Buffer;
+    QByteArray m_det3Buffer;
+    QByteArray m_det4Buffer;
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
@@ -196,6 +212,8 @@ private:
 
     QFile m_det1File;
     QFile m_det2File;
+    QFile m_det3File;
+    QFile m_det4File;
 
     mutable QMutex m_measurementMutex;
 

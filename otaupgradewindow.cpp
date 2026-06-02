@@ -223,30 +223,26 @@ void OTAUpgradeWindow::startNextTask()
     sigWriteLog(tr("=== 开始执行任务%1：探测器[#%2]（分区：%3） ===")
                     .arg(m_currentTaskIndex + 1).arg(index).arg(partition));
 
-    // 1. 发送更新数据包和更新地址（原业务逻辑保留）
-    QByteArray sectorData = QByteArray::fromHex("12 34 00 0F CA 11 00 00 00 00 AB CD");
+    // 1.1.1 发送更新数据包和更新地址（原业务逻辑保留）
+    QByteArray sectorData = QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 00 AB CD");
+    commHelper->sendOTAUpgradeData(index, sectorData);
+
+    // 1.1.2 计数块数
     qint64 fileSize = QFileInfo(filePath).size();
-    quint8 sectorCount = fileSize / 262144; // 扇区大小262144
-    sectorData[9] = sectorCount & 0xFF;
+    quint8 sectorCount = qCeil((double)fileSize / (64*1024)); // 计数块数
 
+    // 2. 按照特定地址块进行Flash擦除指令
+    //第4-5字节代表特定地址，6-7字节代表根据文件大小要进行擦除的块区
+    sectorData = QByteArray::fromHex("55 04 01 00 30 00 00 f0");
+    sectorData[5] = (sectorCount >> 8) & 0xFF;
+    sectorData[6] = sectorCount & 0xFF;
+    commHelper->sendOTAUpgradeData(index, sectorData);
+
+    // 3. 按照特定地址进行Flash写入指令
+    sectorData[1] = 0x05;
+    sectorData[5] = 0x00;
+    sectorData[6] = 0x00;
     if (!commHelper->sendOTAUpgradeData(index, sectorData)) {
-        if (index == 0){
-            qCritical() << tr("时钟同步模块发送更新数据包失败，跳过该任务").arg(index);
-            sigWriteLog(tr("时钟同步模块发送更新数据包失败，跳过该任务").arg(index), QtCriticalMsg);
-        }
-        else{
-            qCritical() << tr("时钟同步模块发送更新数据包失败，跳过该任务").arg(index);
-            sigWriteLog(tr("探测器[#%1]发送更新数据包失败，跳过该任务").arg(index), QtCriticalMsg);
-        }
-        m_currentTaskIndex++;
-        startNextTask(); // 直接执行下一个任务
-        return;
-    }
-    QThread::msleep(1000); // 子线程休眠，不阻塞主线程
-
-    QByteArray addrData = QByteArray::fromHex("12 34 00 0F CA 10 00 00 00 00 AB CD");
-    addrData[7] = (ui->comboBox_partition->currentIndex() == 0) ? 0x00 : 0x80;
-    if (!commHelper->sendOTAUpgradeData(index, addrData)) {
         qCritical() << tr("探测器[#%1]发送更新地址失败，跳过该任务").arg(index);
         sigWriteLog(tr("探测器[#%1]发送更新地址失败，跳过该任务").arg(index), QtCriticalMsg);
         m_currentTaskIndex++;
@@ -255,7 +251,7 @@ void OTAUpgradeWindow::startNextTask()
     }
     QThread::msleep(1000); // 子线程休眠，不阻塞主线程
 
-    // 2. 启动当前任务的异步发送（子线程执行）
+    // 4. 启动当前任务的异步发送（子线程执行）
     QFuture<void> future = QtConcurrent::run(this, &OTAUpgradeWindow::asyncSendOTAData,
                                              index, filePath, partition);
 
@@ -280,80 +276,6 @@ void OTAUpgradeWindow::on_pushButton_exit_clicked()
 }
 
 
-void OTAUpgradeWindow::on_pushButton_switch_clicked()
-{
-    QVector<int> validIndexes;
-    if (ui->checkBox_det1->isEnabled() && ui->checkBox_det1->isChecked())
-        validIndexes.append(1);
-
-    if (ui->checkBox_det2->isEnabled() && ui->checkBox_det2->isChecked())
-        validIndexes.append(2);
-
-    if (ui->checkBox_det3->isEnabled() && ui->checkBox_det3->isChecked())
-        validIndexes.append(3);
-
-    if (ui->checkBox_det4->isEnabled() && ui->checkBox_det4->isChecked())
-        validIndexes.append(4);
-
-    if (validIndexes.size() == 0) {
-        // 没有选中任何行
-        QMessageBox::warning(
-            this,
-            tr("自定义通道测量——提示"),
-            tr("请先选择一个探测器通道，再执行此操作。")
-            );
-        return;  // 或者给个提示
-    }
-
-    QString selectedPartition;
-    if (ui->comboBox_partition->currentIndex() == 0){
-        selectedPartition = QStringLiteral("主分区程序");
-    } else {
-        selectedPartition = QStringLiteral("备用分区程序");
-    }
-
-    for (const auto index : validIndexes) {
-        if (index == 0){
-            qDebug() << (tr("开始切换[时间同步触发模块]程序至[%1]......").arg(selectedPartition));
-            emit sigWriteLog(tr("开始切换[时间同步触发模块]程序至[%1]......").arg(selectedPartition));
-        }
-        else{
-            qDebug() << (tr("开始切换探测器[#%1]程序至[%2]......").arg(index).arg(selectedPartition));
-            emit sigWriteLog(tr("开始切换探测器[#%1]程序至[%2]......").arg(index).arg(selectedPartition));
-        }
-
-        // 切换程序指令
-        QByteArray data = QByteArray::fromHex("12 34 00 0F CA 12 00 00 00 00 AB CD");
-        if (ui->comboBox_partition->currentIndex() == 0){
-            data[9] = 0x00;
-        } else {
-            data[9] = 0x01;
-        }
-
-        if (!commHelper->sendOTAUpgradeData(index, data)){
-            if (index == 0){
-                qDebug() << (tr("[时间同步触发模块]程序切换失败！！！"));
-                emit sigWriteLog(tr("[时间同步触发模块]程序切换失败！！！"));
-            }
-            else{
-                qDebug() << (tr("探测器[#%1]程序切换失败！！！").arg(index).arg(selectedPartition));
-                emit sigWriteLog(tr("探测器[#%1]程序切换失败！！！").arg(index).arg(selectedPartition));
-            }
-
-            continue;
-        }
-
-        if (index == 0){
-            qDebug() << (tr("[时间同步触发模块]程序切换成功！！！"));
-            emit sigWriteLog(tr("[时间同步触发模块]程序切换成功！！！"));
-        }
-        else{
-            qDebug() << (tr("探测器[#%1]程序切换成功！！！").arg(index).arg(selectedPartition));
-            emit sigWriteLog(tr("探测器[#%1]程序切换成功！！！").arg(index).arg(selectedPartition));
-        }
-    }
-}
-
 void OTAUpgradeWindow::asyncSendOTAData(int index, const QString& filePath, const QString& selectedPartition)
 {
     QFile file(filePath);
@@ -363,7 +285,7 @@ void OTAUpgradeWindow::asyncSendOTAData(int index, const QString& filePath, cons
     }
 
     qint64 fileSize = QFileInfo(filePath).size();
-    int sendCount = fileSize / 256;
+    int sendCount = qCeil((double)fileSize / 256);
     bool sendSuccess = true;
     m_currentFileSize[index] = fileSize;
     //m_returnDataSize[index] = 0;
@@ -384,7 +306,7 @@ void OTAUpgradeWindow::asyncSendOTAData(int index, const QString& filePath, cons
             break;
         }
 
-        QThread::msleep(50); // 子线程休眠，不阻塞主线程
+        QThread::msleep(1); // 子线程休眠，不阻塞主线程
     }
 
     file.close();
@@ -395,33 +317,6 @@ void OTAUpgradeWindow::asyncSendOTAData(int index, const QString& filePath, cons
     else{
         std::thread([=](){
             emit sigSendFinished(index, selectedPartition, sendSuccess);
-
-            // QElapsedTimer timer;
-            // timer.start();
-            // bool timeout = true;
-            // while (timer.elapsed() < 30000) { // 最长等待30秒
-            //     if (m_returnDataSize[index] >= m_currentFileSize[index]) {
-            //         timeout = false;
-            //         break;
-            //     }
-
-            //     QThread::msleep(500); // 每500ms检查一次
-            // }
-
-            // if (timeout)
-            // {
-            //     if (index == 0)
-            //         emit sigWriteLog(tr("[时间同步触发模块]数据校验超时失败！！！"));
-            //     else
-            //         emit sigWriteLog(tr("探测器[#%1]数据校验超时失败！！！").arg(index));
-            // }
-            // else
-            // {
-            //     if (index == 0)
-            //         emit sigWriteLog(tr("[时钟同步模块]数据校验结果正确！"));
-            //     else
-            //         emit sigWriteLog(tr("探测器[#%1]数据校验结果正确！").arg(index));
-            // }
         }).join();
     }
 
@@ -433,10 +328,6 @@ void OTAUpgradeWindow::slotSendProgress(int index, const QString& partition, int
     // 更新进度条（主线程安全）
     int progress = (current * 100) / total;
     ui->progressBar->setValue(progress);
-
-    // 更新日志
-    // sigWriteLog(tr("探测器[#%1][%2]更新进度：%3/%4（%5%）")
-    //              .arg(index).arg(partition).arg(current).arg(total).arg(progress));
 }
 
 void OTAUpgradeWindow::slotSendFinished(int index, const QString& partition, bool success)
@@ -445,9 +336,7 @@ void OTAUpgradeWindow::slotSendFinished(int index, const QString& partition, boo
 
     if (success) {
         // 发送完成指令（原业务逻辑保留）
-        QByteArray finishData = QByteArray::fromHex("12 34 00 0F CA 10 00 00 00 00 AB CD");
-        finishData[7] = (ui->comboBox_partition->currentIndex() == 0) ? 0x00 : 0x80;
-
+        QByteArray finishData = QByteArray::fromHex("55 06 01 00 00 00 00 f0");
         if (commHelper->sendOTAUpgradeData(index, finishData)) {            
             qDebug() << (tr("探测器[#%1][%2]数据发送完毕！").arg(index).arg(partition));
             emit sigWriteLog(tr("探测器[#%1][%2]数据发送完毕！").arg(index).arg(partition));

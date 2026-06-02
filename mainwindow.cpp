@@ -88,8 +88,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector2Status, this, &MainWindow::onDetector2StatusChanged);
+    connect(commandHelper, &CommandHelper::sigDetector3Status, this, &MainWindow::onDetector3StatusChanged);
+    connect(commandHelper, &CommandHelper::sigDetector4Status, this, &MainWindow::onDetector4StatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Fault, this, &MainWindow::onDetector1ConnectFault);
     connect(commandHelper, &CommandHelper::sigDetector2Fault, this, &MainWindow::onDetector2ConnectFault);
+    connect(commandHelper, &CommandHelper::sigDetector3Fault, this, &MainWindow::onDetector3ConnectFault);
+    connect(commandHelper, &CommandHelper::sigDetector4Fault, this, &MainWindow::onDetector4ConnectFault);
     connect(commandHelper, &CommandHelper::sigARM1Status, this, &MainWindow::onArm1StatusChanged);
     connect(commandHelper, &CommandHelper::sigARM2Status, this, &MainWindow::onArm2StatusChanged);
     connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData);
@@ -185,6 +189,8 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         // 断电后清除各设备在线标记
         detectOnline[0] = false;
         detectOnline[1] = false;
+        detectOnline[2] = false;
+        detectOnline[3] = false;
         armSensorOnline[0] = false;
         armSensorOnline[1] = false;
     }
@@ -212,6 +218,28 @@ void MainWindow::onDetector2StatusChanged(bool on)
     }
 }
 
+void MainWindow::onDetector3StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "FPGA板3状态: 已连接";
+        detectOnline[2] = true;
+    } else {
+        qInfo() << "FPGA板3状态: 已断开";
+        detectOnline[2] = false;
+    }
+}
+
+void MainWindow::onDetector4StatusChanged(bool on)
+{
+    if (on) {
+        qInfo() << "FPGA板4状态: 已连接";
+        detectOnline[3] = true;
+    } else {
+        qInfo() << "FPGA板4状态: 已断开";
+        detectOnline[3] = false;
+    }
+}
+
 void MainWindow::onDetector1ConnectFault()
 {
     qWarning() << "FPGA板1连接失败";
@@ -222,6 +250,18 @@ void MainWindow::onDetector2ConnectFault()
 {
     qWarning() << "FPGA板2连接失败";
     detectOnline[1] = false;
+}
+
+void MainWindow::onDetector3ConnectFault()
+{
+    qWarning() << "FPGA板3连接失败";
+    detectOnline[2] = false;
+}
+
+void MainWindow::onDetector4ConnectFault()
+{
+    qWarning() << "FPGA板4连接失败";
+    detectOnline[3] = false;
 }
 
 void MainWindow::onArm1StatusChanged(bool on)
@@ -691,6 +731,8 @@ bool MainWindow::startMeasureInternal()
 {
     ui->plotWave->clearData();
     ui->plotWave->refreshPlot();
+    ui->plotSpec->clearData();
+    ui->plotSpec->refreshPlot();
     clearSpectrumData();
     resetWaveformCounters();
     resetSpectrumSequenceTracking();
@@ -704,10 +746,7 @@ bool MainWindow::startMeasureInternal()
         detPara.transferMode = Order::TransferMode::Spectrum512;
     } else if (mode == 1) {
         detPara.transferMode = Order::TransferMode::Spectrum16;
-    } else if (mode == 2) {
-        detPara.transferMode = Order::TransferMode::Waveform;
     }
-
     detPara.measureTime = ui->spb_measureTime->value();
 
     JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
@@ -722,10 +761,9 @@ bool MainWindow::startMeasureInternal()
             settings->getValueByPath(QString("FPGA/wave/threshold%1").arg(channel), 50).toInt();
     }
 
-    if (detPara.transferMode == Order::TransferMode::Waveform) {
+    {
         waveformPlotTimer->start();
-    } else {
-        waveformPlotTimer->stop();
+
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
             ui->plotSpec->setXRange(1, 16);
         } else {
@@ -877,5 +915,63 @@ void MainWindow::on_actionFPGA_triggered()
     w->setWindowFlags(Qt::WindowCloseButtonHint|Qt::Dialog);
     w->setWindowModality(Qt::ApplicationModal);
     w->showNormal();
+}
+
+
+void MainWindow::on_action_relayNetOpen_triggered()
+{
+    commandHelper->connectRelay();
+}
+
+
+void MainWindow::on_action_relayNetClose_triggered()
+{
+    commandHelper->disconnectRelay();
+}
+
+
+void MainWindow::on_action_powerOn_triggered()
+{
+    startUdpListening();
+    commandHelper->PowerOnRelay();
+}
+
+
+void MainWindow::on_action_powerOff_triggered()
+{
+    stopUdpListening();
+    commandHelper->PowerOffRelay();
+}
+
+
+void MainWindow::on_action_connectDet_triggered()
+{
+    commandHelper->connectARM();
+    commandHelper->connectDetector();
+}
+
+
+
+void MainWindow::on_action_disconnectDet_triggered()
+{
+    commandHelper->disconnectARM();
+    commandHelper->disconnectDetector();
+}
+
+
+void MainWindow::on_action_startMeasure_triggered()
+{
+    startMeasureInternal();
+}
+
+
+void MainWindow::on_action_stopMeasure_triggered()
+{
+    waveformPlotTimer->stop();
+    commandHelper->stopMeasure();
+    printWaveformCollectionSummary();
+    printSpectrumSequenceSummary();
+    measureTimer->stop();
+    qInfo() << "手动停止测量";
 }
 

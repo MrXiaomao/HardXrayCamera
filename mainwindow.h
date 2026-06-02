@@ -67,8 +67,12 @@ private slots:
     void onRelayPowerStatusChanged(bool on);
     void onDetector1StatusChanged(bool on);
     void onDetector2StatusChanged(bool on);
+    void onDetector3StatusChanged(bool on);
+    void onDetector4StatusChanged(bool on);
     void onDetector1ConnectFault();
     void onDetector2ConnectFault();
+    void onDetector3ConnectFault();
+    void onDetector4ConnectFault();
     void onArm1StatusChanged(bool on);
     void onArm2StatusChanged(bool on);
     void onArm1SensorData(float temp, float voltage, float current);
@@ -95,6 +99,22 @@ private slots:
     void on_action_hardwareSetting_triggered();
 
     void on_actionFPGA_triggered();
+
+    void on_action_relayNetOpen_triggered();
+
+    void on_action_relayNetClose_triggered();
+
+    void on_action_powerOn_triggered();
+
+    void on_action_powerOff_triggered();
+
+    void on_action_connectDet_triggered();
+
+    void on_action_disconnectDet_triggered();
+
+    void on_action_startMeasure_triggered();
+
+    void on_action_stopMeasure_triggered();
 
 private:
     struct SpectrumEntry {
@@ -149,7 +169,7 @@ private:
     // 继电器电源开关状态
     bool replayPowerOn = false;
     // 探测器在线状态
-    bool detectOnline[2] = {false, false};
+    bool detectOnline[4] = {false, false, false, false};
 
     //系统时钟，目前用来随机产生arm传感器数据
     QTimer* sysTimer = nullptr;

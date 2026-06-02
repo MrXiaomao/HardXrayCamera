@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-24 14:36:24
  * @LastEditors: Maoxiaoqing
@@ -104,6 +104,8 @@ DetectorSetting::DetectorSetting(QWidget *parent)
     //给一个默认IP
     ui->widget_detIP1->setIP("0.0.0.0");
     ui->widget_detIP2->setIP("0.0.0.0");
+    ui->widget_detIP3->setIP("0.0.0.0");
+    ui->widget_detIP4->setIP("0.0.0.0");
     ui->widget_armIP1->setIP("0.0.0.0");
     ui->widget_armIP2->setIP("0.0.0.0");
     ui->widget_relayIP->setIP("0.0.0.0");
@@ -125,16 +127,22 @@ void DetectorSetting::loadSettings()
     // 网络配置读取
     QString ip_det1 = settings->getValueByPath("network/ip1").toString();
     QString ip_det2 = settings->getValueByPath("network/ip2").toString();
+    QString ip_det3 = settings->getValueByPath("network/ip3").toString();
+    QString ip_det4 = settings->getValueByPath("network/ip4").toString();
     QString ip_arm1 = settings->getValueByPath("network/ip_arm1").toString();
     QString ip_arm2 = settings->getValueByPath("network/ip_arm2").toString();
     QString ip_relay = settings->getValueByPath("network/ip_relay").toString();
     ui->widget_detIP1->setIP(ip_det1);
     ui->widget_detIP2->setIP(ip_det2);
+    ui->widget_detIP3->setIP(ip_det3);
+    ui->widget_detIP4->setIP(ip_det4);
     ui->widget_armIP1->setIP(ip_arm1);
     ui->widget_armIP2->setIP(ip_arm2);
     ui->widget_relayIP->setIP(ip_relay);
     ui->spinBox_portDet1->setValue(settings->getValueByPath("network/port_det1").toInt());
     ui->spinBox_portDet2->setValue(settings->getValueByPath("network/port_det2").toInt());
+    ui->spinBox_portDet3->setValue(settings->getValueByPath("network/port_det3").toInt());
+    ui->spinBox_portDet4->setValue(settings->getValueByPath("network/port_det4").toInt());
     ui->spinBox_armPort1->setValue(settings->getValueByPath("network/port_arm1").toInt());
     ui->spinBox_armPort2->setValue(settings->getValueByPath("network/port_arm2").toInt());
     ui->spinBox_portRelay->setValue(settings->getValueByPath("network/port_relay").toInt());
@@ -173,23 +181,31 @@ void DetectorSetting::on_btn_ok_accepted()
     // 网络配置读取
     QString ip_det1 = ui->widget_detIP1->getIP();
     QString ip_det2 = ui->widget_detIP2->getIP();
+    QString ip_det3 = ui->widget_detIP3->getIP();
+    QString ip_det4 = ui->widget_detIP4->getIP();
     QString ip_arm1 = ui->widget_armIP1->getIP();
     QString ip_arm2 = ui->widget_armIP2->getIP();
     QString ip_relay = ui->widget_relayIP->getIP();
     
     int port_det1 = ui->spinBox_portDet1->value();
     int port_det2 = ui->spinBox_portDet2->value();
+    int port_det3 = ui->spinBox_portDet3->value();
+    int port_det4 = ui->spinBox_portDet4->value();
     int port_arm1 = ui->spinBox_armPort1->value();
     int port_arm2 = ui->spinBox_armPort2->value();
     int port_relay = ui->spinBox_portRelay->value();
 
     settings->setValueByPath("network/ip1", ip_det1);
     settings->setValueByPath("network/ip2", ip_det2);
+    settings->setValueByPath("network/ip3", ip_det3);
+    settings->setValueByPath("network/ip4", ip_det4);
     settings->setValueByPath("network/ip_arm1", ip_arm1);
     settings->setValueByPath("network/ip_arm2", ip_arm2);
     settings->setValueByPath("network/ip_relay", ip_relay);
     settings->setValueByPath("network/port_det1", port_det1);
     settings->setValueByPath("network/port_det2", port_det2);
+    settings->setValueByPath("network/port_det3", port_det3);
+    settings->setValueByPath("network/port_det4", port_det4);
     settings->setValueByPath("network/port_arm1", port_arm1);
     settings->setValueByPath("network/port_arm2", port_arm2);
     settings->setValueByPath("network/port_relay", port_relay);
