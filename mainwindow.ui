@@ -24,7 +24,7 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
@@ -229,13 +229,58 @@
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_7">
            <item>
-            <widget class="TrendPlotWidget" name="plotTemp" native="true"/>
-           </item>
-           <item>
-            <widget class="TrendPlotWidget" name="plotVoltage" native="true"/>
-           </item>
-           <item>
-            <widget class="TrendPlotWidget" name="plotCurrent" native="true"/>
+            <widget class="QWidget" name="widget_plot" native="true">
+             <layout class="QHBoxLayout" name="horizontalLayout_8">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QGroupBox" name="">
+                <property name="title">
+                 <string>信号采集机箱</string>
+                </property>
+                <layout class="QVBoxLayout" name="verticalLayout_6">
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotTemp" native="true"/>
+                 </item>
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotVoltage" native="true"/>
+                 </item>
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotCurrent" native="true"/>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="">
+                <property name="title">
+                 <string>电源机箱</string>
+                </property>
+                <layout class="QVBoxLayout" name="verticalLayout_8">
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotTemp_2" native="true"/>
+                 </item>
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotVoltage_2" native="true"/>
+                 </item>
+                 <item>
+                  <widget class="TrendPlotWidget" name="plotCurrent_2" native="true"/>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+             </layout>
+            </widget>
            </item>
            <item>
             <widget class="QGroupBox" name="groupBox_2">
@@ -956,23 +1001,6 @@
    <addaction name="menu_3"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QToolBar" name="toolBar">
-   <property name="windowTitle">
-    <string>toolBar</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-   <addaction name="action_relayNetOpen"/>
-   <addaction name="action_relayNetClose"/>
-   <addaction name="action_powerOn"/>
-   <addaction name="action_powerOff"/>
-   <addaction name="action_connectDet"/>
-   <addaction name="action_disconnectDet"/>
-  </widget>
   <action name="action_setting">
    <property name="text">
     <string>网络配置</string>

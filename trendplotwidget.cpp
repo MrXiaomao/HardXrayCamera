@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 16:14:09
  * @LastEditors: Maoxiaoqing
@@ -90,28 +90,45 @@ void TrendPlotWidget::setTimeWindow(int seconds)
     m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
 }
 
-void TrendPlotWidget::appendPoint(double x, double y)
+void TrendPlotWidget::appendPoint(double x, double y, int graphIndex)
 {
     Q_UNUSED(x);
 
     const double now = QDateTime::currentDateTime().toSecsSinceEpoch();
-    m_xData.append(now);
-    m_yData.append(y);
-    m_graph->addData(now, y);
-    m_graph->data()->removeBefore(now - m_timeWindowSeconds);
+    // m_xData.append(now);
+    // m_yData.append(y);
+    m_plot->graph(graphIndex)->addData(now, y);
+    m_plot->graph(graphIndex)->data()->removeBefore(now - m_timeWindowSeconds);
     m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
 
     m_yMaxData = std::max<double>(m_yMaxData, y);
+}
+
+void TrendPlotWidget::appendPoints(double x, const QVector<double>& y)
+{
+    Q_UNUSED(x);
+
+    const double now = QDateTime::currentDateTime().toSecsSinceEpoch();
+    for (int i=0; i<y.size(); ++i)
+    {
+        m_plot->graph(i)->addData(now, y[i]);
+        m_plot->graph(i)->data()->removeBefore(now - m_timeWindowSeconds);
+        m_yMaxData = std::max<double>(m_yMaxData, y[i]);
+    }
+
+    m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
 }
 
 void TrendPlotWidget::clearData()
 {
     if(m_plot)
     {
-        m_graph->data()->clear();
+        for (int i=0; i<m_plot->graphCount(); ++i) {
+            m_plot->graph(i)->data().clear();
+        }
     }
-    m_xData.clear();
-    m_yData.clear();
+    // m_xData.clear();
+    // m_yData.clear();
 }
 
 void TrendPlotWidget::refreshPlot()
@@ -121,5 +138,26 @@ void TrendPlotWidget::refreshPlot()
         m_plot->yAxis->rescale(false);
         m_plot->yAxis->setRange(0, m_yMaxData * 1.2);
         m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void TrendPlotWidget::addGraph(int count)
+{
+    QVector<QColor> colors;
+    colors.push_back(Qt::black);
+    colors.push_back(Qt::red);
+    colors.push_back(Qt::green);
+    colors.push_back(Qt::blue);
+    colors.push_back(Qt::cyan);
+    colors.push_back(Qt::magenta);
+    for (int i=0; i<count; ++i){
+        QCPGraph* graph = m_plot->addGraph();
+        graph->setPen(QPen(colors[m_plot->graphCount() - 1]));
+        graph->setLineStyle(QCPGraph::lsLine);
+        graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
+        graph->setBrush(QBrush(QColor(0, 0, 255, 20)));
+        graph->setAntialiased(true);
+        graph->setAntialiasedFill(true);
+        graph->setAntialiasedFill(true);
     }
 }

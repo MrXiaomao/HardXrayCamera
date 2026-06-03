@@ -64,7 +64,6 @@ OTAUpgradeWindow::OTAUpgradeWindow(QWidget *parent)
 
         ui->lineEdit_filePath->setText(dirPath);
         ui->pushButton_ok->setEnabled(true);
-        ui->pushButton_switch->setEnabled(true);
 
         QMap<int, QString> rpdFiles = enumRpdFilesByNumber(dirPath);
         // 输出结果（按数字键升序排列）
@@ -183,7 +182,6 @@ void OTAUpgradeWindow::on_pushButton_ok_clicked()
     }
 
     ui->pushButton_ok->setEnabled(false);
-    ui->pushButton_switch->setEnabled(false);
     QString dirPath = ui->lineEdit_filePath->text();
     m_rpdFiles = enumRpdFilesByNumber(dirPath);
 
@@ -202,7 +200,6 @@ void OTAUpgradeWindow::on_pushButton_ok_clicked()
         startNextTask();
     } else {
         ui->pushButton_ok->setEnabled(true);
-        ui->pushButton_switch->setEnabled(true);
     }
 }
 
@@ -271,7 +268,6 @@ void OTAUpgradeWindow::on_pushButton_exit_clicked()
         commHelper->endOTAUpgrade(index);
 
     ui->pushButton_ok->setEnabled(true);
-    ui->pushButton_switch->setEnabled(true);
     this->close();
 }
 
@@ -358,9 +354,8 @@ void OTAUpgradeWindow::slotSendFinished(int index, const QString& partition, boo
 void OTAUpgradeWindow::slotUpgradeFinished()
 {
     // 所有任务完成
-    qDebug() << ("=== 所有OTA任务执行完毕 ===", QtInfoMsg);
+    qDebug() << "=== 所有OTA任务执行完毕 ===";
     sigWriteLog("=== 所有OTA任务执行完毕 ===", QtInfoMsg);
     ui->pushButton_ok->setEnabled(true);
-    ui->pushButton_switch->setEnabled(true);
     ui->progressBar->setValue(0);
 }

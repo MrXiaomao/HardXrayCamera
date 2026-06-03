@@ -150,8 +150,8 @@ signals:
     void sigARM2Status(bool on);
     void sigARM1Fault();//故障，一般指网络不通
     void sigARM2Fault();
-    void sigArm1SensorData(float, float, float);//ARM1传感器数据
-    void sigArm2SensorData(float, float, float);//ARM2传感器数据
+    void sigArm1SensorData(QVector<double>/*温度*/, QVector<double>/*电压*/, QVector<double>/*电流*/);//ARM1传感器数据
+    void sigArm2SensorData(QVector<double>/*温度*/, QVector<double>/*电压*/, QVector<double>/*电流*/);//ARM2传感器数据
 
     // 能谱数据
     void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
@@ -204,11 +204,14 @@ private:
     QByteArray m_det2Buffer;
     QByteArray m_det3Buffer;
     QByteArray m_det4Buffer;
+    QByteArray m_arm1Buffer;
+    QByteArray m_arm2Buffer;
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
 
     bool measure_started = false;
+    std::atomic_bool mIsUpgrading = false;
 
     QFile m_det1File;
     QFile m_det2File;

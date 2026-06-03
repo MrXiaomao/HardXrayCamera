@@ -106,8 +106,8 @@ DetectorSetting::DetectorSetting(QWidget *parent)
     ui->widget_detIP2->setIP("0.0.0.0");
     ui->widget_detIP3->setIP("0.0.0.0");
     ui->widget_detIP4->setIP("0.0.0.0");
-    ui->widget_armIP1->setIP("0.0.0.0");
-    ui->widget_armIP2->setIP("0.0.0.0");
+    ui->widget_armIP1->setIP("192.168.0.90");
+    ui->widget_armIP2->setIP("192.168.0.91");
     ui->widget_relayIP->setIP("0.0.0.0");
 
     loadSettings();

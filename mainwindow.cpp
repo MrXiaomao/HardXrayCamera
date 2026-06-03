@@ -64,21 +64,43 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotProfile->setYAxisLabel("计数");
     ui->plotProfile->setXRange(-25,25);
 
-    // ui->plotVoltage->setTitle("电压曲线");
-    ui->plotVoltage->setXAxisLabel("时间");
-    ui->plotVoltage->setYAxisLabel("电压 (V)");
-    ui->plotVoltage->setTimeWindow(180);
+    {
+        //信号采集机箱
+        // ui->plotVoltage->setTitle("电压曲线");
+        ui->plotVoltage->setXAxisLabel("时间");
+        ui->plotVoltage->setYAxisLabel("电压 (V)");
+        ui->plotVoltage->setTimeWindow(180);
 
-    // ui->plotCurrent->setTitle("电流曲线");
-    ui->plotCurrent->setXAxisLabel("时间");
-    ui->plotCurrent->setYAxisLabel("电流 (A)");
-    ui->plotCurrent->setTimeWindow(180);
+        // ui->plotCurrent->setTitle("电流曲线");
+        ui->plotCurrent->setXAxisLabel("时间");
+        ui->plotCurrent->setYAxisLabel("电流 (A)");
+        ui->plotCurrent->setTimeWindow(180);
 
-    // ui->plotTemp->setTitle("温度曲线");
-    ui->plotTemp->setXAxisLabel("时间");
-    ui->plotTemp->setYAxisLabel("温度 (℃)");
-    ui->plotTemp->setTimeWindow(180);
+        // ui->plotTemp->setTitle("温度曲线");// 共3条
+        ui->plotTemp->addGraph();
+        ui->plotTemp->addGraph();
+        ui->plotTemp->setXAxisLabel("时间");
+        ui->plotTemp->setYAxisLabel("温度 (℃)");
+        ui->plotTemp->setTimeWindow(180);
+    }
+    {
+        //电源机箱
+        // ui->plotVoltage->setTitle("电压曲线");
+        ui->plotVoltage_2->setXAxisLabel("时间");
+        ui->plotVoltage_2->setYAxisLabel("电压 (V)");
+        ui->plotVoltage_2->setTimeWindow(180);
 
+        // ui->plotCurrent->setTitle("电流曲线");
+        ui->plotCurrent_2->setXAxisLabel("时间");
+        ui->plotCurrent_2->setYAxisLabel("电流 (A)");
+        ui->plotCurrent_2->setTimeWindow(180);
+
+        // ui->plotTemp->setTitle("温度曲线");// 共6条
+        ui->plotTemp_2->addGraph(5);
+        ui->plotTemp_2->setXAxisLabel("时间");
+        ui->plotTemp_2->setYAxisLabel("温度 (℃)");
+        ui->plotTemp_2->setTimeWindow(180);
+    }
     commandHelper = CommandHelper::instance();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
@@ -141,11 +163,6 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onUdpShotNumberChanged);
     connect(m_udpShotReceiver, &UdpShotReceiver::bindStateChanged,
             this, &MainWindow::onUdpBindStateChanged);
-
-    sysTimer = new QTimer(this);
-    sysTimer->setInterval(1000);
-    connect(sysTimer, &QTimer::timeout, this, &MainWindow::onSysTimerTimeout);
-    sysTimer->start();
 
     // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
@@ -286,34 +303,89 @@ void MainWindow::onArm2StatusChanged(bool on)
     }
 }
 
-void MainWindow::onArm1SensorData(float temp, float voltage, float current)
+void MainWindow::onArm1SensorData(const QVector<double>&/*温度*/ temperature, const QVector<double>&/*电压*/ voltage, const QVector<double>&/*电流*/ current)
 {
-    ui->plotTemp->appendPoint(0, temp);
-    ui->plotVoltage->appendPoint(0, voltage);
-    ui->plotCurrent->appendPoint(0, current);
+    ui->plotTemp->appendPoints(0, temperature);
+    ui->plotVoltage->appendPoints(0, voltage);
+    ui->plotCurrent->appendPoints(0, current);
     ui->plotTemp->refreshPlot();
     ui->plotVoltage->refreshPlot();
     ui->plotCurrent->refreshPlot();
 
     // 超出阈值且探测器在线时，通过继电器切断电源
-    if (temp > ui->doubleSpinBox_temp->value()
-        || voltage > ui->doubleSpinBox_voltage->value()
-        || current > ui->doubleSpinBox_current->value()) {
+    bool isAlarm = false;
+    for (int i=0; i<temperature.size(); ++i){
+        if (temperature[i] > ui->doubleSpinBox_temp->value())
+        {
+            isAlarm = true;
+            break;
+        }
+    }
+
+    if (!isAlarm){
+        for (int i=0; i<voltage.size(); ++i){
+            if (voltage[i] > ui->doubleSpinBox_voltage->value())
+            {
+                isAlarm = true;
+                break;
+            }
+        }
+    }
+
+    if (!isAlarm){
+        for (int i=0; i<voltage.size(); ++i){
+            if (voltage[i] > ui->doubleSpinBox_current->value())
+            {
+                isAlarm = true;
+                break;
+            }
+        }
+    }
+
+    if (isAlarm) {
         if (detectOnline[0])
             commandHelper->PowerOffRelay();
     }
 }
 
-void MainWindow::onArm2SensorData(float temp, float voltage, float current)
+void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, const QVector<double>&/*电压*/ voltage, const QVector<double>&/*电流*/ current)
 {
-    ui->plotTemp->appendPoint(0, temp);
-    ui->plotVoltage->appendPoint(0, voltage);
-    ui->plotCurrent->appendPoint(0, current);
+    ui->plotTemp_2->appendPoints(0, temperature);
+    ui->plotVoltage_2->appendPoints(0, voltage);
+    ui->plotCurrent_2->appendPoints(0, current);
 
-    if (temp > ui->doubleSpinBox_temp->value()
-        || voltage > ui->doubleSpinBox_voltage->value()
-        || current > ui->doubleSpinBox_current->value()) {
-        if (detectOnline[1])
+    // 超出阈值且探测器在线时，通过继电器切断电源
+    bool isAlarm = false;
+    for (int i=0; i<temperature.size(); ++i){
+        if (temperature[i] > ui->doubleSpinBox_temp->value())
+        {
+            isAlarm = true;
+            break;
+        }
+    }
+
+    if (!isAlarm){
+        for (int i=0; i<voltage.size(); ++i){
+            if (voltage[i] > ui->doubleSpinBox_voltage->value())
+            {
+                isAlarm = true;
+                break;
+            }
+        }
+    }
+
+    if (!isAlarm){
+        for (int i=0; i<voltage.size(); ++i){
+            if (voltage[i] > ui->doubleSpinBox_current->value())
+            {
+                isAlarm = true;
+                break;
+            }
+        }
+    }
+
+    if (isAlarm) {
+        if (detectOnline[0])
             commandHelper->PowerOffRelay();
     }
 }
@@ -866,28 +938,6 @@ double generateValue(double base, double maxDelta, double& lastValue) {
     return newValue;
 }
 
-void MainWindow::onSysTimerTimeout()
-{
-    // 基准值和波动范围
-    const double baseTemp = 57.0;
-    const double tempDelta = 1.0;
-    const double baseVolt = 5.0;
-    const double voltDelta = 0.02;
-    const double baseCurr = 1.1;
-    const double currDelta = 0.05;
-
-    // 上一次值，初始为基准值
-    static double lastTemp = baseTemp;
-    static double lastVolt = baseVolt;
-    static double lastCurr = baseCurr;
-
-    double temp = generateValue(baseTemp, tempDelta, lastTemp);
-    double volt = generateValue(baseVolt, voltDelta, lastVolt);
-    double curr = generateValue(baseCurr, currDelta, lastCurr);
-
-    if (armSensorOnline[0])
-        commandHelper->sigArm1SensorData(temp, volt, curr);
-}
 
 void MainWindow::on_btn_stopMeasure_clicked()
 {
@@ -903,7 +953,10 @@ void MainWindow::on_btn_stopMeasure_clicked()
 void MainWindow::on_action_hardwareSetting_triggered()
 {
     // 硬件参数设置
-
+    DetectorSetting *settDialog = new DetectorSetting();
+    settDialog->setAttribute(Qt::WA_DeleteOnClose);
+    settDialog->setUdpPortEditable(!m_udpListening);
+    settDialog->exec();
 }
 
 #include "otaupgradewindow.h"

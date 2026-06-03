@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 16:14:09
  * @LastEditors: Maoxiaoqing
@@ -26,16 +26,18 @@ public:
     void setXAxisLabel(const QString& text);
     void setYAxisLabel(const QString& text);
     void setTimeWindow(int seconds);
-    void appendPoint(double x, double y);
+    void appendPoint(double x, double y, int graphIndex = 0);
+    void appendPoints(double x, const QVector<double>& y);
     void clearData();
     void refreshPlot();
+    void addGraph(int count = 1);
 
 signals:
 
 private:
     QCustomPlot *m_plot;
-    QVector<double> m_xData;
-    QVector<double> m_yData;
+    // QVector<double> m_xData;
+    // QVector<double> m_yData;
     double m_yMaxData = 0;
     QCPTextElement* m_title = nullptr;
     QCPGraph* m_graph = nullptr;

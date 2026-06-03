@@ -138,13 +138,6 @@
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_switch">
-         <property name="text">
-          <string>切换(&amp;S)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QPushButton" name="pushButton_ok">
          <property name="text">
           <string>更新(&amp;O)</string>

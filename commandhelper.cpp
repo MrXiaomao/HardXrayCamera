@@ -115,6 +115,10 @@ CommandHelper::CommandHelper(QObject *parent)
     connect(client_arm1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
             // qInfo() << "ARM设备1连接成功";
+            // 发送检测指令
+            QByteArray command = QByteArray::fromHex("12 34 01 00 00 00 00 00 00 00 AB CD");
+            client_arm1->send(command);
+
             emit sigARM1Status(true);
         } else {
             // qInfo() << "ARM设备1断开连接";
@@ -125,6 +129,10 @@ CommandHelper::CommandHelper(QObject *parent)
     connect(client_arm2, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
             // qInfo() << "ARM设备2连接成功";
+            // 发送检测指令
+            QByteArray command = QByteArray::fromHex("12 34 01 00 00 00 00 00 00 00 AB CD");
+            client_arm1->send(command);
+
             emit sigARM2Status(true);
         } else {
             // qInfo() << "ARM设备2断开连接";
@@ -149,8 +157,8 @@ CommandHelper::CommandHelper(QObject *parent)
     connect(client_det2, &TcpClient::dataReceived, this, &CommandHelper::handleDet2Data, Qt::DirectConnection);
     connect(client_det3, &TcpClient::dataReceived, this, &CommandHelper::handleDet3Data, Qt::DirectConnection);
     connect(client_det4, &TcpClient::dataReceived, this, &CommandHelper::handleDet4Data, Qt::DirectConnection);
-    connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data);
-    connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data);
+    connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::DirectConnection);
+    connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::DirectConnection);
     
     connect(client_relay, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
         emit sigRelayConnectError(error);
@@ -881,12 +889,132 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
 
 void CommandHelper::handleARM1Data(const QByteArray &binaryData)
 {
+    //信号采集机箱
     qDebug() << "Received data from ARM 1:" << binaryData.toHex(' ');
+
+    m_arm1Buffer.append(binaryData);
+    const int baseFrameLength = 26; // 一个完整的包长度是26字节
+    int offset = 0;
+
+    auto equalAt = [&](int at, const QByteArray& head) -> bool {
+        return (m_arm1Buffer.size() - at >= head.size()) &&
+               (memcmp(m_arm1Buffer.constData() + at, head.constData(), static_cast<size_t>(head.size())) == 0);
+    };
+
+    while (m_arm1Buffer.size() - offset >= baseFrameLength){
+        // 满足一个包的基本长度
+
+        // 判断包头+包尾
+        if (equalAt(offset, QByteArray::fromHex("AA BB")) && equalAt(offset+24, QByteArray::fromHex("CC DD"))) {
+            // data[2] 为电流监测模块的485编号，默认为0x01
+
+            QVector<double>/*温度*/ temperature;
+            QVector<double>/*电压*/ voltage;
+            QVector<double>/*电流*/ current;
+
+            // 电压数据：=  (data[3]*256 +data[4]) / 100
+            //             data[3]为高8位，data[4]为低8位
+            voltage.push_back(double((quint8)m_arm1Buffer[offset+3]*256 + (quint8)m_arm1Buffer[offset+4]) / 100);
+
+            // 电流数据：=  (data[5]*256 +data[6]) / 1000
+            //             data[5]为高8位，data[6]为低8位
+            current.push_back(double((quint8)m_arm1Buffer[offset+5]*256 + (quint8)m_arm1Buffer[offset+6]) / 1000);
+
+            // data[7] data[8] data[9] data[10] data[11]	data[12] data[13]		为第一个温度监测模块的数据帧
+            //         data[7] 为第一个温度监测模块的485编号，默认为0x02
+            //         CH1的温度为： (data[8]*256+data[9])/10
+            //     data[8]为高8位，data[9]为低8位
+            //         CH2的温度为： (data[10]*256+data[11])/10
+            //     data[10]为高8位，data[11]为低8位
+            //         CH3的温度为： (data[12]*256+data[13])/10
+            //     data[12]为高8位，data[13]为低8位
+            for (int i=0; i<=2; ++i){
+                temperature.push_back(double((quint8)m_arm1Buffer[offset+8+i*2]*256 + (quint8)m_arm1Buffer[offset+8+i*2+1]) / 10);
+            }
+
+            // data[14] data[15] data[16] data[17] data[18]	data[19] data[20]		为预留第二个温度监测模块的数据帧，暂未使用
+            // data[21] data[22] data[23] 		为预留的空白数据帧
+            // data[24] 	data[25] 	为0xCC  0xDD  包尾
+
+            emit sigArm1SensorData(temperature, voltage, current);
+            offset += baseFrameLength;
+        } else
+        {
+            ++offset;
+        }
+    }
+
+    if (offset > 0){
+        m_arm1Buffer.remove(0, offset);
+    }
 }
 
 void CommandHelper::handleARM2Data(const QByteArray &binaryData)
-{
+{    
+    //对电源机箱
     qDebug() << "Received data from ARM 2:" << binaryData.toHex(' ');
+
+    m_arm2Buffer.append(binaryData);
+    const int baseFrameLength = 38; // 一个完整的包长度是38字节
+    int offset = 0;
+
+    auto equalAt = [&](int at, const QByteArray& head) -> bool {
+        return (m_arm2Buffer.size() - at >= head.size()) &&
+               (memcmp(m_arm2Buffer.constData() + at, head.constData(), static_cast<size_t>(head.size())) == 0);
+    };
+
+    while (m_arm2Buffer.size() - offset >= baseFrameLength){
+        // 满足一个包的基本长度
+
+        // 判断包头+包尾
+        if (equalAt(offset, QByteArray::fromHex("AA BB")) && equalAt(offset+36, QByteArray::fromHex("CC DD"))) {
+            // data[0] 	data[1] 		为0xAA  0xBB  包头
+            // data[2] data[3] data[4] data[5] data[6]		为电流监测1数据帧
+            // data[7] data[8] data[9] data[10] data[11]		为电流监测2数据帧
+            // data[12] data[13] data[14] data[15] data[16]		为电流监测3数据帧
+            // data[17] data[18] data[19] data[20] data[21]		为电流监测4数据帧
+            // data[22] data[23] data[24] data[25] data[26] data[27] data[28]		为温度监测1数据帧
+            // data[29] data[30] data[31] data[32] data[33] data[34] data[35]		为温度监测2数据帧
+            // data[24] data[25]		为0xCC  0xDD  包尾
+
+            QVector<double>/*温度*/ temperature;
+            QVector<double>/*电压*/ voltage;
+            QVector<double>/*电流*/ current;
+
+            voltage.push_back(double((quint8)m_arm1Buffer[offset+3]*256 + (quint8)m_arm1Buffer[offset+4]) / 100);
+            current.push_back(double((quint8)m_arm1Buffer[offset+5]*256 + (quint8)m_arm1Buffer[offset+6]) / 1000);
+
+            voltage.push_back(double((quint8)m_arm1Buffer[offset+8]*256 + (quint8)m_arm1Buffer[offset+9]) / 100);
+            current.push_back(double((quint8)m_arm1Buffer[offset+10]*256 + (quint8)m_arm1Buffer[offset+11]) / 1000);
+
+            voltage.push_back(double((quint8)m_arm1Buffer[offset+13]*256 + (quint8)m_arm1Buffer[offset+14]) / 100);
+            current.push_back(double((quint8)m_arm1Buffer[offset+15]*256 + (quint8)m_arm1Buffer[offset+16]) / 1000);
+
+            voltage.push_back(double((quint8)m_arm1Buffer[offset+18]*256 + (quint8)m_arm1Buffer[offset+19]) / 100);
+            current.push_back(double((quint8)m_arm1Buffer[offset+20]*256 + (quint8)m_arm1Buffer[offset+21]) / 1000);
+
+            for (int i=0; i<=2; ++i){
+                temperature.push_back(double((quint8)m_arm1Buffer[offset+23+i*2]*256 + (quint8)m_arm1Buffer[offset+23+i*2+1]) / 10);
+            }
+            for (int i=0; i<=2; ++i){
+                temperature.push_back(double((quint8)m_arm1Buffer[offset+30+i*2]*256 + (quint8)m_arm1Buffer[offset+30+i*2+1]) / 10);
+            }
+
+            // data[14] data[15] data[16] data[17] data[18]	data[19] data[20]		为预留第二个温度监测模块的数据帧，暂未使用
+            // data[21] data[22] data[23] 		为预留的空白数据帧
+            // data[24] 	data[25] 	为0xCC  0xDD  包尾
+
+            emit sigArm2SensorData(temperature, voltage, current);
+            offset += baseFrameLength;
+        } else
+        {
+            ++offset;
+        }
+    }
+
+    if (offset > 0){
+        m_arm2Buffer.remove(0, offset);
+    }
 }
 
 void CommandHelper::startOTAUpgrade(quint8 /*index*/)

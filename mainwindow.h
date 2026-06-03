@@ -35,7 +35,6 @@ signals:
 
 private slots:
     void on_action_setting_triggered();
-    void onSysTimerTimeout();
 
     void slotAppendMsg(const QString &msg, QtMsgType msgType);
 
@@ -75,8 +74,8 @@ private slots:
     void onDetector4ConnectFault();
     void onArm1StatusChanged(bool on);
     void onArm2StatusChanged(bool on);
-    void onArm1SensorData(float temp, float voltage, float current);
-    void onArm2SensorData(float temp, float voltage, float current);
+    void onArm1SensorData(const QVector<double>&/*温度*/, const QVector<double>&/*电压*/, const QVector<double>&/*电流*/);
+    void onArm2SensorData(const QVector<double>&/*温度*/, const QVector<double>&/*电压*/, const QVector<double>&/*电流*/);
     void onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
                                 const QVector<quint32> &counts);
     void onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
