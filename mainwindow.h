@@ -171,8 +171,11 @@ private:
     bool detectOnline[4] = {false, false, false, false};
 
     //系统时钟，目前用来随机产生arm传感器数据
-    QTimer* sysTimer = nullptr;
     bool armSensorOnline[2] = {false, false};
 
+    // 无人值守
+    QTimer *startTimer = nullptr;
+    QTimer *stopTimer = nullptr;
+    bool isTaskRunning = false;
 };
 #endif // MAINWINDOW_H

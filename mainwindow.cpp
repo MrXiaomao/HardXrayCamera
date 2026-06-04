@@ -343,8 +343,11 @@ void MainWindow::onArm1SensorData(const QVector<double>&/*温度*/ temperature, 
     }
 
     if (isAlarm) {
-        if (detectOnline[0])
+        // 判断是否无人值守模式
+        if (isTaskRunning)
+        {
             commandHelper->PowerOffRelay();
+        }
     }
 }
 
@@ -385,8 +388,11 @@ void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, 
     }
 
     if (isAlarm) {
-        if (detectOnline[0])
+        // 判断是否无人值守模式
+        if (isTaskRunning)
+        {
             commandHelper->PowerOffRelay();
+        }
     }
 }
 
@@ -863,9 +869,67 @@ bool MainWindow::startMeasureInternal()
     commandHelper->setSaveFileFormat(ui->cmb_saveFormat->currentIndex() == 0 ? Binary : Text);
     commandHelper->setSavePath(QDir::toNativeSeparators(QFileInfo(savePath).absoluteFilePath()));
     commandHelper->setShotNumber(shotNumber);
-    commandHelper->startMeasure(detPara);
-    measureTimer->start(detPara.measureTime);
-    qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+
+    const int measureMode = ui->comboBox_2->currentIndex();
+    if (measureMode == 2){
+        // 开启无人值守模式
+        // 1. 定义两个定时器和成员变量
+        if (startTimer == nullptr)
+            startTimer = new QTimer(this);
+        if (stopTimer == nullptr)
+            stopTimer = new QTimer(this);
+        isTaskRunning = true;
+
+        // 2. 设置时间点A（启动时间），计算时间差后启动启动定时器
+        QDateTime targetA = ui->dateTimeEdit->dateTime();
+        int msecToA = QDateTime::currentDateTime().msecsTo(targetA);
+
+        // 3. 设置时间点B（停止时间）
+        QDateTime targetB = ui->dateTimeEdit_2->dateTime();
+        int msecToB = QDateTime::currentDateTime().msecsTo(targetB);
+
+        if (msecToA < 0 || msecToA > msecToB){
+            QMessageBox::information(this, tr("提示"), tr("时间范围设置不对！\n自动开机时刻必须大于系统当前时间，且关机时间也必须大于开机时间。"));
+            return false;
+        }
+
+        ui->btn_startMeasure->setEnabled(false);
+
+        // 4. 绑定信号槽：时间A到了启动任务
+        connect(startTimer, &QTimer::timeout, this, [=]() {
+            startTimer->stop();
+
+            // 启动工作定
+            commandHelper->startMeasure(detPara);
+            measureTimer->start(detPara.measureTime);
+            qInfo() << "自动测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+        });
+
+        // 5. 绑定信号槽：时间B到了停止任务
+        connect(stopTimer, &QTimer::timeout, this, [&]() {
+            isTaskRunning = false;
+            stopTimer->stop();
+            ui->btn_startMeasure->setEnabled(true);
+
+            // 停止工作定
+            waveformPlotTimer->stop();
+            commandHelper->stopMeasure();
+            printWaveformCollectionSummary();
+            printSpectrumSequenceSummary();
+            measureTimer->stop();
+            qInfo() << "自动停止测量";
+        });
+
+        startTimer->start(msecToA);
+        stopTimer->start(msecToB);
+    }
+    else
+    {
+        commandHelper->startMeasure(detPara);
+        measureTimer->start(detPara.measureTime);
+        qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+    }
+
     return true;
 }
 
@@ -941,6 +1005,17 @@ double generateValue(double base, double maxDelta, double& lastValue) {
 
 void MainWindow::on_btn_stopMeasure_clicked()
 {
+    if (isTaskRunning){
+        if (startTimer->isActive())
+            startTimer->stop();
+
+        if (stopTimer->isActive())
+            stopTimer->stop();
+
+        isTaskRunning = false;
+        ui->btn_startMeasure->setEnabled(true);
+    }
+
     waveformPlotTimer->stop();
     commandHelper->stopMeasure();
     printWaveformCollectionSummary();
