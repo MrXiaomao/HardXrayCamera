@@ -1,4 +1,4 @@
-#include "tcpclient.h"
+﻿#include "tcpclient.h"
 #include <QThread>
 #include <QtGlobal>
 
@@ -60,13 +60,25 @@ void TcpClientThread::stop()
 void TcpClientThread::sendData(const QByteArray& data)
 {
     if (!m_socket || m_socket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "TcpClientThread: send while disconnected";
+        //qWarning() << "TcpClientThread: send while disconnected";
         return;
     }
-    const int chunkSize = 4096;
-    for (int i = 0; i < data.size(); i += chunkSize) {
-        m_socket->write(data.mid(i, chunkSize));
+
+    const int MAX_CHUNK_SIZE = 4096; // 单次最大发送长度
+    int offset = 0; // 当前发送偏移
+
+    while (offset < data.size()) {
+        // 计算本次要发送的长度：不超过剩余数据，也不超过4096
+        int chunkSize = qMin(data.size() - offset, MAX_CHUNK_SIZE);
+        // 截取对应分块
+        QByteArray chunk = data.mid(offset, chunkSize);
+
+        // 发送分块并检查结果
+         qint64 written = m_socket->write(chunk);
         m_socket->flush(); //本项目的指令发送都比较小，且需要尽快到达，发送后立即 flush。对于大数据传输不可用该方法。
+
+        // 偏移增加，处理下一块
+        offset += written;
     }
 }
 
@@ -174,6 +186,7 @@ TcpClient::~TcpClient()
         QMetaObject::invokeMethod(m_worker, "stop", Qt::BlockingQueuedConnection);
     }
     if (m_thread) {
+        m_thread->requestInterruption();
         m_thread->quit();
         m_thread->wait(10000);
     }

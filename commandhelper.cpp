@@ -87,10 +87,28 @@ CommandHelper::CommandHelper(QObject *parent)
     
     client_det1 = new TcpClient(this); //FPGA板1
     client_det2 = new TcpClient(this); //FPGA板2
+    client_det3 = new TcpClient(this); //FPGA板3
+    client_det4 = new TcpClient(this); //FPGA板4
     client_arm1 = new TcpClient(this); //ARM设备1
     client_arm2 = new TcpClient(this); //ARM设备2
     client_relay = new TcpClient(this); //继电器
-    
+    client_arm1->setAutoReconnect(true);
+    client_arm2->setAutoReconnect(true);
+
+    // 温度检测定时器
+    armWorkTimer = new QTimer(this);
+    connect(armWorkTimer, &QTimer::timeout, this, [=]{
+        const QByteArray queryCommand = QByteArray::fromHex("12 34 01 00 00 00 00 00 00 00 AB CD");
+
+        if (client_arm1->isConnected()){
+            client_arm1->send(queryCommand);
+        }
+
+        if (client_arm2->isConnected()){
+            client_arm2->send(queryCommand);
+        }
+    });
+
     //状态改变
     connect(client_det1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
@@ -221,24 +239,18 @@ void CommandHelper::connectARM()
 {
     loadIPConfig(); //确保使用最新的网络配置
 
-    if (ip_arm1 == "192.168.0.58" && port_arm1 == 1024)
-        client_arm1->sigconnectStatusChanged(true);
-    else
-        client_arm1->sigconnectStatusChanged(false);
+    client_arm1->connectToHost(ip_arm1, port_arm1);
+    client_arm2->connectToHost(ip_arm2, port_arm2);
 
-    if (ip_arm2 == "192.168.0.59" && port_arm2 == 1024)
-        client_arm2->sigconnectStatusChanged(true);
-    else
-        client_arm2->sigconnectStatusChanged(false);
-
-    //client_arm1->connectToHost(ip_arm1, port_arm1);
-    //client_arm2->connectToHost(ip_arm2, port_arm2);
+    armWorkTimer->start(5000);
 }
 
 void CommandHelper::disconnectARM()
 {
     client_arm1->disconnectFromHost();
     client_arm2->disconnectFromHost();
+
+    armWorkTimer->stop();
 }
 
 void CommandHelper::connectRelay()
@@ -373,61 +385,63 @@ void CommandHelper::startMeasure(DetParameter detPara)
 
     //分为波形模式和能谱模式发送指令
     {
-        // 发送波形模式相关指令
-        // 传输模式设置
-        sendCommand(client_det3, Order::setTransferMode(Order::TransferMode::Waveform),
-                    "传输模式设置", "FPGA3 波形");
-        sendCommand(client_det4, Order::setTransferMode(Order::TransferMode::Waveform),
-                    "传输模式设置", "FPGA4 波形");
+        if (0){
+            // 发送波形模式相关指令
+            // 传输模式设置
+            sendCommand(client_det3, Order::setTransferMode(Order::TransferMode::Waveform),
+                        "传输模式设置", "FPGA3 波形");
+            sendCommand(client_det4, Order::setTransferMode(Order::TransferMode::Waveform),
+                        "传输模式设置", "FPGA4 波形");
 
-        // 波形触发阈值，两个FPGA各16通道
-        QVector<quint16> thresholdsDet1;
-        QVector<quint16> thresholdsDet2;
-        thresholdsDet1.reserve(16);
-        thresholdsDet2.reserve(16);
-        for (int channel = 0; channel < 16; ++channel) {
-            thresholdsDet1.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel]));
-            thresholdsDet2.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel + 16]));
-        }
+            // 波形触发阈值，两个FPGA各16通道
+            QVector<quint16> thresholdsDet1;
+            QVector<quint16> thresholdsDet2;
+            thresholdsDet1.reserve(16);
+            thresholdsDet2.reserve(16);
+            for (int channel = 0; channel < 16; ++channel) {
+                thresholdsDet1.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel]));
+                thresholdsDet2.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel + 16]));
+            }
 
-        const QVector<QByteArray> thresholdCommandsDet1 = Order::setWaveThresholds(thresholdsDet1);
-        const QVector<QByteArray> thresholdCommandsDet2 = Order::setWaveThresholds(thresholdsDet2);
-        for (int i = 0; i < thresholdCommandsDet1.size(); ++i) {
-            const int firstChannel = i * 2 + 1;
-            const int secondChannel = firstChannel + 1;
-            sendCommand(client_det3, thresholdCommandsDet1.at(i), "波形触发阈值",
-                        QString("FPGA1 CH%1=%2, CH%3=%4")
-                            .arg(firstChannel)
-                            .arg(thresholdsDet1.at(i * 2))
-                            .arg(secondChannel)
-                            .arg(thresholdsDet1.at(i * 2 + 1)));
-        }
-        for (int i = 0; i < thresholdCommandsDet2.size(); ++i) {
-            const int firstChannel = i * 2 + 17;
-            const int secondChannel = firstChannel + 1;
-            sendCommand(client_det4, thresholdCommandsDet2.at(i), "波形触发阈值",
-                        QString("FPGA2 CH%1=%2, CH%3=%4")
-                            .arg(firstChannel)
-                            .arg(thresholdsDet2.at(i * 2))
-                            .arg(secondChannel)
-                            .arg(thresholdsDet2.at(i * 2 + 1)));
-        }
+            const QVector<QByteArray> thresholdCommandsDet1 = Order::setWaveThresholds(thresholdsDet1);
+            const QVector<QByteArray> thresholdCommandsDet2 = Order::setWaveThresholds(thresholdsDet2);
+            for (int i = 0; i < thresholdCommandsDet1.size(); ++i) {
+                const int firstChannel = i * 2 + 1;
+                const int secondChannel = firstChannel + 1;
+                sendCommand(client_det3, thresholdCommandsDet1.at(i), "波形触发阈值",
+                            QString("FPGA1 CH%1=%2, CH%3=%4")
+                                .arg(firstChannel)
+                                .arg(thresholdsDet1.at(i * 2))
+                                .arg(secondChannel)
+                                .arg(thresholdsDet1.at(i * 2 + 1)));
+            }
+            for (int i = 0; i < thresholdCommandsDet2.size(); ++i) {
+                const int firstChannel = i * 2 + 17;
+                const int secondChannel = firstChannel + 1;
+                sendCommand(client_det4, thresholdCommandsDet2.at(i), "波形触发阈值",
+                            QString("FPGA2 CH%1=%2, CH%3=%4")
+                                .arg(firstChannel)
+                                .arg(thresholdsDet2.at(i * 2))
+                                .arg(secondChannel)
+                                .arg(thresholdsDet2.at(i * 2 + 1)));
+            }
 
-        // 发送软件触发指令，开始测量
-        sendCommand(client_det3, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
-                    "波形测量控制", QString("FPGA3 %1").arg(triggerModeText(Order::HardwareTrigger)));
-        sendCommand(client_det4, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
-                    "波形测量控制", QString("FPGA4 %1").arg(triggerModeText(Order::HardwareTrigger)));
+            // 发送软件触发指令，开始测量
+            sendCommand(client_det3, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
+                        "波形测量控制", QString("FPGA3 %1").arg(triggerModeText(Order::HardwareTrigger)));
+            sendCommand(client_det4, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
+                        "波形测量控制", QString("FPGA4 %1").arg(triggerModeText(Order::HardwareTrigger)));
 
-        qDebug() << "Measurement started with parameters:" << measurement.measureTime 
-                << "ms, TransferMode:" << measurement.transferMode;
-        //打印触发阈值，通道号和对应的阈值，一行打印两个通道的阈值
-        for (int channel = 0; channel < 32; channel += 2) {
-            qDebug() << QString("Threshold: CH%1=%2, CH%3=%4")
-                .arg(channel + 1)
-                .arg(measurement.waveformTriggerThreshold[channel])
-                .arg(channel + 2)
-                .arg(measurement.waveformTriggerThreshold[channel + 1]);
+            qDebug() << "Measurement started with parameters:" << measurement.measureTime
+                    << "ms, TransferMode:" << measurement.transferMode;
+            //打印触发阈值，通道号和对应的阈值，一行打印两个通道的阈值
+            for (int channel = 0; channel < 32; channel += 2) {
+                qDebug() << QString("Threshold: CH%1=%2, CH%3=%4")
+                    .arg(channel + 1)
+                    .arg(measurement.waveformTriggerThreshold[channel])
+                    .arg(channel + 2)
+                    .arg(measurement.waveformTriggerThreshold[channel + 1]);
+            }
         }
     }
 
@@ -981,23 +995,23 @@ void CommandHelper::handleARM2Data(const QByteArray &binaryData)
             QVector<double>/*电压*/ voltage;
             QVector<double>/*电流*/ current;
 
-            voltage.push_back(double((quint8)m_arm1Buffer[offset+3]*256 + (quint8)m_arm1Buffer[offset+4]) / 100);
-            current.push_back(double((quint8)m_arm1Buffer[offset+5]*256 + (quint8)m_arm1Buffer[offset+6]) / 1000);
+            voltage.push_back(double((quint8)m_arm2Buffer[offset+3]*256 + (quint8)m_arm2Buffer[offset+4]) / 100);
+            current.push_back(double((quint8)m_arm2Buffer[offset+5]*256 + (quint8)m_arm2Buffer[offset+6]) / 1000);
 
-            voltage.push_back(double((quint8)m_arm1Buffer[offset+8]*256 + (quint8)m_arm1Buffer[offset+9]) / 100);
-            current.push_back(double((quint8)m_arm1Buffer[offset+10]*256 + (quint8)m_arm1Buffer[offset+11]) / 1000);
+            voltage.push_back(double((quint8)m_arm2Buffer[offset+8]*256 + (quint8)m_arm2Buffer[offset+9]) / 100);
+            current.push_back(double((quint8)m_arm2Buffer[offset+10]*256 + (quint8)m_arm2Buffer[offset+11]) / 1000);
 
-            voltage.push_back(double((quint8)m_arm1Buffer[offset+13]*256 + (quint8)m_arm1Buffer[offset+14]) / 100);
-            current.push_back(double((quint8)m_arm1Buffer[offset+15]*256 + (quint8)m_arm1Buffer[offset+16]) / 1000);
+            voltage.push_back(double((quint8)m_arm2Buffer[offset+13]*256 + (quint8)m_arm2Buffer[offset+14]) / 100);
+            current.push_back(double((quint8)m_arm2Buffer[offset+15]*256 + (quint8)m_arm2Buffer[offset+16]) / 1000);
 
-            voltage.push_back(double((quint8)m_arm1Buffer[offset+18]*256 + (quint8)m_arm1Buffer[offset+19]) / 100);
-            current.push_back(double((quint8)m_arm1Buffer[offset+20]*256 + (quint8)m_arm1Buffer[offset+21]) / 1000);
+            voltage.push_back(double((quint8)m_arm2Buffer[offset+18]*256 + (quint8)m_arm2Buffer[offset+19]) / 100);
+            current.push_back(double((quint8)m_arm2Buffer[offset+20]*256 + (quint8)m_arm2Buffer[offset+21]) / 1000);
 
             for (int i=0; i<=2; ++i){
-                temperature.push_back(double((quint8)m_arm1Buffer[offset+23+i*2]*256 + (quint8)m_arm1Buffer[offset+23+i*2+1]) / 10);
+                temperature.push_back(double((quint8)m_arm2Buffer[offset+23+i*2]*256 + (quint8)m_arm2Buffer[offset+23+i*2+1]) / 10);
             }
             for (int i=0; i<=2; ++i){
-                temperature.push_back(double((quint8)m_arm1Buffer[offset+30+i*2]*256 + (quint8)m_arm1Buffer[offset+30+i*2+1]) / 10);
+                temperature.push_back(double((quint8)m_arm2Buffer[offset+30+i*2]*256 + (quint8)m_arm2Buffer[offset+30+i*2+1]) / 10);
             }
 
             // data[14] data[15] data[16] data[17] data[18]	data[19] data[20]		为预留第二个温度监测模块的数据帧，暂未使用
@@ -1040,4 +1054,5 @@ bool CommandHelper::sendOTAUpgradeData(quint8 index, const QByteArray& data)
         client = client_det4;
 
     client->send(data);
+    return true;
 }

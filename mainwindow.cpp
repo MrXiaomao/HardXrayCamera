@@ -86,11 +86,13 @@ MainWindow::MainWindow(QWidget *parent)
     {
         //电源机箱
         // ui->plotVoltage->setTitle("电压曲线");
+        ui->plotVoltage_2->addGraph(3);
         ui->plotVoltage_2->setXAxisLabel("时间");
         ui->plotVoltage_2->setYAxisLabel("电压 (V)");
         ui->plotVoltage_2->setTimeWindow(180);
 
         // ui->plotCurrent->setTitle("电流曲线");
+        ui->plotCurrent_2->addGraph(3);
         ui->plotCurrent_2->setXAxisLabel("时间");
         ui->plotCurrent_2->setYAxisLabel("电流 (A)");
         ui->plotCurrent_2->setTimeWindow(180);
@@ -118,8 +120,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigDetector4Fault, this, &MainWindow::onDetector4ConnectFault);
     connect(commandHelper, &CommandHelper::sigARM1Status, this, &MainWindow::onArm1StatusChanged);
     connect(commandHelper, &CommandHelper::sigARM2Status, this, &MainWindow::onArm2StatusChanged);
-    connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData);
-    connect(commandHelper, &CommandHelper::sigArm2SensorData, this, &MainWindow::onArm2SensorData);
+    connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData, Qt::QueuedConnection);
+    connect(commandHelper, &CommandHelper::sigArm2SensorData, this, &MainWindow::onArm2SensorData, Qt::QueuedConnection);
     // 能谱/波形数据由工作线程发出，排队到主线程处理
     connect(commandHelper, &CommandHelper::sigSpectrumData, this,
         &MainWindow::onSpectrumDataReceived, Qt::QueuedConnection);
@@ -164,6 +166,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_udpShotReceiver, &UdpShotReceiver::bindStateChanged,
             this, &MainWindow::onUdpBindStateChanged);
 
+    ui->btn_relayNetClose->setEnabled(false);
+    ui->bt_powerOn->setEnabled(false);
+    ui->bt_powerOff->setEnabled(false);
+    ui->bt_connectDet->setEnabled(false);
+    ui->bt_disconnectDet->setEnabled(false);
+    ui->btn_startMeasure->setEnabled(false);
+    ui->btn_stopMeasure->setEnabled(false);
+
     // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
 }
@@ -188,18 +198,44 @@ void MainWindow::onMeasureTimerTimeout()
 
 void MainWindow::onRelayStatusChanged(bool on)
 {
-    if (on)
+    if (on){
+        ui->btn_relayNetOpen->setEnabled(false);
+        ui->btn_relayNetClose->setEnabled(true);
+        ui->bt_powerOn->setEnabled(true);
+        ui->bt_powerOff->setEnabled(true);
+
         qInfo() << "继电器网络状态: 已连接";
-    else
+    }
+    else{
+        ui->btn_relayNetClose->setEnabled(false);
+        ui->bt_powerOn->setEnabled(false);
+        ui->bt_powerOff->setEnabled(false);
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "继电器网络状态: 已断开";
+    }
 }
 
 void MainWindow::onRelayPowerStatusChanged(bool on)
 {
     if (on) {
+        ui->bt_powerOn->setEnabled(false);
+        ui->bt_powerOff->setEnabled(true);
+        ui->bt_connectDet->setEnabled(true);
+        ui->bt_disconnectDet->setEnabled(false);
+
         qInfo() << "继电器控制的电源状态: 已开启";
         replayPowerOn = true;
     } else {
+        ui->bt_powerOn->setEnabled(true);
+        ui->bt_powerOff->setEnabled(false);
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
+
         qInfo() << "继电器控制的电源状态: 已关闭";
         replayPowerOn = false;
         stopUdpListening();
@@ -216,9 +252,17 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
 void MainWindow::onDetector1StatusChanged(bool on)
 {
     if (on) {
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(true);
+        ui->btn_startMeasure->setEnabled(true);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板1状态: 已连接";
         detectOnline[0] = true;
     } else {
+        ui->bt_connectDet->setEnabled(true);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板1状态: 已断开";
         detectOnline[0] = false;
     }
@@ -227,9 +271,17 @@ void MainWindow::onDetector1StatusChanged(bool on)
 void MainWindow::onDetector2StatusChanged(bool on)
 {
     if (on) {
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(true);
+        ui->btn_startMeasure->setEnabled(true);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板2状态: 已连接";
         detectOnline[1] = true;
     } else {
+        ui->bt_connectDet->setEnabled(true);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板2状态: 已断开";
         detectOnline[1] = false;
     }
@@ -238,9 +290,17 @@ void MainWindow::onDetector2StatusChanged(bool on)
 void MainWindow::onDetector3StatusChanged(bool on)
 {
     if (on) {
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(true);
+        ui->btn_startMeasure->setEnabled(true);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板3状态: 已连接";
         detectOnline[2] = true;
     } else {
+        ui->bt_connectDet->setEnabled(true);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板3状态: 已断开";
         detectOnline[2] = false;
     }
@@ -249,9 +309,17 @@ void MainWindow::onDetector3StatusChanged(bool on)
 void MainWindow::onDetector4StatusChanged(bool on)
 {
     if (on) {
+        ui->bt_connectDet->setEnabled(false);
+        ui->bt_disconnectDet->setEnabled(true);
+        ui->btn_startMeasure->setEnabled(true);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板4状态: 已连接";
         detectOnline[3] = true;
     } else {
+        ui->bt_connectDet->setEnabled(true);
+        ui->bt_disconnectDet->setEnabled(false);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "FPGA板4状态: 已断开";
         detectOnline[3] = false;
     }
@@ -356,6 +424,9 @@ void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, 
     ui->plotTemp_2->appendPoints(0, temperature);
     ui->plotVoltage_2->appendPoints(0, voltage);
     ui->plotCurrent_2->appendPoints(0, current);
+    ui->plotTemp_2->refreshPlot();
+    ui->plotVoltage_2->refreshPlot();
+    ui->plotCurrent_2->refreshPlot();
 
     // 超出阈值且探测器在线时，通过继电器切断电源
     bool isAlarm = false;
@@ -902,7 +973,7 @@ bool MainWindow::startMeasureInternal()
             // 启动工作定
             commandHelper->startMeasure(detPara);
             measureTimer->start(detPara.measureTime);
-            qInfo() << "自动测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+            qInfo() << "系统开机，测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
         });
 
         // 5. 绑定信号槽：时间B到了停止任务
@@ -917,7 +988,7 @@ bool MainWindow::startMeasureInternal()
             printWaveformCollectionSummary();
             printSpectrumSequenceSummary();
             measureTimer->stop();
-            qInfo() << "自动停止测量";
+            qInfo() << "系统自动退出";
         });
 
         startTimer->start(msecToA);

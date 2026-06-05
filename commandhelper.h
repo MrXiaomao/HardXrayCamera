@@ -175,6 +175,7 @@ private:
     TcpClient* client_arm1; //ARM设备1
     TcpClient* client_arm2; //ARM设备2
     TcpClient* client_relay; //继电器
+    QTimer* armWorkTimer;
 
     QString ip_det1;
     QString ip_det2;
