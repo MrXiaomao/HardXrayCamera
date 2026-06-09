@@ -139,6 +139,7 @@ private:
     void resetSpectrumSequenceTracking();
     void printWaveformCollectionSummary() const;
     void printSpectrumSequenceSummary() const;
+    void showHardwareStartupWaitDialog();
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络

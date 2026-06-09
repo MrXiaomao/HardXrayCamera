@@ -60,7 +60,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
         </property>
@@ -141,9 +141,12 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -157,7 +160,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
         </property>
@@ -195,7 +198,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
         </property>
@@ -399,7 +402,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
         </property>
@@ -438,7 +441,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
         </property>
@@ -477,9 +480,12 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>150</width>
+          <width>200</width>
           <height>16777215</height>
          </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>true</bool>
         </property>
        </widget>
       </item>

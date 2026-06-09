@@ -31,7 +31,8 @@ private:
 
 signals:
     void dataReceived(const QByteArray& data);
-    void sigErrorOccurred(QAbstractSocket::SocketError error);
+    void sigErrorOccurred(QAbstractSocket::SocketError error, const QString& host, quint16 port,
+                          const QString& errorString);
     void connectionStatusChanged(bool connected);
 
 private:
@@ -65,7 +66,8 @@ public:
 signals:
     void startSignal();
     void stopSignal();
-    void sigconnectError(QAbstractSocket::SocketError error);
+    void sigconnectError(QAbstractSocket::SocketError error, const QString& host, quint16 port,
+                        const QString& errorString);
     void sigconnectStatusChanged(bool connected);
     void sendDataSignal(const QByteArray&);
     void dataReceived(const QByteArray&);

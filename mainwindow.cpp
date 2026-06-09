@@ -107,7 +107,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
-        qWarning() << "继电器网络连接失败";
         ui->btn_relayNetOpen->blockSignals(true);
         ui->btn_relayNetOpen->setChecked(false);
         ui->btn_relayNetOpen->setText(QStringLiteral("网络连接"));
@@ -336,25 +335,21 @@ void MainWindow::onDetector4StatusChanged(bool on)
 
 void MainWindow::onDetector1ConnectFault()
 {
-    qWarning() << "FPGA板1连接失败";
     detectOnline[0] = false;
 }
 
 void MainWindow::onDetector2ConnectFault()
 {
-    qWarning() << "FPGA板2连接失败";
     detectOnline[1] = false;
 }
 
 void MainWindow::onDetector3ConnectFault()
 {
-    qWarning() << "FPGA板3连接失败";
     detectOnline[2] = false;
 }
 
 void MainWindow::onDetector4ConnectFault()
 {
-    qWarning() << "FPGA板4连接失败";
     detectOnline[3] = false;
 }
 
@@ -1027,6 +1022,7 @@ void MainWindow::on_bt_powerOn_clicked()
 {
     startUdpListening();
     commandHelper->PowerOnRelay();
+    showHardwareStartupWaitDialog();
 }
 
 //关闭探测器供电电源，通过继电器进行控制探测器的电源
@@ -1145,6 +1141,7 @@ void MainWindow::on_action_powerOn_triggered()
 {
     startUdpListening();
     commandHelper->PowerOnRelay();
+    showHardwareStartupWaitDialog();
 }
 
 
@@ -1152,6 +1149,16 @@ void MainWindow::on_action_powerOff_triggered()
 {
     stopUdpListening();
     commandHelper->PowerOffRelay();
+}
+
+void MainWindow::showHardwareStartupWaitDialog()
+{
+    QMessageBox box(this);
+    box.setWindowTitle(QStringLiteral("提示"));
+    box.setText(QStringLiteral("硬件启动中，请稍等。"));
+    box.setStandardButtons(QMessageBox::NoButton);
+    QTimer::singleShot(5000, &box, &QMessageBox::accept);
+    box.exec();
 }
 
 

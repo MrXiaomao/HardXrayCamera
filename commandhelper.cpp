@@ -77,6 +77,13 @@ int channelNumberFromMask(quint32 channelMask)
     return 0;
 }
 
+void logTcpConnectFailure(const QString& deviceName, const QString& host, quint16 port,
+                          const QString& errorString)
+{
+    qWarning().noquote() << QStringLiteral("%1连接失败，IP: %2，端口: %3，原因: %4")
+                                .arg(deviceName, host, QString::number(port), errorString);
+}
+
 } // end anonymous namespace
 
 CommandHelper::CommandHelper(QObject *parent)
@@ -178,42 +185,53 @@ CommandHelper::CommandHelper(QObject *parent)
     connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::DirectConnection);
     connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::DirectConnection);
     
-    connect(client_relay, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
+    connect(client_relay, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError error, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("继电器"), host, port, errorString);
         emit sigRelayConnectError(error);
     });
     
     // 连接失败
-    connect(client_det1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError ){
-        // qWarning() << "FPGA板1连接失败:" << error;
-        // emit sigAppendMsg(QString("FPGA板1连接失败: %1\n").arg(error), QtWarningMsg);
+    connect(client_det1, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("FPGA板1"), host, port, errorString);
         emit sigDetector1Fault();
     });
 
-    connect(client_det2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError){
-        // qWarning() << "FPGA板2连接失败:" << error;
-        // emit sigAppendMsg(QString("FPGA板2连接失败: %1\n").arg(error), QtWarningMsg);
+    connect(client_det2, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("FPGA板2"), host, port, errorString);
         emit sigDetector2Fault();
     });
 
-    connect(client_det3, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError ){
-        // qWarning() << "FPGA板1连接失败:" << error;
-        // emit sigAppendMsg(QString("FPGA板1连接失败: %1\n").arg(error), QtWarningMsg);
+    connect(client_det3, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("FPGA板3"), host, port, errorString);
         emit sigDetector3Fault();
     });
 
-    connect(client_det4, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError){
-        // qWarning() << "FPGA板2连接失败:" << error;
-        // emit sigAppendMsg(QString("FPGA板2连接失败: %1\n").arg(error), QtWarningMsg);
+    connect(client_det4, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("FPGA板4"), host, port, errorString);
         emit sigDetector4Fault();
     });
 
-    connect(client_arm1, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        Q_UNUSED(error)
+    connect(client_arm1, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("ARM设备1"), host, port, errorString);
         emit sigARM1Fault();
     });
 
-    connect(client_arm2, &TcpClient::sigconnectError, this, [=](QAbstractSocket::SocketError error){
-        Q_UNUSED(error)
+    connect(client_arm2, &TcpClient::sigconnectError, this,
+            [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
+                const QString& errorString) {
+        logTcpConnectFailure(QStringLiteral("ARM设备2"), host, port, errorString);
         emit sigARM2Fault();
     });
 }

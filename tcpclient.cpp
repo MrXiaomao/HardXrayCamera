@@ -117,9 +117,8 @@ void TcpClientThread::onConnected()
 
 void TcpClientThread::onError(QAbstractSocket::SocketError error)
 {
-    if (m_socket)
-        qWarning() << "TcpClientThread socket error:" << error << m_socket->errorString();
-    emit sigErrorOccurred(error);
+    const QString errorString = m_socket ? m_socket->errorString() : QString();
+    emit sigErrorOccurred(error, m_host, m_port, errorString);
     if (m_autoReconnect)
         scheduleReconnect();
 }
@@ -171,7 +170,11 @@ TcpClient::TcpClient(QObject *parent)
         m_connected = c;
         emit sigconnectStatusChanged(c);
     });
-    connect(m_worker, &TcpClientThread::sigErrorOccurred, this, &TcpClient::sigconnectError);
+    connect(m_worker, &TcpClientThread::sigErrorOccurred, this,
+            [this](QAbstractSocket::SocketError error, const QString& host, quint16 port,
+                   const QString& errorString) {
+        emit sigconnectError(error, host, port, errorString);
+    });
 
     m_thread->start();
 }
