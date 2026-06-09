@@ -108,6 +108,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
         qWarning() << "继电器网络连接失败";
+        ui->btn_relayNetOpen->blockSignals(true);
+        ui->btn_relayNetOpen->setChecked(false);
+        ui->btn_relayNetOpen->setText(QStringLiteral("网络连接"));
+        ui->btn_relayNetOpen->blockSignals(false);
     });
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
@@ -166,7 +170,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_udpShotReceiver, &UdpShotReceiver::bindStateChanged,
             this, &MainWindow::onUdpBindStateChanged);
 
-    ui->btn_relayNetClose->setEnabled(false);
+    ui->btn_relayNetOpen->setCheckable(true);
+    ui->btn_relayNetOpen->setChecked(false);
+    ui->btn_relayNetOpen->setText(QStringLiteral("网络连接"));
+    ui->btn_relayNetClose->hide();
     ui->bt_powerOn->setEnabled(false);
     ui->bt_powerOff->setEnabled(false);
     ui->bt_connectDet->setEnabled(false);
@@ -198,16 +205,18 @@ void MainWindow::onMeasureTimerTimeout()
 
 void MainWindow::onRelayStatusChanged(bool on)
 {
+    ui->btn_relayNetOpen->blockSignals(true);
+    ui->btn_relayNetOpen->setChecked(on);
+    ui->btn_relayNetOpen->setText(on ? QStringLiteral("网络断开") : QStringLiteral("网络连接"));
+    ui->btn_relayNetOpen->blockSignals(false);
+
     if (on){
-        ui->btn_relayNetOpen->setEnabled(false);
-        ui->btn_relayNetClose->setEnabled(true);
         ui->bt_powerOn->setEnabled(true);
         ui->bt_powerOff->setEnabled(true);
 
         qInfo() << "继电器网络状态: 已连接";
     }
     else{
-        ui->btn_relayNetClose->setEnabled(false);
         ui->bt_powerOn->setEnabled(false);
         ui->bt_powerOff->setEnabled(false);
         ui->bt_connectDet->setEnabled(false);
@@ -581,13 +590,16 @@ void MainWindow::slotAppendMsg(const QString &msg, QtMsgType msgType)
 
 void MainWindow::on_btn_relayNetOpen_clicked()
 {
-    commandHelper->connectRelay();
+    if (ui->btn_relayNetOpen->isChecked())
+        commandHelper->connectRelay();
+    else
+        commandHelper->disconnectRelay();
 }
 
 
 void MainWindow::on_btn_relayNetClose_clicked()
 {
-    commandHelper->disconnectRelay();
+    // 功能已合并至 btn_relayNetOpen 切换按钮，保留此槽避免 UI 变更时链接报错
 }
 
 int MainWindow::logicalChannelNumber(int detectorIndex, int channelNumber) const
