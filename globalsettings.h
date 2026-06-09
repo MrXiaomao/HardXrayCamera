@@ -137,7 +137,7 @@ public:
     };
 
     // 辅助函数：解析路径并设置值
-    // setValueByPath(settings, "network/ip1", ip_det1);
+    // setValueByPath(settings, "network/ip_fpga1_main", ip_fpga1_main);
     void setValueByPath(JsonSettings* settings, const QString& path, const QVariant& value) {
         QStringList parts = path.split('/');
         

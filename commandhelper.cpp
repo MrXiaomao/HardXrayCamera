@@ -592,18 +592,18 @@ void CommandHelper::loadIPConfig()
     ScopedFileLock lock(settings);
 
     // 网络配置读取
-    ip_fpga1_main = settings->getValueByPath("network/ip1").toString();
-    ip_fpga2_main = settings->getValueByPath("network/ip2").toString();
-    ip_fpga1_wave = settings->getValueByPath("network/ip3").toString();
-    ip_fpga2_wave = settings->getValueByPath("network/ip4").toString();
+    ip_fpga1_main = settings->getValueByPath("network/ip_fpga1_main").toString();
+    ip_fpga2_main = settings->getValueByPath("network/ip_fpga2_main").toString();
+    ip_fpga1_wave = settings->getValueByPath("network/ip_fpga1_wave").toString();
+    ip_fpga2_wave = settings->getValueByPath("network/ip_fpga2_wave").toString();
     ip_arm1 = settings->getValueByPath("network/ip_arm1").toString();
     ip_arm2 = settings->getValueByPath("network/ip_arm2").toString();
     ip_relay = settings->getValueByPath("network/ip_relay").toString();
 
-    port_fpga1_main = settings->getValueByPath("network/port_det1").toUInt();
-    port_fpga2_main = settings->getValueByPath("network/port_det2").toUInt();
-    port_fpga1_wave = settings->getValueByPath("network/port_det3").toUInt();
-    port_fpga2_wave = settings->getValueByPath("network/port_det4").toUInt();
+    port_fpga1_main = settings->getValueByPath("network/port_fpga1_main").toUInt();
+    port_fpga2_main = settings->getValueByPath("network/port_fpga2_main").toUInt();
+    port_fpga1_wave = settings->getValueByPath("network/port_fpga1_wave").toUInt();
+    port_fpga2_wave = settings->getValueByPath("network/port_fpga2_wave").toUInt();
     port_arm1 = settings->getValueByPath("network/port_arm1").toUInt();
     port_arm2 = settings->getValueByPath("network/port_arm2").toUInt();
     port_relay = settings->getValueByPath("network/port_relay").toUInt();

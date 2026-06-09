@@ -45,7 +45,7 @@
        <number>5</number>
       </property>
       <item row="1" column="1">
-       <widget class="IPAddress" name="widget_detIP1" native="true">
+       <widget class="IPAddress" name="widget_fpga1MainIP" native="true">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
           <horstretch>0</horstretch>
@@ -132,7 +132,7 @@
        </spacer>
       </item>
       <item row="3" column="1">
-       <widget class="IPAddress" name="widget_detIP3" native="true">
+       <widget class="IPAddress" name="widget_fpga1WaveIP" native="true">
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -151,7 +151,7 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="IPAddress" name="widget_detIP2" native="true">
+       <widget class="IPAddress" name="widget_fpga2MainIP" native="true">
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -173,7 +173,7 @@
        </widget>
       </item>
       <item row="1" column="4">
-       <widget class="QSpinBox" name="spinBox_portDet1">
+       <widget class="QSpinBox" name="spinBox_portFpga1Main">
         <property name="maximum">
          <number>65535</number>
         </property>
@@ -241,7 +241,7 @@
        </widget>
       </item>
       <item row="2" column="4">
-       <widget class="QSpinBox" name="spinBox_portDet2">
+       <widget class="QSpinBox" name="spinBox_portFpga2Main">
         <property name="maximum">
          <number>65535</number>
         </property>
@@ -471,7 +471,7 @@
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="IPAddress" name="widget_detIP4" native="true">
+       <widget class="IPAddress" name="widget_fpga2WaveIP" native="true">
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -504,7 +504,7 @@
        </widget>
       </item>
       <item row="3" column="4">
-       <widget class="QSpinBox" name="spinBox_portDet3">
+       <widget class="QSpinBox" name="spinBox_portFpga1Wave">
         <property name="maximum">
          <number>65535</number>
         </property>
@@ -514,7 +514,7 @@
        </widget>
       </item>
       <item row="4" column="4">
-       <widget class="QSpinBox" name="spinBox_portDet4">
+       <widget class="QSpinBox" name="spinBox_portFpga2Wave">
         <property name="maximum">
          <number>65535</number>
         </property>
