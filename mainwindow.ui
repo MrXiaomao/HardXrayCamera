@@ -816,7 +816,7 @@
                </size>
               </property>
               <property name="text">
-               <string>能谱刷新时间/ms</string>
+               <string>分时积分/ms</string>
               </property>
              </widget>
             </item>
@@ -842,12 +842,12 @@
              <widget class="QComboBox" name="cmb_transferMode">
               <item>
                <property name="text">
-                <string>512能谱</string>
+                <string>分时能谱</string>
                </property>
               </item>
               <item>
                <property name="text">
-                <string>16道能谱</string>
+                <string>HXR能量道</string>
                </property>
               </item>
              </widget>
@@ -918,7 +918,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="tab">
           <attribute name="title">
@@ -939,7 +939,7 @@
          </widget>
          <widget class="QWidget" name="tab_2">
           <attribute name="title">
-           <string>UDP运行日志</string>
+           <string>炮号广播日志</string>
           </attribute>
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
@@ -967,7 +967,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>17</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

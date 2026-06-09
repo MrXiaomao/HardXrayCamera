@@ -43,9 +43,10 @@ FixedDataPlotWidget::~FixedDataPlotWidget()
 void FixedDataPlotWidget::setTitle(const QString& title)
 {
     if (!m_title) {
-        m_plot->plotLayout()->insertRow(0);
+        m_plot->plotLayout()->insertRow(1);
         m_title = new QCPTextElement(m_plot, title, QFont("微软雅黑", 12, QFont::Bold));
-        m_plot->plotLayout()->addElement(0, 0, m_title);
+        m_title->setTextFlags(Qt::AlignCenter);
+        m_plot->plotLayout()->addElement(1, 0, m_title);
     } else {
         m_title->setText(title);
     }
