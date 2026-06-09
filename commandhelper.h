@@ -47,7 +47,7 @@ public:
     // 关闭继电器网络
     void disconnectRelay();
     
-    // 发送指令到FPGA板1
+    // 发送指令到FPGA主板主网口
     // void sendFPGA1(const QByteArray& data);
     // void sendFPGA2(const QByteArray& data);
 
@@ -95,10 +95,10 @@ private:
     // 初始化常用指令
     void initCommand(); 
 
-    // FPGA1初始化指令
+    // FPGA主板1主网口初始化指令
     void initFPGA1Commands();
 
-    // FPGA2初始化指令
+    // FPGA主板2主网口初始化指令
     void initFPGA2Commands();
     
     // 读取网络配置，IP和port
@@ -160,34 +160,34 @@ signals:
 public slots:
     // 继电器数据处理
     void handleRelayData(const QByteArray &binaryData);
-    void handleDet1Data(const QByteArray &binaryData);
-    void handleDet2Data(const QByteArray &binaryData);
-    void handleDet3Data(const QByteArray &binaryData);
-    void handleDet4Data(const QByteArray &binaryData);
+    void handleFpga1MainData(const QByteArray &binaryData);
+    void handleFpga2MainData(const QByteArray &binaryData);
+    void handleFpga1WaveData(const QByteArray &binaryData);
+    void handleFpga2WaveData(const QByteArray &binaryData);
     void handleARM1Data(const QByteArray &binaryData);
     void handleARM2Data(const QByteArray &binaryData);
 
 private:
-    TcpClient* client_det1; //FPGA板1
-    TcpClient* client_det2; //FPGA板2
-    TcpClient* client_det3; //FPGA板3
-    TcpClient* client_det4; //FPGA板4
+    TcpClient* client_fpga1_main; // FPGA主板1主网口(控制/能谱)
+    TcpClient* client_fpga2_main; // FPGA主板2主网口(控制/能谱)
+    TcpClient* client_fpga1_wave; // 副网口，仅接收波形（FPGA主板1）
+    TcpClient* client_fpga2_wave; // 副网口，仅接收波形（FPGA主板2）
     TcpClient* client_arm1; //ARM设备1
     TcpClient* client_arm2; //ARM设备2
     TcpClient* client_relay; //继电器
     QTimer* armWorkTimer;
 
-    QString ip_det1;
-    QString ip_det2;
-    QString ip_det3;
-    QString ip_det4;
+    QString ip_fpga1_main;
+    QString ip_fpga2_main;
+    QString ip_fpga1_wave;
+    QString ip_fpga2_wave;
     QString ip_arm1;
     QString ip_arm2;
     QString ip_relay;
-    quint16 port_det1;
-    quint16 port_det2;
-    quint16 port_det3;
-    quint16 port_det4;
+    quint16 port_fpga1_main;
+    quint16 port_fpga2_main;
+    quint16 port_fpga1_wave;
+    quint16 port_fpga2_wave;
     quint16 port_arm1;
     quint16 port_arm2;
     quint16 port_relay;
@@ -196,15 +196,15 @@ private:
     saveFileFormat mfileFormat = Binary;
     QString mSavePath = "data"; //默认保存路径
     QString mShotNumber; // 当前炮号，用于数据文件命名
-    QString mfileNameDet1; //当前测量的能谱文件名，包含路径
-    QString mfileNameDet2; //当前测量的能谱文件名，包含路径
-    QString mfileNameDet3; //当前测量的波形文件名，包含路径
-    QString mfileNameDet4; //当前测量的波形文件名，包含路径
+    QString mfileNameFpga1Main; // FPGA主板1主网口能谱数据文件名
+    QString mfileNameFpga2Main; // FPGA主板2主网口能谱数据文件名
+    QString mfileNameFpga1Wave; // FPGA主板1副网口波形数据文件名
+    QString mfileNameFpga2Wave; // FPGA主板2副网口波形数据文件名
     DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等
-    QByteArray m_det1Buffer;
-    QByteArray m_det2Buffer;
-    QByteArray m_det3Buffer;
-    QByteArray m_det4Buffer;
+    QByteArray m_fpga1MainBuffer;
+    QByteArray m_fpga2MainBuffer;
+    QByteArray m_fpga1WaveBuffer;
+    QByteArray m_fpga2WaveBuffer;
     QByteArray m_arm1Buffer;
     QByteArray m_arm2Buffer;
 
@@ -214,10 +214,10 @@ private:
     bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;
 
-    QFile m_det1File;
-    QFile m_det2File;
-    QFile m_det3File;
-    QFile m_det4File;
+    QFile m_fpga1MainFile;
+    QFile m_fpga2MainFile;
+    QFile m_fpga1WaveFile;
+    QFile m_fpga2WaveFile;
 
     mutable QMutex m_measurementMutex;
 

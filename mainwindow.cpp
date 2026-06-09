@@ -264,14 +264,14 @@ void MainWindow::onDetector1StatusChanged(bool on)
         ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板1状态: 已连接";
+        qInfo() << "FPGA主板1主网口(控制/能谱)状态: 已连接";
         detectOnline[0] = true;
     } else {
         ui->bt_connectDet->setEnabled(true);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板1状态: 已断开";
+        qInfo() << "FPGA主板1主网口(控制/能谱)状态: 已断开";
         detectOnline[0] = false;
     }
 }
@@ -283,14 +283,14 @@ void MainWindow::onDetector2StatusChanged(bool on)
         ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板2状态: 已连接";
+        qInfo() << "FPGA主板2主网口(控制/能谱)状态: 已连接";
         detectOnline[1] = true;
     } else {
         ui->bt_connectDet->setEnabled(true);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板2状态: 已断开";
+        qInfo() << "FPGA主板2主网口(控制/能谱)状态: 已断开";
         detectOnline[1] = false;
     }
 }
@@ -302,14 +302,14 @@ void MainWindow::onDetector3StatusChanged(bool on)
         ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板3状态: 已连接";
+        qInfo() << "FPGA主板1副网口(波形接收)状态: 已连接";
         detectOnline[2] = true;
     } else {
         ui->bt_connectDet->setEnabled(true);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板3状态: 已断开";
+        qInfo() << "FPGA主板1副网口(波形接收)状态: 已断开";
         detectOnline[2] = false;
     }
 }
@@ -321,14 +321,14 @@ void MainWindow::onDetector4StatusChanged(bool on)
         ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板4状态: 已连接";
+        qInfo() << "FPGA主板2副网口(波形接收)状态: 已连接";
         detectOnline[3] = true;
     } else {
         ui->bt_connectDet->setEnabled(true);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
-        qInfo() << "FPGA板4状态: 已断开";
+        qInfo() << "FPGA主板2副网口(波形接收)状态: 已断开";
         detectOnline[3] = false;
     }
 }

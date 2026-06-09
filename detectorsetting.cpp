@@ -19,7 +19,9 @@
 
 namespace {
 constexpr int ChannelCount = 32;
-constexpr int ThresholdTableRows = ChannelCount / 2;
+constexpr int ThresholdChannelsPerRow = 4;
+constexpr int ThresholdTableRows = ChannelCount / ThresholdChannelsPerRow;
+constexpr int ThresholdTableColumns = ThresholdChannelsPerRow * 2;
 constexpr int ThresholdMin = 0;
 constexpr int ThresholdMax = 65525;
 constexpr int DefaultThreshold = 50;
@@ -380,21 +382,24 @@ void DetectorSetting::onSelectCsvFile()
 void DetectorSetting::initThresholdTable()
 {
     ui->tableThreshold->clear();
-    ui->tableThreshold->setColumnCount(4);
+    ui->tableThreshold->setColumnCount(ThresholdTableColumns);
     ui->tableThreshold->setRowCount(ThresholdTableRows);
-    ui->tableThreshold->setHorizontalHeaderLabels(QStringList() << "通道号" << "波形阈值" << "通道号" << "波形阈值");
+    QStringList headers;
+    for (int i = 0; i < ThresholdChannelsPerRow; ++i)
+        headers << "通道号" << "波形阈值";
+    ui->tableThreshold->setHorizontalHeaderLabels(headers);
     ui->tableThreshold->verticalHeader()->setVisible(false);
     ui->tableThreshold->horizontalHeader()->setStretchLastSection(true);
-    ui->tableThreshold->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    ui->tableThreshold->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    ui->tableThreshold->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    ui->tableThreshold->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+    for (int col = 0; col < ThresholdTableColumns; ++col) {
+        ui->tableThreshold->horizontalHeader()->setSectionResizeMode(
+            col, (col % 2 == 0) ? QHeaderView::ResizeToContents : QHeaderView::Stretch);
+    }
     ui->tableThreshold->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableThreshold->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     for (int row = 0; row < ThresholdTableRows; ++row) {
-        for (int side = 0; side < 2; ++side) {
-            const int channel = row * 2 + side + 1;
+        for (int side = 0; side < ThresholdChannelsPerRow; ++side) {
+            const int channel = row * ThresholdChannelsPerRow + side + 1;
             const int channelColumn = side * 2;
             const int thresholdColumn = channelColumn + 1;
 
@@ -423,8 +428,8 @@ void DetectorSetting::applyThresholdToChecked()
 {
     const int value = ui->spb_waveThreshold1->value();
     for (int channel = 1; channel <= ChannelCount; ++channel) {
-        const int row = (channel - 1) / 2;
-        const int channelColumn = ((channel - 1) % 2) * 2;
+        const int row = (channel - 1) / ThresholdChannelsPerRow;
+        const int channelColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2;
         QTableWidgetItem* item = ui->tableThreshold->item(row, channelColumn);
         if (item && item->checkState() == Qt::Checked)
             setThresholdValue(channel, value);
@@ -433,16 +438,16 @@ void DetectorSetting::applyThresholdToChecked()
 
 int DetectorSetting::thresholdValue(int channel) const
 {
-    const int row = (channel - 1) / 2;
-    const int thresholdColumn = ((channel - 1) % 2) * 2 + 1;
+    const int row = (channel - 1) / ThresholdChannelsPerRow;
+    const int thresholdColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2 + 1;
     QSpinBox* spinBox = qobject_cast<QSpinBox*>(ui->tableThreshold->cellWidget(row, thresholdColumn));
     return spinBox ? spinBox->value() : DefaultThreshold;
 }
 
 void DetectorSetting::setThresholdValue(int channel, int value)
 {
-    const int row = (channel - 1) / 2;
-    const int thresholdColumn = ((channel - 1) % 2) * 2 + 1;
+    const int row = (channel - 1) / ThresholdChannelsPerRow;
+    const int thresholdColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2 + 1;
     QSpinBox* spinBox = qobject_cast<QSpinBox*>(ui->tableThreshold->cellWidget(row, thresholdColumn));
     if (spinBox)
         spinBox->setValue(qBound(ThresholdMin, value, ThresholdMax));

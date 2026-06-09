@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-19 15:26:11
+ * @LastEditTime: 2026-06-09 20:02:52
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -84,6 +84,11 @@ void logTcpConnectFailure(const QString& deviceName, const QString& host, quint1
                                 .arg(deviceName, host, QString::number(port), errorString);
 }
 
+const char kFpga1MainPort[] = "FPGA主板1主网口(控制/能谱)";
+const char kFpga2MainPort[] = "FPGA主板2主网口(控制/能谱)";
+const char kFpga1WavePort[] = "FPGA主板1副网口(波形接收)";
+const char kFpga2WavePort[] = "FPGA主板2副网口(波形接收)";
+
 } // end anonymous namespace
 
 CommandHelper::CommandHelper(QObject *parent)
@@ -92,10 +97,10 @@ CommandHelper::CommandHelper(QObject *parent)
     loadIPConfig();
     initCommand();
     
-    client_det1 = new TcpClient(this); //FPGA板1
-    client_det2 = new TcpClient(this); //FPGA板2
-    client_det3 = new TcpClient(this); //FPGA板3
-    client_det4 = new TcpClient(this); //FPGA板4
+    client_fpga1_main = new TcpClient(this); // FPGA主板1主网口(控制/能谱)
+    client_fpga2_main = new TcpClient(this); // FPGA主板2主网口(控制/能谱)
+    client_fpga1_wave = new TcpClient(this); // 副网口，仅接收波形（FPGA主板1）
+    client_fpga2_wave = new TcpClient(this); // 副网口，仅接收波形（FPGA主板2）
     client_arm1 = new TcpClient(this); //ARM设备1
     client_arm2 = new TcpClient(this); //ARM设备2
     client_relay = new TcpClient(this); //继电器
@@ -117,22 +122,22 @@ CommandHelper::CommandHelper(QObject *parent)
     });
 
     //状态改变
-    connect(client_det1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+    connect(client_fpga1_main, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            // qInfo() << "FPGA板1连接成功";
+            // qInfo() << "FPGA主板1主网口连接成功";
             emit sigDetector1Status(true);
         } else {
-            // qInfo() << "FPGA板1断开连接";
+            // qInfo() << "FPGA主板1主网口断开连接";
             emit sigDetector1Status(false);
         }
     });
 
-    connect(client_det2, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+    connect(client_fpga2_main, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
-            // qInfo() << "FPGA板2连接成功";
+            // qInfo() << "FPGA主板2主网口连接成功";
             emit sigDetector2Status(true);
         } else {
-            // qInfo() << "FPGA板2断开连接";
+            // qInfo() << "FPGA主板2主网口断开连接";
             emit sigDetector2Status(false);
         }
     });
@@ -178,10 +183,10 @@ CommandHelper::CommandHelper(QObject *parent)
     });
 
     connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData);
-    connect(client_det1, &TcpClient::dataReceived, this, &CommandHelper::handleDet1Data, Qt::DirectConnection);
-    connect(client_det2, &TcpClient::dataReceived, this, &CommandHelper::handleDet2Data, Qt::DirectConnection);
-    connect(client_det3, &TcpClient::dataReceived, this, &CommandHelper::handleDet3Data, Qt::DirectConnection);
-    connect(client_det4, &TcpClient::dataReceived, this, &CommandHelper::handleDet4Data, Qt::DirectConnection);
+    connect(client_fpga1_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1MainData, Qt::DirectConnection);
+    connect(client_fpga2_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2MainData, Qt::DirectConnection);
+    connect(client_fpga1_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1WaveData, Qt::DirectConnection);
+    connect(client_fpga2_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2WaveData, Qt::DirectConnection);
     connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::DirectConnection);
     connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::DirectConnection);
     
@@ -193,31 +198,31 @@ CommandHelper::CommandHelper(QObject *parent)
     });
     
     // 连接失败
-    connect(client_det1, &TcpClient::sigconnectError, this,
+    connect(client_fpga1_main, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("FPGA板1"), host, port, errorString);
+        logTcpConnectFailure(QString::fromUtf8(kFpga1MainPort), host, port, errorString);
         emit sigDetector1Fault();
     });
 
-    connect(client_det2, &TcpClient::sigconnectError, this,
+    connect(client_fpga2_main, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("FPGA板2"), host, port, errorString);
+        logTcpConnectFailure(QString::fromUtf8(kFpga2MainPort), host, port, errorString);
         emit sigDetector2Fault();
     });
 
-    connect(client_det3, &TcpClient::sigconnectError, this,
+    connect(client_fpga1_wave, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("FPGA板3"), host, port, errorString);
+        logTcpConnectFailure(QString::fromUtf8(kFpga1WavePort), host, port, errorString);
         emit sigDetector3Fault();
     });
 
-    connect(client_det4, &TcpClient::sigconnectError, this,
+    connect(client_fpga2_wave, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("FPGA板4"), host, port, errorString);
+        logTcpConnectFailure(QString::fromUtf8(kFpga2WavePort), host, port, errorString);
         emit sigDetector4Fault();
     });
 
@@ -239,18 +244,18 @@ CommandHelper::CommandHelper(QObject *parent)
 void CommandHelper::connectDetector()
 {
     loadIPConfig(); //确保使用最新的网络配置
-    client_det1->connectToHost(ip_det1, port_det1);
-    client_det2->connectToHost(ip_det2, port_det2);
-    client_det3->connectToHost(ip_det3, port_det3);
-    client_det4->connectToHost(ip_det4, port_det4);
+    client_fpga1_main->connectToHost(ip_fpga1_main, port_fpga1_main);
+    client_fpga2_main->connectToHost(ip_fpga2_main, port_fpga2_main);
+    client_fpga1_wave->connectToHost(ip_fpga1_wave, port_fpga1_wave);
+    client_fpga2_wave->connectToHost(ip_fpga2_wave, port_fpga2_wave);
 }
 
 void CommandHelper::disconnectDetector()
 {
-    client_det1->disconnectFromHost();
-    client_det2->disconnectFromHost();
-    client_det3->disconnectFromHost();
-    client_det4->disconnectFromHost();
+    client_fpga1_main->disconnectFromHost();
+    client_fpga2_main->disconnectFromHost();
+    client_fpga1_wave->disconnectFromHost();
+    client_fpga2_wave->disconnectFromHost();
 }
 
 void CommandHelper::connectARM()
@@ -313,18 +318,19 @@ void CommandHelper::initCommand()
     cmdPool.append(CommandItem("软件触发", cmdSoftTrigger));
 }
 
-// FPGA板1的初始化指令
+// FPGA主板1主网口初始化指令
 void CommandHelper::initFPGA1Commands()
 {
     //传输模式设置指令
     QByteArray cmdSetTransferMode = Order::setTransferMode(Order::TransferMode::Spectrum512);
-    sendCommand(client_det1, cmdSetTransferMode, "传输模式设置", "FPGA1 512道能谱");    
+    sendCommand(client_fpga1_main, cmdSetTransferMode, "传输模式设置",
+                QString("%1 512道能谱").arg(QString::fromUtf8(kFpga1MainPort)));
 }
 
 void CommandHelper::initFPGA2Commands()
 {
-    // FPGA板2的初始化指令
-    // 这里可以添加更多针对FPGA板2的常用指令
+    // FPGA主板2主网口初始化指令
+    // 这里可以添加更多针对FPGA主板2主网口的常用指令
 }
 
 void CommandHelper::startMeasure(DetParameter detPara)
@@ -334,34 +340,34 @@ void CommandHelper::startMeasure(DetParameter detPara)
     {
         QMutexLocker locker(&m_measurementMutex);
         closeMeasurementFilesLocked();
-        m_det1Buffer.clear();
-        m_det2Buffer.clear();
-        m_det3Buffer.clear();
-        m_det4Buffer.clear();
+        m_fpga1MainBuffer.clear();
+        m_fpga2MainBuffer.clear();
+        m_fpga1WaveBuffer.clear();
+        m_fpga2WaveBuffer.clear();
         measure_started = true;
         m_detPara = measurement;
 
         const QString shotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
         QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-        mfileNameDet1 = QString("%1/Det1_%2_%3_%4_spec.%5")
+        mfileNameFpga1Main = QString("%1/Fpga1_%2_%3_%4_spec.%5")
             .arg(mSavePath)
             .arg(shotTag)
             .arg(timestamp)
             .arg(m_detPara.measureTime)
             .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameDet2 = QString("%1/Det2_%2_%3_%4_spec.%5")
+        mfileNameFpga2Main = QString("%1/Fpga2_%2_%3_%4_spec.%5")
             .arg(mSavePath)
             .arg(shotTag)
             .arg(timestamp)
             .arg(m_detPara.measureTime)
             .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameDet3 = QString("%1/Det3_%2_%3_%4_wave.%5")
+        mfileNameFpga1Wave = QString("%1/Fpga1_%2_%3_%4_wave.%5")
             .arg(mSavePath)
             .arg(shotTag)
             .arg(timestamp)
             .arg(m_detPara.measureTime)
             .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameDet4 = QString("%1/Det4_%2_%3_%4_wave.%5")
+        mfileNameFpga2Wave = QString("%1/Fpga2_%2_%3_%4_wave.%5")
             .arg(mSavePath)
             .arg(shotTag)
             .arg(timestamp)
@@ -372,119 +378,74 @@ void CommandHelper::startMeasure(DetParameter detPara)
         if (!dir.exists())
             dir.mkpath(".");
 
-        m_det1File.setFileName(mfileNameDet1);
-        m_det2File.setFileName(mfileNameDet2);
-        m_det3File.setFileName(mfileNameDet3);
-        m_det4File.setFileName(mfileNameDet4);
+        m_fpga1MainFile.setFileName(mfileNameFpga1Main);
+        m_fpga2MainFile.setFileName(mfileNameFpga2Main);
+        m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
+        m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
 
-        if (!m_det1File.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open Det1 file:" << mfileNameDet1;
+        if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "Failed to open FPGA主板1主网口 file:" << mfileNameFpga1Main;
         } else {
-            qInfo() << "Det1 data will be saved to:" << mfileNameDet1;
+            qInfo() << "FPGA主板1主网口 data will be saved to:" << mfileNameFpga1Main;
         }
-        if (!m_det2File.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open Det2 file:" << mfileNameDet2;
+        if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "Failed to open FPGA主板2主网口 file:" << mfileNameFpga2Main;
         } else {
-            qInfo() << "Det2 data will be saved to:" << mfileNameDet2;
+            qInfo() << "FPGA主板2主网口 data will be saved to:" << mfileNameFpga2Main;
         }
-        if (!m_det3File.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open Det3 file:" << mfileNameDet3;
+        if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "Failed to open FPGA主板1副网口 file:" << mfileNameFpga1Wave;
         } else {
-            qInfo() << "Det3 data will be saved to:" << mfileNameDet3;
+            qInfo() << "FPGA主板1副网口 data will be saved to:" << mfileNameFpga1Wave;
         }
-        if (!m_det4File.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open Det4 file:" << mfileNameDet4;
+        if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "Failed to open FPGA主板2副网口 file:" << mfileNameFpga2Wave;
         } else {
-            qInfo() << "Det4 data will be saved to:" << mfileNameDet4;
+            qInfo() << "FPGA主板2副网口 data will be saved to:" << mfileNameFpga2Wave;
         }
     }
 
     bool spectrum16Ready = true;
 
-    //分为波形模式和能谱模式发送指令
+    // 发送能谱模式控制指令
     {
-        if (0){
-            // 发送波形模式相关指令
-            // 传输模式设置
-            sendCommand(client_det3, Order::setTransferMode(Order::TransferMode::Waveform),
-                        "传输模式设置", "FPGA3 波形");
-            sendCommand(client_det4, Order::setTransferMode(Order::TransferMode::Waveform),
-                        "传输模式设置", "FPGA4 波形");
-
-            // 波形触发阈值，两个FPGA各16通道
-            QVector<quint16> thresholdsDet1;
-            QVector<quint16> thresholdsDet2;
-            thresholdsDet1.reserve(16);
-            thresholdsDet2.reserve(16);
-            for (int channel = 0; channel < 16; ++channel) {
-                thresholdsDet1.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel]));
-                thresholdsDet2.append(static_cast<quint16>(measurement.waveformTriggerThreshold[channel + 16]));
-            }
-
-            const QVector<QByteArray> thresholdCommandsDet1 = Order::setWaveThresholds(thresholdsDet1);
-            const QVector<QByteArray> thresholdCommandsDet2 = Order::setWaveThresholds(thresholdsDet2);
-            for (int i = 0; i < thresholdCommandsDet1.size(); ++i) {
-                const int firstChannel = i * 2 + 1;
-                const int secondChannel = firstChannel + 1;
-                sendCommand(client_det3, thresholdCommandsDet1.at(i), "波形触发阈值",
-                            QString("FPGA1 CH%1=%2, CH%3=%4")
-                                .arg(firstChannel)
-                                .arg(thresholdsDet1.at(i * 2))
-                                .arg(secondChannel)
-                                .arg(thresholdsDet1.at(i * 2 + 1)));
-            }
-            for (int i = 0; i < thresholdCommandsDet2.size(); ++i) {
-                const int firstChannel = i * 2 + 17;
-                const int secondChannel = firstChannel + 1;
-                sendCommand(client_det4, thresholdCommandsDet2.at(i), "波形触发阈值",
-                            QString("FPGA2 CH%1=%2, CH%3=%4")
-                                .arg(firstChannel)
-                                .arg(thresholdsDet2.at(i * 2))
-                                .arg(secondChannel)
-                                .arg(thresholdsDet2.at(i * 2 + 1)));
-            }
-
-            // 发送软件触发指令，开始测量
-            sendCommand(client_det3, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
-                        "波形测量控制", QString("FPGA3 %1").arg(triggerModeText(Order::HardwareTrigger)));
-            sendCommand(client_det4, Order::controlWaveform(Order::TriggerMode::HardwareTrigger),
-                        "波形测量控制", QString("FPGA4 %1").arg(triggerModeText(Order::HardwareTrigger)));
-
-            qDebug() << "Measurement started with parameters:" << measurement.measureTime
-                    << "ms, TransferMode:" << measurement.transferMode;
-            //打印触发阈值，通道号和对应的阈值，一行打印两个通道的阈值
-            for (int channel = 0; channel < 32; channel += 2) {
-                qDebug() << QString("Threshold: CH%1=%2, CH%3=%4")
-                    .arg(channel + 1)
-                    .arg(measurement.waveformTriggerThreshold[channel])
-                    .arg(channel + 2)
-                    .arg(measurement.waveformTriggerThreshold[channel + 1]);
-            }
-        }
-    }
-
-    {// 发送能谱模式相关指令
         // 传输模式设置
-        sendCommand(client_det1, Order::setTransferMode(measurement.transferMode),
-                    "传输模式设置", QString("FPGA1 %1").arg(transferModeText(measurement.transferMode)));
-        sendCommand(client_det2, Order::setTransferMode(measurement.transferMode),
-                    "传输模式设置", QString("FPGA2 %1").arg(transferModeText(measurement.transferMode)));
+        sendCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
+                    "传输模式设置",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
+                                         transferModeText(measurement.transferMode)));
+        sendCommand(client_fpga2_main, Order::setTransferMode(measurement.transferMode),
+                    "传输模式设置",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
+                                         transferModeText(measurement.transferMode)));
         // 能谱刷新时间,ms
-        sendCommand(client_det1, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
-                    "能谱刷新时间", QString("FPGA1 %1 ms").arg(measurement.spectrumRefreshInterval));
-        sendCommand(client_det2, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
-                    "能谱刷新时间", QString("FPGA2 %1 ms").arg(measurement.spectrumRefreshInterval));
+        sendCommand(client_fpga1_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
+                    "能谱刷新时间",
+                    QString("%1 %2 ms").arg(QString::fromUtf8(kFpga1MainPort))
+                        .arg(measurement.spectrumRefreshInterval));
+        sendCommand(client_fpga2_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
+                    "能谱刷新时间",
+                    QString("%1 %2 ms").arg(QString::fromUtf8(kFpga2MainPort))
+                        .arg(measurement.spectrumRefreshInterval));
         // 能谱触发阈值
-        sendCommand(client_det1, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
-                    "能谱触发阈值", QString("FPGA1 %1 LSB").arg(measurement.spectrumTriggerThreshold));
-        sendCommand(client_det2, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
-                    "能谱触发阈值", QString("FPGA2 %1 LSB").arg(measurement.spectrumTriggerThreshold));
+        sendCommand(client_fpga1_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
+                    "能谱触发阈值",
+                    QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga1MainPort))
+                        .arg(measurement.spectrumTriggerThreshold));
+        sendCommand(client_fpga2_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
+                    "能谱触发阈值",
+                    QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga2MainPort))
+                        .arg(measurement.spectrumTriggerThreshold));
         // 能谱死时间,单位*16ns
         const int deadTime16ns = measurement.spectrumDeadTime / 16;
-        sendCommand(client_det1, Order::setSpectrumDeadTime(deadTime16ns),
-                    "能谱死时间", QString("FPGA1 %1 ns, %2*16ns").arg(measurement.spectrumDeadTime).arg(deadTime16ns));
-        sendCommand(client_det2, Order::setSpectrumDeadTime(deadTime16ns),
-                    "能谱死时间", QString("FPGA2 %1 ns, %2*16ns").arg(measurement.spectrumDeadTime).arg(deadTime16ns));
+        sendCommand(client_fpga1_main, Order::setSpectrumDeadTime(deadTime16ns),
+                    "能谱死时间",
+                    QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga1MainPort))
+                        .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
+        sendCommand(client_fpga2_main, Order::setSpectrumDeadTime(deadTime16ns),
+                    "能谱死时间",
+                    QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga2MainPort))
+                        .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
 
         if (measurement.transferMode == Order::TransferMode::Spectrum16) {
             JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
@@ -498,8 +459,10 @@ void CommandHelper::startMeasure(DetParameter detPara)
                 emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
                 spectrum16Ready = false;
             } else {
-                send16SpecEnergyWindowCommands(client_det1, QStringLiteral("FPGA1"), channelBoundaries, 0);
-                send16SpecEnergyWindowCommands(client_det2, QStringLiteral("FPGA2"), channelBoundaries, 16);
+                send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
+                                               channelBoundaries, 0);
+                send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
+                                               channelBoundaries, 16);
             }
         }
 
@@ -511,10 +474,14 @@ void CommandHelper::startMeasure(DetParameter detPara)
         }
 
         // 发送软件触发指令，开始测量
-        sendCommand(client_det1, Order::controlSpectrum(Order::SoftwareTrigger),
-                    "能谱测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::SoftwareTrigger)));
-        sendCommand(client_det2, Order::controlSpectrum(Order::SoftwareTrigger),
-                    "能谱测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::SoftwareTrigger)));
+        sendCommand(client_fpga1_main, Order::controlSpectrum(Order::SoftwareTrigger),
+                    "能谱测量控制",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
+                                         triggerModeText(Order::SoftwareTrigger)));
+        sendCommand(client_fpga2_main, Order::controlSpectrum(Order::SoftwareTrigger),
+                    "能谱测量控制",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
+                                         triggerModeText(Order::SoftwareTrigger)));
             
         //打印测量基本参数
         qInfo() << "Measurement started with parameters:" << measurement.measureTime 
@@ -536,21 +503,16 @@ void CommandHelper::stopMeasure()
         closeMeasurementFilesLocked();
     }
 
-    // 发送停止指令    
-    {
-        // 发送停止波形传输指令
-        sendCommand(client_det3, Order::controlWaveform(Order::Stop),
-                    "波形测量控制", QString("FPGA3 %1").arg(triggerModeText(Order::Stop)));
-        sendCommand(client_det4, Order::controlWaveform(Order::Stop),
-                    "波形测量控制", QString("FPGA4 %1").arg(triggerModeText(Order::Stop)));
-    }
-
     {
         // 发送停止能谱传输指令
-        sendCommand(client_det1, Order::controlSpectrum(Order::Stop),
-                    "能谱测量控制", QString("FPGA1 %1").arg(triggerModeText(Order::Stop)));
-        sendCommand(client_det2, Order::controlSpectrum(Order::Stop),
-                    "能谱测量控制", QString("FPGA2 %1").arg(triggerModeText(Order::Stop)));
+        sendCommand(client_fpga1_main, Order::controlSpectrum(Order::Stop),
+                    "能谱测量控制",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
+                                         triggerModeText(Order::Stop)));
+        sendCommand(client_fpga2_main, Order::controlSpectrum(Order::Stop),
+                    "能谱测量控制",
+                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
+                                         triggerModeText(Order::Stop)));
     }
 
     qDebug() << "Measurement stopped.";
@@ -564,14 +526,14 @@ void CommandHelper::closeMeasurementFiles()
 
 void CommandHelper::closeMeasurementFilesLocked()
 {
-    if (m_det1File.isOpen())
-        m_det1File.close();
-    if (m_det2File.isOpen())
-        m_det2File.close();
-    if (m_det3File.isOpen())
-        m_det3File.close();
-    if (m_det4File.isOpen())
-        m_det4File.close();
+    if (m_fpga1MainFile.isOpen())
+        m_fpga1MainFile.close();
+    if (m_fpga2MainFile.isOpen())
+        m_fpga2MainFile.close();
+    if (m_fpga1WaveFile.isOpen())
+        m_fpga1WaveFile.close();
+    if (m_fpga2WaveFile.isOpen())
+        m_fpga2WaveFile.close();
 }
 
 CommandHelper::~CommandHelper()
@@ -630,18 +592,18 @@ void CommandHelper::loadIPConfig()
     ScopedFileLock lock(settings);
 
     // 网络配置读取
-    ip_det1 = settings->getValueByPath("network/ip1").toString();
-    ip_det2 = settings->getValueByPath("network/ip2").toString();
-    ip_det3 = settings->getValueByPath("network/ip3").toString();
-    ip_det4 = settings->getValueByPath("network/ip4").toString();
+    ip_fpga1_main = settings->getValueByPath("network/ip1").toString();
+    ip_fpga2_main = settings->getValueByPath("network/ip2").toString();
+    ip_fpga1_wave = settings->getValueByPath("network/ip3").toString();
+    ip_fpga2_wave = settings->getValueByPath("network/ip4").toString();
     ip_arm1 = settings->getValueByPath("network/ip_arm1").toString();
     ip_arm2 = settings->getValueByPath("network/ip_arm2").toString();
     ip_relay = settings->getValueByPath("network/ip_relay").toString();
 
-    port_det1 = settings->getValueByPath("network/port_det1").toUInt();
-    port_det2 = settings->getValueByPath("network/port_det2").toUInt();
-    port_det3 = settings->getValueByPath("network/port_det3").toUInt();
-    port_det4 = settings->getValueByPath("network/port_det4").toUInt();
+    port_fpga1_main = settings->getValueByPath("network/port_det1").toUInt();
+    port_fpga2_main = settings->getValueByPath("network/port_det2").toUInt();
+    port_fpga1_wave = settings->getValueByPath("network/port_det3").toUInt();
+    port_fpga2_wave = settings->getValueByPath("network/port_det4").toUInt();
     port_arm1 = settings->getValueByPath("network/port_arm1").toUInt();
     port_arm2 = settings->getValueByPath("network/port_arm2").toUInt();
     port_relay = settings->getValueByPath("network/port_relay").toUInt();
@@ -668,7 +630,7 @@ void CommandHelper::handleRelayData(const QByteArray &binaryData)
     }
 }
 
-void CommandHelper::handleDet1Data(const QByteArray &binaryData)
+void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
 {
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
@@ -676,23 +638,23 @@ void CommandHelper::handleDet1Data(const QByteArray &binaryData)
         return ;
     }
 
-    //存储数据到mfileNameDet1文件中。
-    if (m_det1File.isOpen()) {
-        m_det1File.write(binaryData);
-        m_det1File.flush();
+    //存储数据到mfileNameFpga1Main文件中。
+    if (m_fpga1MainFile.isOpen()) {
+        m_fpga1MainFile.write(binaryData);
+        m_fpga1MainFile.flush();
     } else {
-        qWarning() << "Det1 file is not open:" << mfileNameDet1;
+        qWarning() << "FPGA主板1主网口 file is not open:" << mfileNameFpga1Main;
     }
-    // 处理FPGA板1的数据，根据当前传输模式选择解析器
+    // 处理FPGA主板1主网口能谱数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
-        processSpec16Data(1, m_det1Buffer, binaryData);
+        processSpec16Data(1, m_fpga1MainBuffer, binaryData);
     } else {
-        processSpec512Data(1, m_det1Buffer, binaryData);
+        processSpec512Data(1, m_fpga1MainBuffer, binaryData);
     }
 }
 
-// 处理FPGA板2的数据
-void CommandHelper::handleDet2Data(const QByteArray &binaryData)
+// 处理FPGA主板2主网口能谱数据
+void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
 {
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
@@ -700,23 +662,23 @@ void CommandHelper::handleDet2Data(const QByteArray &binaryData)
         return ;
     }
 
-    //存储数据到mfileNameDet2文件中。
-    if (m_det2File.isOpen()) {
-        m_det2File.write(binaryData);
-        m_det2File.flush();
+    //存储数据到mfileNameFpga2Main文件中。
+    if (m_fpga2MainFile.isOpen()) {
+        m_fpga2MainFile.write(binaryData);
+        m_fpga2MainFile.flush();
     } else {
-        qWarning() << "Det2 file is not open:" << mfileNameDet2;
+        qWarning() << "FPGA主板2主网口 file is not open:" << mfileNameFpga2Main;
     }
-    // 处理FPGA板2的数据，根据当前传输模式选择解析器
+    // 处理FPGA主板2主网口能谱数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
-        processSpec16Data(2, m_det2Buffer, binaryData);
+        processSpec16Data(2, m_fpga2MainBuffer, binaryData);
     } else {
-        processSpec512Data(2, m_det2Buffer, binaryData);
+        processSpec512Data(2, m_fpga2MainBuffer, binaryData);
     }
 }
 
-// 处理FPGA板3的数据
-void CommandHelper::handleDet3Data(const QByteArray &binaryData)
+// 处理FPGA主板1副网口波形数据
+void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
 {
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
@@ -724,19 +686,19 @@ void CommandHelper::handleDet3Data(const QByteArray &binaryData)
         return ;
     }
 
-    //存储数据到mfileNameDet3文件中。
-    if (m_det3File.isOpen()) {
-        m_det3File.write(binaryData);
-        m_det3File.flush();
+    //存储数据到mfileNameFpga1Wave文件中。
+    if (m_fpga1WaveFile.isOpen()) {
+        m_fpga1WaveFile.write(binaryData);
+        m_fpga1WaveFile.flush();
     } else {
-        qWarning() << "Det3 file is not open:" << mfileNameDet3;
+        qWarning() << "FPGA主板1副网口 file is not open:" << mfileNameFpga1Wave;
     }
-    // 处理FPGA板3的数据，根据当前传输模式选择解析器
-    processWaveformData(1, m_det3Buffer, binaryData);
+    // 处理FPGA主板1副网口波形数据
+    processWaveformData(1, m_fpga1WaveBuffer, binaryData);
 }
 
-// 处理FPGA板4的数据
-void CommandHelper::handleDet4Data(const QByteArray &binaryData)
+// 处理FPGA主板2副网口波形数据
+void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
 {
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
@@ -744,15 +706,15 @@ void CommandHelper::handleDet4Data(const QByteArray &binaryData)
         return ;
     }
 
-    //存储数据到mfileNameDet4文件中。
-    if (m_det4File.isOpen()) {
-        m_det4File.write(binaryData);
-        m_det4File.flush();
+    //存储数据到mfileNameFpga2Wave文件中。
+    if (m_fpga2WaveFile.isOpen()) {
+        m_fpga2WaveFile.write(binaryData);
+        m_fpga2WaveFile.flush();
     } else {
-        qWarning() << "Det4 file is not open:" << mfileNameDet4;
+        qWarning() << "FPGA主板2副网口 file is not open:" << mfileNameFpga2Wave;
     }
-    // 处理FPGA板4的数据，根据当前传输模式选择解析器
-    processWaveformData(2, m_det4Buffer, binaryData);
+    // 处理FPGA主板2副网口波形数据
+    processWaveformData(2, m_fpga2WaveBuffer, binaryData);
 }
 
 // 处理512道能谱数据，按照协议解析出时间戳、通道号和计数，并通过信号发送给界面更新
@@ -1063,13 +1025,13 @@ bool CommandHelper::sendOTAUpgradeData(quint8 index, const QByteArray& data)
 {
     TcpClient* client = nullptr;
     if (1 == index)
-        client = client_det1;
+        client = client_fpga1_main;
     else if (2 == index)
-        client = client_det2;
+        client = client_fpga2_main;
     else if (3 == index)
-        client = client_det3;
+        client = client_fpga1_wave;
     else
-        client = client_det4;
+        client = client_fpga2_wave;
 
     client->send(data);
     return true;
