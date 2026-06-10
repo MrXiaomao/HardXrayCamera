@@ -7,6 +7,8 @@
 #include <QButtonGroup>
 #include <QDateTime>
 #include <QTimer>
+#include <QFile>
+
 
 #include <QFileInfo>
 
@@ -256,8 +258,8 @@ void OTAUpgradeWindow::startNextTask()
     sectorData[5] = 0x00;
     sectorData[6] = 0x00;
     if (!commHelper->sendOTAUpgradeData(index, sectorData)) {
-        qCritical() << tr("探测器[#%1]发送写入指令失败，跳过该任务").arg(index);
-        sigWriteLog(tr("探测器[#%1]发送写入指令失败，跳过该任务").arg(index), QtCriticalMsg);
+        qCritical() << tr("探测器[#%1]开始发送写入指令失败，跳过该任务").arg(index);
+        sigWriteLog(tr("探测器[#%1]开始发送写入指令失败，跳过该任务").arg(index), QtCriticalMsg);
         commHelper->endOTAUpgrade(index);
         m_runningTasks--;
         m_currentTaskIndex++;
@@ -268,6 +270,10 @@ void OTAUpgradeWindow::startNextTask()
         }
         return;
     }
+
+    qDebug() << tr("探测器[#%1]开始写入指令发送成功").arg(index);
+    sigWriteLog(tr("探测器[#%1]开始写入指令发送成功").arg(index));
+
     QThread::msleep(1000); // 子线程休眠，不阻塞主线程
 
     // 4. 启动当前任务的异步发送（子线程执行）
@@ -318,7 +324,7 @@ void OTAUpgradeWindow::asyncSendOTAData(int index)
             break;
         }
 
-        QThread::msleep(1); // 子线程休眠，不阻塞主线程
+        QThread::msleep(5); // 子线程休眠，不阻塞主线程
     }
 
     file.close();
@@ -338,11 +344,11 @@ void OTAUpgradeWindow::slotSendFinished(int index, bool success)
     if (success) {
         QByteArray finishData = QByteArray::fromHex("55 06 01 00 00 00 00 f0");
         if (commHelper->sendOTAUpgradeData(index, finishData)) {
-            qDebug() << tr("探测器[#%1][主分区程序]数据发送完毕！").arg(index);
-            emit sigWriteLog(tr("探测器[#%1][主分区程序]数据发送完毕！").arg(index));
+            qDebug() << tr("探测器[#%1][主分区程序]数据写入完毕！").arg(index);
+            emit sigWriteLog(tr("探测器[#%1][主分区程序]数据写入完毕！").arg(index));
         } else {
-            qCritical() << tr("探测器[#%1][主分区程序]发送完成指令失败！").arg(index);
-            sigWriteLog(tr("探测器[#%1][主分区程序]发送完成指令失败！").arg(index), QtCriticalMsg);
+            qCritical() << tr("探测器[#%1][主分区程序]写入完成指令失败！").arg(index);
+            sigWriteLog(tr("探测器[#%1][主分区程序]写入完成指令失败！").arg(index), QtCriticalMsg);
         }
     } else {
         qCritical() << tr("探测器[#%1][主分区程序]更新失败！").arg(index);
