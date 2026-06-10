@@ -173,12 +173,35 @@
               <item>
                <widget class="QLabel" name="label_2">
                 <property name="text">
-                 <string>图片编号</string>
+                 <string>能谱编号</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QSpinBox" name="spb_specID">
+                <property name="minimumSize">
+                 <size>
+                  <width>60</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_waveID">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="text">
+                 <string>波形编号</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spb_waveID">
                 <property name="minimumSize">
                  <size>
                   <width>60</width>

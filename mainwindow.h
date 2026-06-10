@@ -2,7 +2,7 @@
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-05-27 09:39:05
+ * @LastEditTime: 2026-06-10 18:32:22
  * @Description: 请填写简介
  */
 #ifndef MAINWINDOW_H
@@ -122,16 +122,26 @@ private:
         QVector<quint32> counts;
     };
 
+    struct WaveformEntry {
+        int detectorIndex = 0;
+        quint32 timeUnits = 0; // 时间单位，ms
+        QVector<quint16> samples;
+    };
+
     static constexpr int kChannelsPerDetector = 16;
     static constexpr int kSpectrumChannelCount = 32; // 探测器1: 1~16，探测器2: 17~32
     static constexpr int kDetector2ChannelOffset = 16; // 探测器2的逻辑通道号相对于物理通道的偏移
 
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
+    void clearWaveformData();
     void appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                             const QVector<quint32> &counts);
+    void appendWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
+                            const QVector<quint16> &samples);
     void ensureSpectrumBinAddresses(int binCount);
     void updateSpecIdSpinBoxRange();
+    void updateWaveIdSpinBoxRange();
     void updateSpectrumRefreshIntervalRange();
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
@@ -157,9 +167,8 @@ private:
     QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
     QVector<quint32> m_lastSpectrumSequenceByChannel;
     QVector<bool> m_hasSpectrumSequenceByChannel;
-    // 波形按逻辑通道存储的最新一帧数据（覆盖式存储）
-    QVector<QVector<quint16>> m_waveformByChannel;
-    QVector<int> m_waveformCountByChannel;
+    // 按逻辑通道(1~32)存储波形历史
+    QVector<QVector<WaveformEntry>> m_waveformByChannel;
     QVector<QVector<quint32>> m_waveformSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingWaveformNumbersByChannel;
     QVector<quint32> m_lastWaveformSequenceByChannel;

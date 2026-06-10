@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-06-10 14:57:34
+ * @LastEditTime: 2026-06-10 18:32:06
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -881,7 +881,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
             //打印通道号和时间戳
             const char* p = packet.constData();
             const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
-            const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2);
+            const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，ms
             const int channelNumber = channelNumberFromMask(channelMask);
             qDebug() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
