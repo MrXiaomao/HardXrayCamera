@@ -632,30 +632,44 @@ void CommandHelper::handleRelayData(const QByteArray &binaryData)
 
 void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
 {
-    QMutexLocker locker(&m_measurementMutex);
-    if (!measure_started){
-        // 测量未开始不应该进入到这里，可能是上次未点击停止测量
-        return ;
+    if (mIsUpgrading.load() && mDetectorIndex == 1)
+    {
+        emit sigOTAUpgradeData(mDetectorIndex, binaryData);
+        return;
     }
 
-    //存储数据到mfileNameFpga1Main文件中。
-    if (m_fpga1MainFile.isOpen()) {
-        m_fpga1MainFile.write(binaryData);
-        m_fpga1MainFile.flush();
-    } else {
-        qWarning() << "FPGA主板1主网口 file is not open:" << mfileNameFpga1Main;
-    }
-    // 处理FPGA主板1主网口能谱数据，根据当前传输模式选择解析器
-    if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
-        processSpec16Data(1, m_fpga1MainBuffer, binaryData);
-    } else {
-        processSpec512Data(1, m_fpga1MainBuffer, binaryData);
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        if (!measure_started){
+            // 测量未开始不应该进入到这里，可能是上次未点击停止测量
+            return ;
+        }
+
+        //存储数据到mfileNameFpga1Main文件中。
+        if (m_fpga1MainFile.isOpen()) {
+            m_fpga1MainFile.write(binaryData);
+            m_fpga1MainFile.flush();
+        } else {
+            qWarning() << "FPGA主板1主网口 file is not open:" << mfileNameFpga1Main;
+        }
+        // 处理FPGA主板1主网口能谱数据，根据当前传输模式选择解析器
+        if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
+            processSpec16Data(1, m_fpga1MainBuffer, binaryData);
+        } else {
+            processSpec512Data(1, m_fpga1MainBuffer, binaryData);
+        }
     }
 }
 
 // 处理FPGA主板2主网口能谱数据
 void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
 {
+    if (mIsUpgrading.load() && mDetectorIndex == 2)
+    {
+        emit sigOTAUpgradeData(mDetectorIndex, binaryData);
+        return;
+    }
+
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
         // 测量未开始不应该进入到这里，可能是上次未点击停止测量
@@ -680,6 +694,12 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
 // 处理FPGA主板1副网口波形数据
 void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
 {
+    if (mIsUpgrading.load() && mDetectorIndex == 3)
+    {
+        emit sigOTAUpgradeData(mDetectorIndex, binaryData);
+        return;
+    }
+
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
         // 测量未开始不应该进入到这里，可能是上次未点击停止测量
@@ -700,6 +720,12 @@ void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
 // 处理FPGA主板2副网口波形数据
 void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
 {
+    if (mIsUpgrading.load() && mDetectorIndex == 4)
+    {
+        emit sigOTAUpgradeData(mDetectorIndex, binaryData);
+        return;
+    }
+
     QMutexLocker locker(&m_measurementMutex);
     if (!measure_started){
         // 测量未开始不应该进入到这里，可能是上次未点击停止测量
@@ -1011,14 +1037,27 @@ void CommandHelper::handleARM2Data(const QByteArray &binaryData)
     }
 }
 
-void CommandHelper::startOTAUpgrade(quint8 /*index*/)
+void CommandHelper::startOTAUpgrade(quint8 index)
 {
+    mDetectorIndex = index;
     mIsUpgrading = true;
 }
 
 void CommandHelper::endOTAUpgrade(quint8 /*index*/)
 {
     mIsUpgrading = false;
+}
+
+bool CommandHelper::isDetectorConnected(int index) const
+{
+    switch (index) {
+    case 1:
+        return client_fpga1_main && client_fpga1_main->isConnected();
+    case 2:
+        return client_fpga2_main && client_fpga2_main->isConnected();
+    default:
+        return false;
+    }
 }
 
 bool CommandHelper::sendOTAUpgradeData(quint8 index, const QByteArray& data)

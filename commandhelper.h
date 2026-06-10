@@ -90,6 +90,8 @@ public:
     void startOTAUpgrade(quint8 index);
     bool sendOTAUpgradeData(quint8 index, const QByteArray& data);
     void endOTAUpgrade(quint8 index);
+    // index 1=FPGA1主网口, 2=FPGA2主网口
+    bool isDetectorConnected(int index) const;
 
 private:
     // 初始化常用指令
@@ -157,6 +159,8 @@ signals:
     void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                          const QVector<quint32>& counts);
 
+    void sigOTAUpgradeData(quint8, const QByteArray& data); // 上报OTA升级数据
+
 public slots:
     // 继电器数据处理
     void handleRelayData(const QByteArray &binaryData);
@@ -213,6 +217,7 @@ private:
 
     bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;
+    quint8 mDetectorIndex = 1;
 
     QFile m_fpga1MainFile;
     QFile m_fpga2MainFile;

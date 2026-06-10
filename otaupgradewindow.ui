@@ -28,10 +28,27 @@
         <string>选项</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
+        <item row="1" column="1" colspan="2">
+         <widget class="QLineEdit" name="lineEdit_filePath">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="readOnly">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>更新文件路径：</string>
+          </property>
+         </widget>
+        </item>
         <item row="0" column="0">
          <widget class="QCheckBox" name="checkBox_det1">
           <property name="text">
-           <string>探测器#1</string>
+           <string>水平相机</string>
           </property>
           <property name="checked">
            <bool>false</bool>
@@ -41,59 +58,7 @@
         <item row="0" column="1">
          <widget class="QCheckBox" name="checkBox_det2">
           <property name="text">
-           <string>探测器#2</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <widget class="QCheckBox" name="checkBox_det3">
-          <property name="text">
-           <string>探测器#3</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="3">
-         <widget class="QCheckBox" name="checkBox_det4">
-          <property name="text">
-           <string>探测器#4</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>程序分区类型：</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1" colspan="2">
-         <widget class="QComboBox" name="comboBox_partition">
-          <item>
-           <property name="text">
-            <string>主分区程序</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>备用分区程序</string>
-           </property>
-          </item>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>更新文件路径：</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1" colspan="2">
-         <widget class="QLineEdit" name="lineEdit_filePath">
-          <property name="enabled">
-           <bool>true</bool>
-          </property>
-          <property name="readOnly">
-           <bool>true</bool>
+           <string>垂直相机</string>
           </property>
          </widget>
         </item>
