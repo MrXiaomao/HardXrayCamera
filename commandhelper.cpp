@@ -142,6 +142,14 @@ CommandHelper::CommandHelper(QObject *parent)
         }
     });
 
+    connect(client_fpga1_wave, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+        emit sigStatus_fpga1_wave(connected);
+    });
+
+    connect(client_fpga2_wave, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
+        emit sigStatus_fpga2_wave(connected);
+    });
+
     connect(client_arm1, &TcpClient::sigconnectStatusChanged, this, [=](bool connected){
         if(connected){
             // qInfo() << "ARM设备1连接成功";
@@ -216,14 +224,14 @@ CommandHelper::CommandHelper(QObject *parent)
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
         logTcpConnectFailure(QString::fromUtf8(kFpga1WavePort), host, port, errorString);
-        emit sigDetector3Fault();
+        emit sigFault_fpga1_wave();
     });
 
     connect(client_fpga2_wave, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
         logTcpConnectFailure(QString::fromUtf8(kFpga2WavePort), host, port, errorString);
-        emit sigDetector4Fault();
+        emit sigFault_fpga2_wave();
     });
 
     connect(client_arm1, &TcpClient::sigconnectError, this,

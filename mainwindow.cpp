@@ -115,12 +115,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector2Status, this, &MainWindow::onDetector2StatusChanged);
-    connect(commandHelper, &CommandHelper::sigDetector3Status, this, &MainWindow::onDetector3StatusChanged);
-    connect(commandHelper, &CommandHelper::sigDetector4Status, this, &MainWindow::onDetector4StatusChanged);
+    connect(commandHelper, &CommandHelper::sigStatus_fpga1_wave, this, &MainWindow::onDetector3StatusChanged);
+    connect(commandHelper, &CommandHelper::sigStatus_fpga2_wave, this, &MainWindow::onDetector4StatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Fault, this, &MainWindow::onDetector1ConnectFault);
     connect(commandHelper, &CommandHelper::sigDetector2Fault, this, &MainWindow::onDetector2ConnectFault);
-    connect(commandHelper, &CommandHelper::sigDetector3Fault, this, &MainWindow::onDetector3ConnectFault);
-    connect(commandHelper, &CommandHelper::sigDetector4Fault, this, &MainWindow::onDetector4ConnectFault);
+    connect(commandHelper, &CommandHelper::sigFault_fpga1_wave, this, &MainWindow::onDetector3ConnectFault);
+    connect(commandHelper, &CommandHelper::sigFault_fpga2_wave, this, &MainWindow::onDetector4ConnectFault);
     connect(commandHelper, &CommandHelper::sigARM1Status, this, &MainWindow::onArm1StatusChanged);
     connect(commandHelper, &CommandHelper::sigARM2Status, this, &MainWindow::onArm2StatusChanged);
     connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData, Qt::QueuedConnection);

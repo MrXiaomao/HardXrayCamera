@@ -142,10 +142,10 @@ signals:
     void sigDetector2Status(bool on);
     void sigDetector1Fault();//故障，一般指网络不通
     void sigDetector2Fault();
-    void sigDetector3Status(bool on);
-    void sigDetector4Status(bool on);
-    void sigDetector3Fault();//故障，一般指网络不通
-    void sigDetector4Fault();
+    void sigStatus_fpga1_wave(bool on);
+    void sigStatus_fpga2_wave(bool on);
+    void sigFault_fpga1_wave();//故障，一般指网络不通
+    void sigFault_fpga2_wave();
 
     // ARM状态
     void sigARM1Status(bool on);
