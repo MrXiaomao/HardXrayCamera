@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-06-09 20:02:52
+ * @LastEditTime: 2026-06-10 14:57:34
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -495,11 +495,9 @@ void CommandHelper::startMeasure(DetParameter detPara)
 
 void CommandHelper::stopMeasure()
 {
-    Order::TransferMode transferMode = Order::TransferMode::Spectrum512;
     {
         QMutexLocker locker(&m_measurementMutex);
         measure_started = false;
-        transferMode = m_detPara.transferMode;
         closeMeasurementFilesLocked();
     }
 

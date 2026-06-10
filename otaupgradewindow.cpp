@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QButtonGroup>
 #include <QDateTime>
+#include <QTimer>
 
 #include <QFileInfo>
 
@@ -49,9 +50,16 @@ OTAUpgradeWindow::OTAUpgradeWindow(QWidget *parent)
     connect(commHelper, &CommandHelper::sigDetector2Status, this, [=](bool on){
         ui->checkBox_det2->setEnabled(on);
     });
-    connect(commHelper, &CommandHelper::sigOTAUpgradeData, this, [=](quint8 index, const QByteArray& data){
-        if (data.at(0) == 0x86)
-         {
+    connect(commHelper, &CommandHelper::sigOTAUpgradeData, this, [=](quint8 recvIndex, const QByteArray& data){
+        if (recvIndex != m_currentUpgradeIndex)
+            return;
+        if (data.isEmpty())
+            return;
+
+        emit sigWriteLog(QString(tr("OTA收到回包：%1")).arg(QString(data.toHex(' ').toUpper())));
+
+        if (static_cast<quint8>(data.at(0)) == 0x86) {
+            m_eraseSucceeded = true;
             emit sigWriteLog(tr("旧程序擦除成功！"));
             m_waitLoop.quit();
         }
@@ -192,39 +200,72 @@ void OTAUpgradeWindow::startNextTask()
     }
 
     const int index = m_taskQueue[m_currentTaskIndex];
+    m_currentUpgradeIndex = index;
+    m_eraseSucceeded = false;
+
+    commHelper->startOTAUpgrade(index);
 
     qDebug() << tr("=== 开始执行任务%1：探测器[#%2]（主分区程序） ===")
                 .arg(m_currentTaskIndex + 1).arg(index);
     sigWriteLog(tr("=== 开始执行任务%1：探测器[#%2]（主分区程序） ===")
                     .arg(m_currentTaskIndex + 1).arg(index));
 
-    // 1.1.1 发送更新数据包和更新地址（原业务逻辑保留）
+    // 1. 发送开始标志
     QByteArray sectorData = QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 00 AB CD");
     commHelper->sendOTAUpgradeData(index, sectorData);
 
-    // 1.1.2 计数块数
+    // 2. 按文件大小计算擦除块数并发送擦除指令
     qint64 fileSize = QFileInfo(m_binFileName).size();
-    quint8 sectorCount = qCeil((double)fileSize / (64*1024)); // 计数块数
+    quint16 sectorCount = static_cast<quint16>(qCeil(static_cast<double>(fileSize) / (64 * 1024)));
+    if (sectorCount == 0)
+        sectorCount = 1;
 
-    // 2. 按照特定地址块进行Flash擦除指令
-    //第4-5字节代表特定地址，6-7字节代表根据文件大小要进行擦除的块区
     sectorData = QByteArray::fromHex("55 04 01 00 00 00 00 f0");
-    sectorData[5] = (sectorCount >> 8) & 0xFF;
-    sectorData[6] = sectorCount & 0xFF;
+    sectorData[5] = static_cast<char>((sectorCount >> 8) & 0xFF);
+    sectorData[6] = static_cast<char>(sectorCount & 0xFF);
     commHelper->sendOTAUpgradeData(index, sectorData);
+    sigWriteLog(QString(tr("发送擦除指令（%1块）：%2"))
+                    .arg(sectorCount)
+                    .arg(QString(sectorData.toHex(' ').toUpper())));
 
-    // 堵塞等待86字节
-    m_waitLoop.exec();
+    // 等待擦除完成回包 0x86
+    {
+        QTimer eraseTimer;
+        eraseTimer.setSingleShot(true);
+        connect(&eraseTimer, &QTimer::timeout, &m_waitLoop, &QEventLoop::quit);
+        eraseTimer.start(60000);
+        m_waitLoop.exec();
+        eraseTimer.stop();
+    }
 
-    // 3. 按照特定地址进行Flash写入指令
+    if (!m_eraseSucceeded) {
+        sigWriteLog(tr("探测器[#%1]擦除超时或失败，跳过该任务").arg(index), QtCriticalMsg);
+        commHelper->endOTAUpgrade(index);
+        m_runningTasks--;
+        m_currentTaskIndex++;
+        if (m_runningTasks == 0) {
+            emit sigUpgradeFinished();
+        } else {
+            startNextTask();
+        }
+        return;
+    }
+
+    // 3. 发送 Flash 写入指令
     sectorData[1] = 0x05;
     sectorData[5] = 0x00;
     sectorData[6] = 0x00;
     if (!commHelper->sendOTAUpgradeData(index, sectorData)) {
-        qCritical() << tr("探测器[#%1]发送更新地址失败，跳过该任务").arg(index);
-        sigWriteLog(tr("探测器[#%1]发送更新地址失败，跳过该任务").arg(index), QtCriticalMsg);
+        qCritical() << tr("探测器[#%1]发送写入指令失败，跳过该任务").arg(index);
+        sigWriteLog(tr("探测器[#%1]发送写入指令失败，跳过该任务").arg(index), QtCriticalMsg);
+        commHelper->endOTAUpgrade(index);
+        m_runningTasks--;
         m_currentTaskIndex++;
-        startNextTask();
+        if (m_runningTasks == 0) {
+            emit sigUpgradeFinished();
+        } else {
+            startNextTask();
+        }
         return;
     }
     QThread::msleep(1000); // 子线程休眠，不阻塞主线程
@@ -263,7 +304,6 @@ void OTAUpgradeWindow::asyncSendOTAData(int index)
     qint64 fileSize = QFileInfo(m_binFileName).size();
     int sendCount = qCeil((double)fileSize / 256);
     bool sendSuccess = true;
-    commHelper->startOTAUpgrade(index);
     for (int i = 0; i < sendCount && sendSuccess; ++i) {
         emit sigSendProgress(index, i + 1, sendCount);
 
@@ -282,15 +322,7 @@ void OTAUpgradeWindow::asyncSendOTAData(int index)
     }
 
     file.close();
-    if (!sendSuccess) {
-        emit sigSendFinished(index, sendSuccess);
-    } else {
-        std::thread([=](){
-            emit sigSendFinished(index, sendSuccess);
-        }).join();
-    }
-
-    commHelper->endOTAUpgrade(index); // 发送结束指令
+    emit sigSendFinished(index, sendSuccess);
 }
 
 void OTAUpgradeWindow::slotSendProgress(int /*index*/, int current, int total)
@@ -317,7 +349,8 @@ void OTAUpgradeWindow::slotSendFinished(int index, bool success)
         sigWriteLog(tr("探测器[#%1][主分区程序]更新失败！").arg(index), QtCriticalMsg);
     }
 
-    // 按钮状态
+    commHelper->endOTAUpgrade(index);
+
     if (m_runningTasks == 0) {
         emit sigUpgradeFinished();
     }

@@ -48,7 +48,9 @@ private:
     QList<int> m_taskQueue; // 任务队列：设备索引
     QString m_binFileName; // 当前正在发送的bin文件路径
     int m_currentTaskIndex = 0; // 当前执行的任务索引
-    QEventLoop m_waitLoop; // 等待事件循环，用于等待升级完成
+    int m_currentUpgradeIndex = 0; // 当前等待回包的探测器索引
+    bool m_eraseSucceeded = false;
+    QEventLoop m_waitLoop; // 等待事件循环，用于等待擦除完成
 
     // 异步发送OTA数据的核心函数（子线程执行）
     void asyncSendOTAData(int index);
