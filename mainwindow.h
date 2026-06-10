@@ -34,8 +34,6 @@ signals:
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
 
 private slots:
-    void on_action_setting_triggered();
-
     void slotAppendMsg(const QString &msg, QtMsgType msgType);
 
     void on_btn_relayNetOpen_clicked();

@@ -124,7 +124,7 @@
          </size>
         </property>
         <property name="text">
-         <string>FPGA主板1主网口IP(控制/能谱)</string>
+         <string>水平相机主网口IP(控制/能谱)</string>
         </property>
        </widget>
       </item>
@@ -409,7 +409,7 @@
       <item row="3" column="0">
        <widget class="QLabel" name="label_11">
         <property name="text">
-         <string>FPGA主板1副网口IP(波形接收)</string>
+         <string>水平相机副网口IP(波形接收)</string>
         </property>
        </widget>
       </item>
@@ -447,7 +447,7 @@
          </size>
         </property>
         <property name="text">
-         <string>FPGA主板2主网口IP(控制/能谱)</string>
+         <string>垂直相机主网口IP(控制/能谱)</string>
         </property>
        </widget>
       </item>
@@ -467,7 +467,7 @@
       <item row="5" column="0">
        <widget class="QLabel" name="label_13">
         <property name="text">
-         <string>FPGA主板2副网口IP(波形接收)</string>
+         <string>垂直相机副网口IP(波形接收)</string>
         </property>
        </widget>
       </item>

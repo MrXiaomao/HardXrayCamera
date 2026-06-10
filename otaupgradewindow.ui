@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>OTA更新</string>
+   <string>远程程序更新（FPGA）</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_3">
    <item>

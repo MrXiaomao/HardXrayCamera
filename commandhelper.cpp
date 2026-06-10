@@ -84,10 +84,10 @@ void logTcpConnectFailure(const QString& deviceName, const QString& host, quint1
                                 .arg(deviceName, host, QString::number(port), errorString);
 }
 
-const char kFpga1MainPort[] = "FPGA主板1主网口(控制/能谱)";
-const char kFpga2MainPort[] = "FPGA主板2主网口(控制/能谱)";
-const char kFpga1WavePort[] = "FPGA主板1副网口(波形接收)";
-const char kFpga2WavePort[] = "FPGA主板2副网口(波形接收)";
+const char kFpga1MainPort[] = "水平相机主网口(控制/能谱)";
+const char kFpga2MainPort[] = "垂直相机主网口(控制/能谱)";
+const char kFpga1WavePort[] = "水平相机副网口(波形接收)";
+const char kFpga2WavePort[] = "垂直相机副网口(波形接收)";
 
 } // end anonymous namespace
 
@@ -392,24 +392,24 @@ void CommandHelper::startMeasure(DetParameter detPara)
         m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
 
         if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open FPGA主板1主网口 file:" << mfileNameFpga1Main;
+            qWarning() << "Failed to open 水平相机主网口 file:" << mfileNameFpga1Main;
         } else {
-            qInfo() << "FPGA主板1主网口 data will be saved to:" << mfileNameFpga1Main;
+            qInfo() << "水平相机主网口 data will be saved to:" << mfileNameFpga1Main;
         }
         if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open FPGA主板2主网口 file:" << mfileNameFpga2Main;
+            qWarning() << "Failed to open 垂直相机主网口 file:" << mfileNameFpga2Main;
         } else {
-            qInfo() << "FPGA主板2主网口 data will be saved to:" << mfileNameFpga2Main;
+            qInfo() << "垂直相机主网口 data will be saved to:" << mfileNameFpga2Main;
         }
         if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open FPGA主板1副网口 file:" << mfileNameFpga1Wave;
+            qWarning() << "Failed to open 水平相机副网口 file:" << mfileNameFpga1Wave;
         } else {
-            qInfo() << "FPGA主板1副网口 data will be saved to:" << mfileNameFpga1Wave;
+            qInfo() << "水平相机副网口 data will be saved to:" << mfileNameFpga1Wave;
         }
         if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open FPGA主板2副网口 file:" << mfileNameFpga2Wave;
+            qWarning() << "Failed to open 垂直相机副网口 file:" << mfileNameFpga2Wave;
         } else {
-            qInfo() << "FPGA主板2副网口 data will be saved to:" << mfileNameFpga2Wave;
+            qInfo() << "垂直相机副网口 data will be saved to:" << mfileNameFpga2Wave;
         }
     }
 
@@ -656,9 +656,9 @@ void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
             m_fpga1MainFile.write(binaryData);
             m_fpga1MainFile.flush();
         } else {
-            qWarning() << "FPGA主板1主网口 file is not open:" << mfileNameFpga1Main;
+            qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
         }
-        // 处理FPGA主板1主网口能谱数据，根据当前传输模式选择解析器
+        // 处理水平相机主网口能谱数据，根据当前传输模式选择解析器
         if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
             processSpec16Data(1, m_fpga1MainBuffer, binaryData);
         } else {
@@ -687,9 +687,9 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
         m_fpga2MainFile.write(binaryData);
         m_fpga2MainFile.flush();
     } else {
-        qWarning() << "FPGA主板2主网口 file is not open:" << mfileNameFpga2Main;
+        qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
     }
-    // 处理FPGA主板2主网口能谱数据，根据当前传输模式选择解析器
+    // 处理垂直相机主网口能谱数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
         processSpec16Data(2, m_fpga2MainBuffer, binaryData);
     } else {
@@ -717,9 +717,9 @@ void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
         m_fpga1WaveFile.write(binaryData);
         m_fpga1WaveFile.flush();
     } else {
-        qWarning() << "FPGA主板1副网口 file is not open:" << mfileNameFpga1Wave;
+        qWarning() << "水平相机副网口 file is not open:" << mfileNameFpga1Wave;
     }
-    // 处理FPGA主板1副网口波形数据
+    // 处理水平相机副网口波形数据
     processWaveformData(1, m_fpga1WaveBuffer, binaryData);
 }
 
@@ -743,9 +743,9 @@ void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
         m_fpga2WaveFile.write(binaryData);
         m_fpga2WaveFile.flush();
     } else {
-        qWarning() << "FPGA主板2副网口 file is not open:" << mfileNameFpga2Wave;
+        qWarning() << "垂直相机副网口 file is not open:" << mfileNameFpga2Wave;
     }
-    // 处理FPGA主板2副网口波形数据
+    // 处理垂直相机副网口波形数据
     processWaveformData(2, m_fpga2WaveBuffer, binaryData);
 }
 
