@@ -87,7 +87,10 @@
              <property name="title">
               <string>测量数据图像预览</string>
              </property>
-             <layout class="QHBoxLayout" name="horizontalLayout_4">
+             <layout class="QVBoxLayout" name="verticalLayout_pictureSetting">
+              <property name="spacing">
+               <number>4</number>
+              </property>
               <property name="topMargin">
                <number>5</number>
               </property>
@@ -95,6 +98,8 @@
                <number>5</number>
               </property>
               <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_4">
+                <item>
                <widget class="QLabel" name="label_17">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
@@ -260,6 +265,113 @@
                  </size>
                 </property>
                </spacer>
+              </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_profile">
+                <item>
+                 <widget class="QLabel" name="label_energyLeft">
+                  <property name="text">
+                   <string>能量左/keV</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QDoubleSpinBox" name="dsbx_energyLeft">
+                  <property name="minimumSize">
+                   <size>
+                    <width>70</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="decimals">
+                   <number>1</number>
+                  </property>
+                  <property name="minimum">
+                   <double>0.000000000000000</double>
+                  </property>
+                  <property name="maximum">
+                   <double>500.000000000000000</double>
+                  </property>
+                  <property name="singleStep">
+                   <double>1.000000000000000</double>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_energyRight">
+                  <property name="text">
+                   <string>能量右/keV</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QDoubleSpinBox" name="dsbx_energyRight">
+                  <property name="minimumSize">
+                   <size>
+                    <width>70</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="decimals">
+                   <number>1</number>
+                  </property>
+                  <property name="minimum">
+                   <double>0.000000000000000</double>
+                  </property>
+                  <property name="maximum">
+                   <double>500.000000000000000</double>
+                  </property>
+                  <property name="singleStep">
+                   <double>1.000000000000000</double>
+                  </property>
+                  <property name="value">
+                   <double>100.000000000000000</double>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_generateProfile">
+                  <property name="text">
+                   <string>生成剖面分布</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_profileID">
+                  <property name="text">
+                   <string>剖面编号</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="spb_profileID">
+                  <property name="minimumSize">
+                   <size>
+                    <width>60</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="minimum">
+                   <number>0</number>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer_profile">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
               </item>
              </layout>
             </widget>
@@ -551,40 +663,30 @@
                </size>
               </property>
               <property name="text">
-               <string>关机</string>
+               <string>断开采集系统</string>
               </property>
              </widget>
             </item>
             <item row="0" column="1">
              <widget class="QPushButton" name="btn_relayNetClose">
               <property name="text">
-               <string>网络断开</string>
+               <string>断开远程控制</string>
               </property>
              </widget>
             </item>
-            <item row="1" column="1">
-             <widget class="QPushButton" name="bt_powerOff">
+            <item row="1" column="0" colspan="2">
+             <widget class="SwitchButton" name="switch_power" native="true">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="text">
-               <string>电源关闭</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QPushButton" name="bt_powerOn">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>电源开启</string>
+              <property name="minimumSize">
+               <size>
+                <width>120</width>
+                <height>32</height>
+               </size>
               </property>
              </widget>
             </item>
@@ -597,7 +699,7 @@
                </sizepolicy>
               </property>
               <property name="text">
-               <string>网络连接</string>
+               <string>连接远程控制</string>
               </property>
              </widget>
             </item>
@@ -616,7 +718,7 @@
                </size>
               </property>
               <property name="text">
-               <string>开机</string>
+               <string>连接采集系统</string>
               </property>
              </widget>
             </item>
@@ -1088,7 +1190,7 @@
   </action>
   <action name="action_relayNetOpen">
    <property name="text">
-    <string>网络连接</string>
+    <string>连接远程控制</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1096,7 +1198,7 @@
   </action>
   <action name="action_relayNetClose">
    <property name="text">
-    <string>网络断开</string>
+    <string>断开远程控制</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1104,7 +1206,7 @@
   </action>
   <action name="action_powerOn">
    <property name="text">
-    <string>电源开启</string>
+    <string>远程上电</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1112,7 +1214,7 @@
   </action>
   <action name="action_powerOff">
    <property name="text">
-    <string>电源关闭</string>
+    <string>远程断电</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1120,7 +1222,7 @@
   </action>
   <action name="action_connectDet">
    <property name="text">
-    <string>开机</string>
+    <string>连接采集系统</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1128,7 +1230,7 @@
   </action>
   <action name="action_disconnectDet">
    <property name="text">
-    <string>关机</string>
+    <string>断开采集系统</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1162,6 +1264,12 @@
    <class>TrendPlotWidget</class>
    <extends>QWidget</extends>
    <header>trendplotwidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SwitchButton</class>
+   <extends>QWidget</extends>
+   <header>switchbutton.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

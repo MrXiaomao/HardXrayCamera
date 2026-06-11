@@ -7,6 +7,7 @@
  */
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "switchbutton.h"
 #include <QFileDialog>
 #include <QToolButton>
 #include <QAction>
@@ -15,6 +16,10 @@
 #include <QTimer>
 #include <QDir>
 #include <QMessageBox>
+#include <QCoreApplication>
+#include <QFile>
+#include <QTextStream>
+#include <cmath>
 #include <algorithm>
 
 #include "detectorsetting.h"
@@ -60,10 +65,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotSpec->setYAxisLabel("计数");
     ui->plotSpec->setXRange(1,512);
 
-    ui->plotProfile->setTitle("剖面图");
+    ui->plotProfile->setTitle("剖面分布");
     ui->plotProfile->setXAxisLabel("z轴位置");
     ui->plotProfile->setYAxisLabel("计数");
-    ui->plotProfile->setXRange(-25,25);
+    ui->plotProfile->setXRange(kProfileZMin, kProfileZMax);
+    ui->plotProfile->ensureGraphCount(2);
+    ui->plotProfile->setGraphColor(0, Qt::blue);
+    ui->plotProfile->setGraphColor(1, Qt::red);
 
     {
         //信号采集机箱
@@ -110,7 +118,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
         ui->btn_relayNetOpen->blockSignals(true);
         ui->btn_relayNetOpen->setChecked(false);
-        ui->btn_relayNetOpen->setText(QStringLiteral("网络连接"));
+        ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
         ui->btn_relayNetOpen->blockSignals(false);
     });
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
@@ -163,10 +171,15 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateSpectrumRefreshIntervalRange);
     connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::updateHxrDisplayBinControls);
+    connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::updateProfileControls);
     connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
+    connect(ui->spb_profileID, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::refreshProfilePlot);
     updateSpectrumRefreshIntervalRange();
     updateHxrDisplayBinControls();
+    updateProfileControls();
 
     m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
 
@@ -180,10 +193,22 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->btn_relayNetOpen->setCheckable(true);
     ui->btn_relayNetOpen->setChecked(false);
-    ui->btn_relayNetOpen->setText(QStringLiteral("网络连接"));
+    ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
     ui->btn_relayNetClose->hide();
-    ui->bt_powerOn->setEnabled(false);
-    ui->bt_powerOff->setEnabled(false);
+
+    ui->switch_power->setAutoChecked(false);
+    ui->switch_power->setText(QStringLiteral("远程上电"), QStringLiteral("远程断电"));
+    ui->switch_power->setChecked(false);
+    setPowerSwitchEnabled(false);
+    connect(ui->switch_power, &SwitchButton::clicked, this, [this]() {
+        if (!ui->switch_power->getChecked()) {
+            commandHelper->PowerOnRelay();
+            showHardwareStartupWaitDialog();
+        } else {
+            commandHelper->PowerOffRelay();
+        }
+    });
+
     ui->bt_connectDet->setEnabled(false);
     ui->bt_disconnectDet->setEnabled(false);
     ui->btn_startMeasure->setEnabled(false);
@@ -222,18 +247,17 @@ void MainWindow::onRelayStatusChanged(bool on)
 {
     ui->btn_relayNetOpen->blockSignals(true);
     ui->btn_relayNetOpen->setChecked(on);
-    ui->btn_relayNetOpen->setText(on ? QStringLiteral("网络断开") : QStringLiteral("网络连接"));
+    ui->btn_relayNetOpen->setText(on ? QStringLiteral("断开远程控制") : QStringLiteral("连接远程控制"));
     ui->btn_relayNetOpen->blockSignals(false);
 
     if (on){
-        ui->bt_powerOn->setEnabled(true);
-        ui->bt_powerOff->setEnabled(true);
+        setPowerSwitchEnabled(true);
 
         qInfo() << "继电器网络状态: 已连接";
     }
     else{
-        ui->bt_powerOn->setEnabled(false);
-        ui->bt_powerOff->setEnabled(false);
+        setPowerSwitchEnabled(false);
+        syncPowerSwitchFromRelay(false);
         ui->bt_connectDet->setEnabled(false);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
@@ -244,17 +268,15 @@ void MainWindow::onRelayStatusChanged(bool on)
 
 void MainWindow::onRelayPowerStatusChanged(bool on)
 {
+    syncPowerSwitchFromRelay(on);
+
     if (on) {
-        ui->bt_powerOn->setEnabled(false);
-        ui->bt_powerOff->setEnabled(true);
         ui->bt_connectDet->setEnabled(true);
         ui->bt_disconnectDet->setEnabled(false);
 
         qInfo() << "继电器控制的电源状态: 已开启";
         replayPowerOn = true;
     } else {
-        ui->bt_powerOn->setEnabled(true);
-        ui->bt_powerOff->setEnabled(false);
         ui->bt_connectDet->setEnabled(false);
         ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
@@ -703,6 +725,7 @@ void MainWindow::clearSpectrumData()
     updateSpecIdSpinBoxRange();
     ui->plotSpec->clearData();
     ui->plotSpec->refreshPlot();
+    clearProfileData();
 }
 
 void MainWindow::clearWaveformData()
@@ -814,6 +837,298 @@ void MainWindow::updateHxrDisplayBinControls()
 int MainWindow::hxrDisplayBinCount() const
 {
     return ui->spb_hxrDisplayBins->value();
+}
+
+void MainWindow::updateProfileControls()
+{
+    const bool spectrum512Mode = ui->cmb_transferMode->currentIndex() == 0;
+    ui->label_energyLeft->setVisible(spectrum512Mode);
+    ui->dsbx_energyLeft->setVisible(spectrum512Mode);
+    ui->label_energyRight->setVisible(spectrum512Mode);
+    ui->dsbx_energyRight->setVisible(spectrum512Mode);
+    ui->btn_generateProfile->setVisible(spectrum512Mode);
+    ui->label_profileID->setVisible(spectrum512Mode);
+    ui->spb_profileID->setVisible(spectrum512Mode);
+}
+
+QString MainWindow::energyCalibrationFilePath() const
+{
+    const QString fileName = QStringLiteral("能量刻度.csv");
+    const QString appDirPath = QCoreApplication::applicationDirPath();
+    const QString appDirFile = QDir(appDirPath).filePath(fileName);
+    if (QFile::exists(appDirFile))
+        return appDirFile;
+
+    const QString currentDirFile = QDir::currentPath() + QDir::separator() + fileName;
+    if (QFile::exists(currentDirFile))
+        return currentDirFile;
+
+    return appDirFile;
+}
+
+bool MainWindow::loadEnergyCalibration(QVector<EnergyCalibration> &calibration,
+                                        QString *errorMessage) const
+{
+    calibration.clear();
+    calibration.resize(kProfileChannelCount);
+
+    const QString filePath = energyCalibrationFilePath();
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (errorMessage)
+            *errorMessage = tr("无法打开能量刻度文件：%1").arg(filePath);
+        return false;
+    }
+
+    QTextStream in(&file);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    in.setEncoding(QStringConverter::Utf8);
+#else
+    in.setCodec("UTF-8");
+#endif
+
+    if (in.atEnd()) {
+        if (errorMessage)
+            *errorMessage = tr("能量刻度文件为空：%1").arg(filePath);
+        return false;
+    }
+
+    const QString header = in.readLine().trimmed();
+    if (!header.startsWith(QStringLiteral("channel"), Qt::CaseInsensitive)) {
+        if (errorMessage)
+            *errorMessage = tr("能量刻度文件首行应为标题 channel,k,b");
+        return false;
+    }
+
+    int loadedRows = 0;
+    while (!in.atEnd()) {
+        const QString line = in.readLine().trimmed();
+        if (line.isEmpty())
+            continue;
+
+        const QStringList fields = line.split(QLatin1Char(','));
+        if (fields.size() < 3) {
+            if (errorMessage)
+                *errorMessage = tr("能量刻度文件格式错误：%1").arg(line);
+            return false;
+        }
+
+        bool okChannel = false;
+        bool okK = false;
+        bool okB = false;
+        const int channel = fields.at(0).trimmed().toInt(&okChannel);
+        const double k = fields.at(1).trimmed().toDouble(&okK);
+        const double b = fields.at(2).trimmed().toDouble(&okB);
+        if (!okChannel || !okK || !okB || channel < 1 || channel > kProfileChannelCount) {
+            if (errorMessage)
+                *errorMessage = tr("能量刻度文件数据无效：%1").arg(line);
+            return false;
+        }
+        if (qFuzzyIsNull(k)) {
+            if (errorMessage)
+                *errorMessage = tr("通道 %1 的 k 系数不能为 0").arg(channel);
+            return false;
+        }
+
+        calibration[channel - 1].k = k;
+        calibration[channel - 1].b = b;
+        ++loadedRows;
+    }
+
+    if (loadedRows != kProfileChannelCount) {
+        if (errorMessage) {
+            *errorMessage = tr("能量刻度文件应包含 %1 个通道，当前 %2 个")
+                                .arg(kProfileChannelCount)
+                                .arg(loadedRows);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+void MainWindow::energyToBinRange(double energyLeft, double energyRight,
+                                  const EnergyCalibration &cal,
+                                  int &binStart, int &binEnd) const
+{
+    const double eMin = qMin(energyLeft, energyRight);
+    const double eMax = qMax(energyLeft, energyRight);
+
+    double chLow = (eMin - cal.b) / cal.k;
+    double chHigh = (eMax - cal.b) / cal.k;
+    if (chLow > chHigh)
+        std::swap(chLow, chHigh);
+
+    binStart = qBound(1, static_cast<int>(std::floor(chLow)), kSpectrum512BinCount);
+    binEnd = qBound(1, static_cast<int>(std::ceil(chHigh)), kSpectrum512BinCount);
+    if (binStart > binEnd)
+        std::swap(binStart, binEnd);
+}
+
+quint64 MainWindow::sumCountsInBinRange(const QVector<quint32> &counts,
+                                        int binStart, int binEnd) const
+{
+    if (counts.isEmpty() || binStart < 1 || binEnd < binStart)
+        return 0;
+
+    const int startIndex = binStart - 1;
+    const int endIndex = qMin(binEnd, counts.size()) - 1;
+    if (startIndex >= counts.size())
+        return 0;
+
+    quint64 total = 0;
+    for (int i = startIndex; i <= endIndex; ++i)
+        total += counts.at(i);
+    return total;
+}
+
+double MainWindow::profileChannelPosition(int logicalChannel) const
+{
+    if (logicalChannel < 1 || logicalChannel > kProfileChannelCount)
+        return 0.0;
+
+    return kProfileZMin
+           + (logicalChannel - 1) * (kProfileZMax - kProfileZMin)
+                 / (kProfileChannelCount - 1);
+}
+
+void MainWindow::generateProfileSnapshots()
+{
+    if (ui->cmb_transferMode->currentIndex() != 0) {
+        QMessageBox::information(this, tr("提示"), tr("剖面分布仅适用于512道能谱模式"));
+        return;
+    }
+
+    const double energyLeft = ui->dsbx_energyLeft->value();
+    const double energyRight = ui->dsbx_energyRight->value();
+    if (energyLeft > energyRight) {
+        QMessageBox::information(this, tr("提示"), tr("能量区间左端不能大于右端"));
+        return;
+    }
+
+    QString calError;
+    if (!loadEnergyCalibration(m_energyCalibration, &calError)) {
+        QMessageBox::warning(this, tr("提示"), calError);
+        return;
+    }
+
+    int profileCount = 0;
+    for (const QVector<SpectrumEntry> &channelSpectra : m_spectrumByChannel) {
+        profileCount = qMax(profileCount, channelSpectra.size());
+    }
+    if (profileCount <= 0) {
+        QMessageBox::information(this, tr("提示"), tr("当前没有512道能谱数据，无法生成剖面分布"));
+        return;
+    }
+
+    QVector<int> binStarts(kProfileChannelCount);
+    QVector<int> binEnds(kProfileChannelCount);
+    for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+        energyToBinRange(energyLeft, energyRight, m_energyCalibration.at(ch),
+                         binStarts[ch], binEnds[ch]);
+    }
+
+    m_profileSnapshots.clear();
+    m_profileSnapshots.reserve(profileCount);
+
+    for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
+        ProfileSnapshot snapshot;
+        snapshot.counts.resize(kProfileChannelCount);
+        snapshot.timeMs = 0;
+
+        for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+            const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+            if (profileIndex >= spectra.size()) {
+                snapshot.counts[ch] = 0;
+                continue;
+            }
+
+            const SpectrumEntry &entry = spectra.at(profileIndex);
+            if (snapshot.timeMs == 0)
+                snapshot.timeMs = entry.timeMs;
+            snapshot.counts[ch] = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+        }
+
+        m_profileSnapshots.append(snapshot);
+    }
+
+    ui->spb_profileID->blockSignals(true);
+    ui->spb_profileID->setValue(profileCount - 1);
+    ui->spb_profileID->blockSignals(false);
+    updateProfileIdSpinBoxRange();
+    refreshProfilePlot();
+
+    qInfo() << QString("剖面分布已生成 %1 帧，能量区间 [%2, %3] keV")
+                   .arg(profileCount)
+                   .arg(energyLeft, 0, 'f', 1)
+                   .arg(energyRight, 0, 'f', 1);
+}
+
+void MainWindow::updateProfileIdSpinBoxRange()
+{
+    const int maxProfileId = qMax(0, m_profileSnapshots.size() - 1);
+
+    ui->spb_profileID->blockSignals(true);
+    ui->spb_profileID->setMaximum(maxProfileId);
+    if (ui->spb_profileID->value() > maxProfileId)
+        ui->spb_profileID->setValue(maxProfileId);
+    ui->spb_profileID->blockSignals(false);
+}
+
+void MainWindow::clearProfileData()
+{
+    m_profileSnapshots.clear();
+    ui->spb_profileID->blockSignals(true);
+    ui->spb_profileID->setValue(0);
+    ui->spb_profileID->blockSignals(false);
+    updateProfileIdSpinBoxRange();
+    ui->plotProfile->clearAllGraphData();
+    ui->plotProfile->refreshPlot(false, true);
+}
+
+void MainWindow::refreshProfilePlot()
+{
+    if (m_profileSnapshots.isEmpty()) {
+        ui->plotProfile->clearAllGraphData();
+        ui->plotProfile->setTitle(QStringLiteral("剖面分布 (无数据)"));
+        ui->plotProfile->refreshPlot(false, true);
+        return;
+    }
+
+    const int profileId = ui->spb_profileID->value();
+    if (profileId < 0 || profileId >= m_profileSnapshots.size()) {
+        ui->plotProfile->clearAllGraphData();
+        ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 (无数据)").arg(profileId));
+        ui->plotProfile->refreshPlot(false, true);
+        return;
+    }
+
+    const ProfileSnapshot &snapshot = m_profileSnapshots.at(profileId);
+    QVector<double> verticalX(kVerticalCameraChannels);
+    QVector<double> verticalY(kVerticalCameraChannels);
+    QVector<double> horizontalX(kVerticalCameraChannels);
+    QVector<double> horizontalY(kVerticalCameraChannels);
+
+    for (int i = 0; i < kVerticalCameraChannels; ++i) {
+        verticalX[i] = profileChannelPosition(i + 1);
+        verticalY[i] = static_cast<double>(snapshot.counts.at(i));
+
+        horizontalX[i] = profileChannelPosition(i + kVerticalCameraChannels + 1);
+        horizontalY[i] = static_cast<double>(snapshot.counts.at(i + kVerticalCameraChannels));
+    }
+
+    ui->plotProfile->setGraphData(0, verticalX, verticalY);
+    ui->plotProfile->setGraphData(1, horizontalX, horizontalY);
+    ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 t=%2ms (垂直/水平)")
+                                  .arg(profileId)
+                                  .arg(snapshot.timeMs));
+    ui->plotProfile->setXRange(kProfileZMin, kProfileZMax);
+    ui->plotProfile->refreshPlot(false, true);
+}
+
+void MainWindow::on_btn_generateProfile_clicked()
+{
+    generateProfileSnapshots();
 }
 
 void MainWindow::refreshSpectrumPlot()
@@ -1200,19 +1515,6 @@ void MainWindow::on_btn_startMeasure_clicked()
     startMeasureInternal();
 }
 
-//打开探测器供电电源，通过继电器进行控制探测器的电源
-void MainWindow::on_bt_powerOn_clicked()
-{
-    commandHelper->PowerOnRelay();
-    showHardwareStartupWaitDialog();
-}
-
-//关闭探测器供电电源，通过继电器进行控制探测器的电源
-void MainWindow::on_bt_powerOff_clicked()
-{
-    commandHelper->PowerOffRelay();
-}
-
 //连接探测器网络
 void MainWindow::on_bt_connectDet_clicked()
 {
@@ -1342,6 +1644,18 @@ void MainWindow::on_action_powerOn_triggered()
 void MainWindow::on_action_powerOff_triggered()
 {
     commandHelper->PowerOffRelay();
+}
+
+void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
+{
+    ui->switch_power->blockSignals(true);
+    ui->switch_power->setChecked(powerOn);
+    ui->switch_power->blockSignals(false);
+}
+
+void MainWindow::setPowerSwitchEnabled(bool enabled)
+{
+    ui->switch_power->setEnabled(enabled);
 }
 
 void MainWindow::showHardwareStartupWaitDialog()

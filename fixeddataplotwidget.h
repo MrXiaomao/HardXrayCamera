@@ -16,13 +16,17 @@ public:
     
     void setTitle(const QString& title);
     void setGraphColor(const QColor& color);
+    void setGraphColor(int graphIndex, const QColor& color);
     void setXAxisLabel(const QString& text);
     void setYAxisLabel(const QString& text);
     void setXRange(double min, double max);
     void setData(const QVector<double>& x, const QVector<double>& y);
     void setData(const QVector<quint32>& x, const QVector<quint32>& y);
+    void ensureGraphCount(int count);
+    void setGraphData(int graphIndex, const QVector<double>& x, const QVector<double>& y);
     void clearData();
-    void refreshPlot();
+    void clearAllGraphData();
+    void refreshPlot(bool rescaleX = true, bool rescaleY = true);
 
 signals:
 
@@ -33,6 +37,7 @@ private:
 
     QCPTextElement* m_title = nullptr;
     QCPGraph* m_graph = nullptr;
+    QVector<QCPGraph*> m_graphs;
 };
 
 #endif // FIXEDDATAPLOTWIDGET_H

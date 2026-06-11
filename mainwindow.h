@@ -42,10 +42,6 @@ private slots:
 
     void on_btn_startMeasure_clicked();
 
-    void on_bt_powerOn_clicked();
-
-    void on_bt_powerOff_clicked();
-
     void on_bt_connectDet_clicked();
 
     void on_bt_disconnectDet_clicked();
@@ -116,7 +112,19 @@ private slots:
 
     void on_action_stopMeasure_triggered();
 
+    void on_btn_generateProfile_clicked();
+
 private:
+    struct EnergyCalibration {
+        double k = 1.0;
+        double b = 0.0;
+    };
+
+    struct ProfileSnapshot {
+        quint32 timeMs = 0;
+        QVector<quint64> counts; // 32 个逻辑通道在能量区间内的总计数
+    };
+
     struct SpectrumEntry {
         int detectorIndex = 0;
         quint32 timeMs = 0; //单位，ms
@@ -133,6 +141,12 @@ private:
     static constexpr int kSpectrumChannelCount = 32; // 探测器1: 1~16，探测器2: 17~32
     static constexpr int kDetector2ChannelOffset = 16; // 探测器2的逻辑通道号相对于物理通道的偏移
 
+    static constexpr int kSpectrum512BinCount = 512;
+    static constexpr int kProfileChannelCount = 32;
+    static constexpr int kVerticalCameraChannels = 16;
+    static constexpr double kProfileZMin = -25.0;
+    static constexpr double kProfileZMax = 25.0;
+
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
     void clearWaveformData();
@@ -145,7 +159,18 @@ private:
     void updateWaveIdSpinBoxRange();
     void updateSpectrumRefreshIntervalRange();
     void updateHxrDisplayBinControls();
+    void updateProfileControls();
     int hxrDisplayBinCount() const;
+    bool loadEnergyCalibration(QVector<EnergyCalibration> &calibration, QString *errorMessage) const;
+    QString energyCalibrationFilePath() const;
+    void energyToBinRange(double energyLeft, double energyRight, const EnergyCalibration &cal,
+                          int &binStart, int &binEnd) const;
+    quint64 sumCountsInBinRange(const QVector<quint32> &counts, int binStart, int binEnd) const;
+    double profileChannelPosition(int logicalChannel) const;
+    void generateProfileSnapshots();
+    void updateProfileIdSpinBoxRange();
+    void clearProfileData();
+    void refreshProfilePlot();
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
     void resetWaveformCounters();
@@ -153,6 +178,8 @@ private:
     void printWaveformCollectionSummary() const;
     void printSpectrumSequenceSummary() const;
     void showHardwareStartupWaitDialog();
+    void syncPowerSwitchFromRelay(bool powerOn);
+    void setPowerSwitchEnabled(bool enabled);
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
@@ -177,6 +204,8 @@ private:
     QVector<quint32> m_lastWaveformSequenceByChannel;
     QVector<bool> m_hasWaveformSequenceByChannel;
     QTimer* waveformPlotTimer = nullptr;
+    QVector<EnergyCalibration> m_energyCalibration;
+    QVector<ProfileSnapshot> m_profileSnapshots;
 
     // 继电器电源开关状态
     bool replayPowerOn = false;

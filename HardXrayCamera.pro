@@ -24,6 +24,7 @@ SOURCES += \
     offlinewindow.cpp \
     order.cpp \
     qcustomplot.cpp \
+    switchbutton.cpp \
     tcpclient.cpp \
     trendplotwidget.cpp
 
@@ -39,6 +40,7 @@ HEADERS += \
     offlinewindow.h \
     order.h \
     qcustomplot.h \
+    switchbutton.h \
     tcpclient.h \
     trendplotwidget.h
 

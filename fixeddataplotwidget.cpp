@@ -25,14 +25,7 @@ FixedDataPlotWidget::FixedDataPlotWidget(QWidget *parent)
     m_plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
 
     //创建一条曲线
-    m_graph = m_plot->addGraph();
-    m_graph->setPen(QPen(Qt::black));
-    m_graph->setLineStyle(QCPGraph::lsLine);
-    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
-    m_graph->setBrush(QBrush(QColor(0, 0, 255, 20)));
-    m_graph->setAntialiased(true);
-    m_graph->setAntialiasedFill(true);
-    m_graph->setAntialiasedFill(true);
+    ensureGraphCount(1);
 }
 
 FixedDataPlotWidget::~FixedDataPlotWidget()
@@ -54,9 +47,37 @@ void FixedDataPlotWidget::setTitle(const QString& title)
 
 void FixedDataPlotWidget::setGraphColor(const QColor& color)
 {
-    if (m_graph) {
-        m_graph->setPen(QPen(color));
+    setGraphColor(0, color);
+}
+
+void FixedDataPlotWidget::setGraphColor(int graphIndex, const QColor& color)
+{
+    if (graphIndex >= 0 && graphIndex < m_graphs.size() && m_graphs.at(graphIndex))
+        m_graphs.at(graphIndex)->setPen(QPen(color));
+}
+
+void FixedDataPlotWidget::ensureGraphCount(int count)
+{
+    if (count <= 0)
+        return;
+
+    static const QVector<QColor> kDefaultColors = {
+        Qt::black, Qt::red, Qt::blue, Qt::green, Qt::magenta, Qt::cyan
+    };
+
+    while (m_graphs.size() < count) {
+        QCPGraph *graph = m_plot->addGraph();
+        const QColor color = kDefaultColors.at(m_graphs.size() % kDefaultColors.size());
+        graph->setPen(QPen(color));
+        graph->setLineStyle(QCPGraph::lsLine);
+        graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
+        graph->setBrush(QBrush(color.lighter(180)));
+        graph->setAntialiased(true);
+        graph->setAntialiasedFill(true);
+        m_graphs.append(graph);
     }
+
+    m_graph = m_graphs.first();
 }
 
 void FixedDataPlotWidget::setXAxisLabel(const QString& text)
@@ -106,21 +127,36 @@ void FixedDataPlotWidget::setData(const QVector<quint32>& x, const QVector<quint
     }
 }
 
+void FixedDataPlotWidget::setGraphData(int graphIndex, const QVector<double>& x, const QVector<double>& y)
+{
+    if (graphIndex < 0 || graphIndex >= m_graphs.size())
+        return;
+
+    m_graphs.at(graphIndex)->setData(x, y);
+}
+
 void FixedDataPlotWidget::clearData()
 {
-    if (m_plot) {
-        m_graph->data()->clear();
+    clearAllGraphData();
+}
+
+void FixedDataPlotWidget::clearAllGraphData()
+{
+    for (QCPGraph *graph : m_graphs) {
+        if (graph)
+            graph->data()->clear();
     }
     m_xData.clear();
     m_yData.clear();
 }
 
-void FixedDataPlotWidget::refreshPlot()
+void FixedDataPlotWidget::refreshPlot(bool rescaleX, bool rescaleY)
 {
     if (m_plot) {
-        m_plot->xAxis->rescale(true);
-        m_plot->yAxis->rescale(true);
-        //m_plot->yAxis->setRange(0, m_yMaxData * 1.2);
+        if (rescaleX)
+            m_plot->xAxis->rescale(true);
+        if (rescaleY)
+            m_plot->yAxis->rescale(true);
         m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
