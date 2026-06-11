@@ -161,7 +161,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::updateSpectrumRefreshIntervalRange);
+    connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::updateHxrDisplayBinControls);
+    connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::refreshSpectrumPlot);
     updateSpectrumRefreshIntervalRange();
+    updateHxrDisplayBinControls();
 
     m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
 
@@ -792,6 +797,25 @@ void MainWindow::updateSpectrumRefreshIntervalRange()
         ui->spb_specRefashTime->setValue(minMs);
 }
 
+void MainWindow::updateHxrDisplayBinControls()
+{
+    const bool hxrMode = ui->cmb_transferMode->currentIndex() == 1;
+    ui->label_hxrDisplayBins->setVisible(hxrMode);
+    ui->spb_hxrDisplayBins->setVisible(hxrMode);
+
+    if (hxrMode)
+        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+    else
+        ui->plotSpec->setXRange(1, 512);
+
+    refreshSpectrumPlot();
+}
+
+int MainWindow::hxrDisplayBinCount() const
+{
+    return ui->spb_hxrDisplayBins->value();
+}
+
 void MainWindow::refreshSpectrumPlot()
 {
     const int channel = ui->spb_channel->value();
@@ -817,8 +841,25 @@ void MainWindow::refreshSpectrumPlot()
                                .arg(specId)
                                .arg(entry.timeMs)
                                );
-    ensureSpectrumBinAddresses(entry.counts.size());
-    ui->plotSpec->setData(m_spectrumBinAddresses, entry.counts);
+
+    const bool hxrMode = ui->cmb_transferMode->currentIndex() == 1;
+    const int displayBinCount = hxrMode
+                                    ? qMin(hxrDisplayBinCount(), entry.counts.size())
+                                    : entry.counts.size();
+    if (displayBinCount <= 0) {
+        ui->plotSpec->clearData();
+        ui->plotSpec->refreshPlot();
+        return;
+    }
+
+    ensureSpectrumBinAddresses(displayBinCount);
+    if (hxrMode) {
+        ui->plotSpec->setXRange(1, displayBinCount);
+        ui->plotSpec->setData(m_spectrumBinAddresses,
+                              entry.counts.mid(0, displayBinCount));
+    } else {
+        ui->plotSpec->setData(m_spectrumBinAddresses, entry.counts);
+    }
     ui->plotSpec->refreshPlot();
 }
 
@@ -986,7 +1027,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     commandHelper->sendSpectrumControl(Order::HardwareTrigger);
 
     if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
-        ui->plotSpec->setXRange(1, 16);
+        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
     } else {
         ui->plotSpec->setXRange(1, 512);
     }
@@ -1071,7 +1112,7 @@ bool MainWindow::startMeasureInternal()
             return false;
 
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
-            ui->plotSpec->setXRange(1, 16);
+            ui->plotSpec->setXRange(1, hxrDisplayBinCount());
         } else {
             ui->plotSpec->setXRange(1, 512);
         }
@@ -1140,7 +1181,7 @@ bool MainWindow::startMeasureInternal()
         waveformPlotTimer->start();
 
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
-            ui->plotSpec->setXRange(1, 16);
+            ui->plotSpec->setXRange(1, hxrDisplayBinCount());
         } else {
             ui->plotSpec->setXRange(1, 512);
         }

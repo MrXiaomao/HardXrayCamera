@@ -144,6 +144,8 @@ private:
     void updateSpecIdSpinBoxRange();
     void updateWaveIdSpinBoxRange();
     void updateSpectrumRefreshIntervalRange();
+    void updateHxrDisplayBinControls();
+    int hxrDisplayBinCount() const;
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
     void resetWaveformCounters();
