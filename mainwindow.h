@@ -90,6 +90,9 @@ private slots:
     void stopUdpListening();
 
     bool startMeasureInternal();
+    bool buildDetParameter(DetParameter &detPara, Order::TriggerMode trigMode) const;
+    void triggerAutoMeasureFromShot(const QString &shotNumber);
+    void stopMeasureSession(bool sendHardwareStop);
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
 
@@ -185,5 +188,8 @@ private:
     QTimer *startTimer = nullptr;
     QTimer *stopTimer = nullptr;
     bool isTaskRunning = false;
+
+    enum class AutoMeasureState { Idle, WaitingShot, Measuring };
+    AutoMeasureState m_autoMeasureState = AutoMeasureState::Idle;
 };
 #endif // MAINWINDOW_H

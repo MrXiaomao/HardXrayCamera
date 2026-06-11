@@ -65,7 +65,12 @@ public:
 
     void startMeasure(DetParameter detPara);
 
+    bool configureMeasure(const DetParameter &detPara);
+    void beginRecording(const DetParameter &detPara);
+    void sendSpectrumControl(Order::TriggerMode mode);
+
     void stopMeasure();
+    void closeMeasurementFiles();
     
     // 文件存储格式
     void setSaveFileFormat(saveFileFormat format)
@@ -226,7 +231,6 @@ private:
 
     mutable QMutex m_measurementMutex;
 
-    void closeMeasurementFiles();
     void closeMeasurementFilesLocked();
 };
 

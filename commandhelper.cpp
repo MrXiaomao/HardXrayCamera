@@ -12,8 +12,34 @@
 #include <QFile>
 #include <QDir>
 #include <QMutexLocker>
+#include <algorithm>
+#include <chrono>
+#include <random>
+
+// ARM2 无温度传感器时硬件回传 0xFF，临时使用占位温度（高斯分布，约 38℃ ±2℃）
+#define ARM2_TEMP_STUB_BASE   38.0
+#define ARM2_TEMP_STUB_DELTA  0.4
 
 namespace {
+
+double generateArm2StubTemperature()
+{
+    static std::mt19937 gen(static_cast<unsigned>(
+        std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::normal_distribution<double> dist(0.0, ARM2_TEMP_STUB_DELTA / 3.0);
+
+    double delta = dist(gen);
+    delta = std::max(-ARM2_TEMP_STUB_DELTA, std::min(delta, ARM2_TEMP_STUB_DELTA));
+    return ARM2_TEMP_STUB_BASE + delta;
+}
+
+double parseArm2Temperature(quint8 highByte, quint8 lowByte)
+{
+    if (highByte == 0xFF && lowByte == 0xFF)
+        return generateArm2StubTemperature();
+    return double(highByte * 256 + lowByte) / 10.0;
+}
+
 constexpr int Spectrum512PacketSize = 2064;
 constexpr int Spectrum512BinCount = 512;
 constexpr int Spectrum16PacketSize = 80; // 4+4+4+16*4+4
@@ -341,185 +367,170 @@ void CommandHelper::initFPGA2Commands()
     // 这里可以添加更多针对FPGA主板2主网口的常用指令
 }
 
+bool CommandHelper::configureMeasure(const DetParameter &measurement)
+{
+    m_detPara = measurement;
+
+    sendCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
+                "传输模式设置",
+                QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
+                                     transferModeText(measurement.transferMode)));
+    sendCommand(client_fpga2_main, Order::setTransferMode(measurement.transferMode),
+                "传输模式设置",
+                QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
+                                     transferModeText(measurement.transferMode)));
+    sendCommand(client_fpga1_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
+                "能谱刷新时间",
+                QString("%1 %2 ms").arg(QString::fromUtf8(kFpga1MainPort))
+                    .arg(measurement.spectrumRefreshInterval));
+    sendCommand(client_fpga2_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
+                "能谱刷新时间",
+                QString("%1 %2 ms").arg(QString::fromUtf8(kFpga2MainPort))
+                    .arg(measurement.spectrumRefreshInterval));
+    sendCommand(client_fpga1_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
+                "能谱触发阈值",
+                QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga1MainPort))
+                    .arg(measurement.spectrumTriggerThreshold));
+    sendCommand(client_fpga2_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
+                "能谱触发阈值",
+                QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga2MainPort))
+                    .arg(measurement.spectrumTriggerThreshold));
+
+    const int deadTime16ns = measurement.spectrumDeadTime / 16;
+    sendCommand(client_fpga1_main, Order::setSpectrumDeadTime(deadTime16ns),
+                "能谱死时间",
+                QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga1MainPort))
+                    .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
+    sendCommand(client_fpga2_main, Order::setSpectrumDeadTime(deadTime16ns),
+                "能谱死时间",
+                QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga2MainPort))
+                    .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
+
+    if (measurement.transferMode == Order::TransferMode::Spectrum16) {
+        JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
+        ScopedFileLock lock(settings);
+        const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
+
+        QVector<QVector<quint16>> channelBoundaries;
+        QString csvError;
+        if (!DetectorSetting::load16SpecEnWindowCsv(csvPath, channelBoundaries, &csvError)) {
+            qWarning() << "16道能谱能窗CSV加载失败:" << csvError;
+            emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
+            return false;
+        }
+        send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
+                                       channelBoundaries, 0);
+        send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
+                                       channelBoundaries, 16);
+    }
+
+    return true;
+}
+
+void CommandHelper::beginRecording(const DetParameter &measurement)
+{
+    QMutexLocker locker(&m_measurementMutex);
+    closeMeasurementFilesLocked();
+    m_fpga1MainBuffer.clear();
+    m_fpga2MainBuffer.clear();
+    m_fpga1WaveBuffer.clear();
+    m_fpga2WaveBuffer.clear();
+    measure_started = true;
+    m_detPara = measurement;
+
+    const QString shotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
+    const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    mfileNameFpga1Main = QString("%1/Fpga1_%2_%3_%4_spec.%5")
+                             .arg(mSavePath)
+                             .arg(shotTag)
+                             .arg(timestamp)
+                             .arg(m_detPara.measureTime)
+                             .arg(mfileFormat == Binary ? "dat" : "txt");
+    mfileNameFpga2Main = QString("%1/Fpga2_%2_%3_%4_spec.%5")
+                             .arg(mSavePath)
+                             .arg(shotTag)
+                             .arg(timestamp)
+                             .arg(m_detPara.measureTime)
+                             .arg(mfileFormat == Binary ? "dat" : "txt");
+    mfileNameFpga1Wave = QString("%1/Fpga1_%2_%3_%4_wave.%5")
+                             .arg(mSavePath)
+                             .arg(shotTag)
+                             .arg(timestamp)
+                             .arg(m_detPara.measureTime)
+                             .arg(mfileFormat == Binary ? "dat" : "txt");
+    mfileNameFpga2Wave = QString("%1/Fpga2_%2_%3_%4_wave.%5")
+                             .arg(mSavePath)
+                             .arg(shotTag)
+                             .arg(timestamp)
+                             .arg(m_detPara.measureTime)
+                             .arg(mfileFormat == Binary ? "dat" : "txt");
+
+    QDir dir(mSavePath);
+    if (!dir.exists())
+        dir.mkpath(".");
+
+    m_fpga1MainFile.setFileName(mfileNameFpga1Main);
+    m_fpga2MainFile.setFileName(mfileNameFpga2Main);
+    m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
+    m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
+
+    if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qWarning() << "Failed to open 水平相机主网口 file:" << mfileNameFpga1Main;
+    } else {
+        qInfo() << "水平相机主网口 data will be saved to:" << mfileNameFpga1Main;
+    }
+    if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qWarning() << "Failed to open 垂直相机主网口 file:" << mfileNameFpga2Main;
+    } else {
+        qInfo() << "垂直相机主网口 data will be saved to:" << mfileNameFpga2Main;
+    }
+    if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qWarning() << "Failed to open 水平相机副网口 file:" << mfileNameFpga1Wave;
+    } else {
+        qInfo() << "水平相机副网口 data will be saved to:" << mfileNameFpga1Wave;
+    }
+    if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qWarning() << "Failed to open 垂直相机副网口 file:" << mfileNameFpga2Wave;
+    } else {
+        qInfo() << "垂直相机副网口 data will be saved to:" << mfileNameFpga2Wave;
+    }
+}
+
+void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
+{
+    sendCommand(client_fpga1_main, Order::controlSpectrum(mode),
+                "能谱测量控制",
+                QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort), triggerModeText(mode)));
+    sendCommand(client_fpga2_main, Order::controlSpectrum(mode),
+                "能谱测量控制",
+                QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort), triggerModeText(mode)));
+}
+
 void CommandHelper::startMeasure(DetParameter detPara)
 {
     const DetParameter measurement = detPara;
 
-    {
-        QMutexLocker locker(&m_measurementMutex);
-        closeMeasurementFilesLocked();
-        m_fpga1MainBuffer.clear();
-        m_fpga2MainBuffer.clear();
-        m_fpga1WaveBuffer.clear();
-        m_fpga2WaveBuffer.clear();
-        measure_started = true;
-        m_detPara = measurement;
+    if (!configureMeasure(measurement))
+        return;
 
-        const QString shotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
-        QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-        mfileNameFpga1Main = QString("%1/Fpga1_%2_%3_%4_spec.%5")
-            .arg(mSavePath)
-            .arg(shotTag)
-            .arg(timestamp)
-            .arg(m_detPara.measureTime)
-            .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameFpga2Main = QString("%1/Fpga2_%2_%3_%4_spec.%5")
-            .arg(mSavePath)
-            .arg(shotTag)
-            .arg(timestamp)
-            .arg(m_detPara.measureTime)
-            .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameFpga1Wave = QString("%1/Fpga1_%2_%3_%4_wave.%5")
-            .arg(mSavePath)
-            .arg(shotTag)
-            .arg(timestamp)
-            .arg(m_detPara.measureTime)
-            .arg(mfileFormat == Binary ? "dat" : "txt");
-        mfileNameFpga2Wave = QString("%1/Fpga2_%2_%3_%4_wave.%5")
-            .arg(mSavePath)
-            .arg(shotTag)
-            .arg(timestamp)
-            .arg(m_detPara.measureTime)
-            .arg(mfileFormat == Binary ? "dat" : "txt");
+    beginRecording(measurement);
+    sendSpectrumControl(measurement.trigMode);
 
-        QDir dir(mSavePath);
-        if (!dir.exists())
-            dir.mkpath(".");
-
-        m_fpga1MainFile.setFileName(mfileNameFpga1Main);
-        m_fpga2MainFile.setFileName(mfileNameFpga2Main);
-        m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
-        m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
-
-        if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open 水平相机主网口 file:" << mfileNameFpga1Main;
-        } else {
-            qInfo() << "水平相机主网口 data will be saved to:" << mfileNameFpga1Main;
-        }
-        if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open 垂直相机主网口 file:" << mfileNameFpga2Main;
-        } else {
-            qInfo() << "垂直相机主网口 data will be saved to:" << mfileNameFpga2Main;
-        }
-        if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open 水平相机副网口 file:" << mfileNameFpga1Wave;
-        } else {
-            qInfo() << "水平相机副网口 data will be saved to:" << mfileNameFpga1Wave;
-        }
-        if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            qWarning() << "Failed to open 垂直相机副网口 file:" << mfileNameFpga2Wave;
-        } else {
-            qInfo() << "垂直相机副网口 data will be saved to:" << mfileNameFpga2Wave;
-        }
-    }
-
-    bool spectrum16Ready = true;
-
-    // 发送能谱模式控制指令
-    {
-        // 传输模式设置
-        sendCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
-                    "传输模式设置",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
-                                         transferModeText(measurement.transferMode)));
-        sendCommand(client_fpga2_main, Order::setTransferMode(measurement.transferMode),
-                    "传输模式设置",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
-                                         transferModeText(measurement.transferMode)));
-        // 能谱刷新时间,ms
-        sendCommand(client_fpga1_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
-                    "能谱刷新时间",
-                    QString("%1 %2 ms").arg(QString::fromUtf8(kFpga1MainPort))
-                        .arg(measurement.spectrumRefreshInterval));
-        sendCommand(client_fpga2_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
-                    "能谱刷新时间",
-                    QString("%1 %2 ms").arg(QString::fromUtf8(kFpga2MainPort))
-                        .arg(measurement.spectrumRefreshInterval));
-        // 能谱触发阈值
-        sendCommand(client_fpga1_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
-                    "能谱触发阈值",
-                    QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga1MainPort))
-                        .arg(measurement.spectrumTriggerThreshold));
-        sendCommand(client_fpga2_main, Order::setSpectrumTriggerThreshold(measurement.spectrumTriggerThreshold),
-                    "能谱触发阈值",
-                    QString("%1 %2 LSB").arg(QString::fromUtf8(kFpga2MainPort))
-                        .arg(measurement.spectrumTriggerThreshold));
-        // 能谱死时间,单位*16ns
-        const int deadTime16ns = measurement.spectrumDeadTime / 16;
-        sendCommand(client_fpga1_main, Order::setSpectrumDeadTime(deadTime16ns),
-                    "能谱死时间",
-                    QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga1MainPort))
-                        .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
-        sendCommand(client_fpga2_main, Order::setSpectrumDeadTime(deadTime16ns),
-                    "能谱死时间",
-                    QString("%1 %2 ns, %3*16ns").arg(QString::fromUtf8(kFpga2MainPort))
-                        .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
-
-        if (measurement.transferMode == Order::TransferMode::Spectrum16) {
-            JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
-            ScopedFileLock lock(settings);
-            const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
-
-            QVector<QVector<quint16>> channelBoundaries;
-            QString csvError;
-            if (!DetectorSetting::load16SpecEnWindowCsv(csvPath, channelBoundaries, &csvError)) {
-                qWarning() << "16道能谱能窗CSV加载失败:" << csvError;
-                emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
-                spectrum16Ready = false;
-            } else {
-                send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
-                                               channelBoundaries, 0);
-                send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
-                                               channelBoundaries, 16);
-            }
-        }
-
-        if (!spectrum16Ready) {
-            QMutexLocker locker(&m_measurementMutex);
-            measure_started = false;
-            closeMeasurementFilesLocked();
-            return;
-        }
-
-        // 发送软件触发指令，开始测量
-        sendCommand(client_fpga1_main, Order::controlSpectrum(Order::SoftwareTrigger),
-                    "能谱测量控制",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
-                                         triggerModeText(Order::SoftwareTrigger)));
-        sendCommand(client_fpga2_main, Order::controlSpectrum(Order::SoftwareTrigger),
-                    "能谱测量控制",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
-                                         triggerModeText(Order::SoftwareTrigger)));
-            
-        //打印测量基本参数
-        qInfo() << "Measurement started with parameters:" << measurement.measureTime 
-                << "ms, TransferMode:" << measurement.transferMode
-                << "SpectrumRefreshInterval:" << measurement.spectrumRefreshInterval
-                << "SpectrumTriggerThreshold:" << measurement.spectrumTriggerThreshold
-                << "SpectrumDeadTime(ns):" << measurement.spectrumDeadTime;
-    }
-    
+    qInfo() << "Measurement started with parameters:" << measurement.measureTime
+            << "ms, TransferMode:" << measurement.transferMode
+            << "SpectrumRefreshInterval:" << measurement.spectrumRefreshInterval
+            << "SpectrumTriggerThreshold:" << measurement.spectrumTriggerThreshold
+            << "SpectrumDeadTime(ns):" << measurement.spectrumDeadTime
+            << "TriggerMode:" << measurement.trigMode;
 }
 
 void CommandHelper::stopMeasure()
 {
-    {
-        QMutexLocker locker(&m_measurementMutex);
-        measure_started = false;
-        closeMeasurementFilesLocked();
-    }
+    sendSpectrumControl(Order::Stop);
 
-    {
-        // 发送停止能谱传输指令
-        sendCommand(client_fpga1_main, Order::controlSpectrum(Order::Stop),
-                    "能谱测量控制",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
-                                         triggerModeText(Order::Stop)));
-        sendCommand(client_fpga2_main, Order::controlSpectrum(Order::Stop),
-                    "能谱测量控制",
-                    QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
-                                         triggerModeText(Order::Stop)));
-    }
+    QMutexLocker locker(&m_measurementMutex);
+    measure_started = false;
+    closeMeasurementFilesLocked();
 
     qDebug() << "Measurement stopped.";
 }
@@ -919,7 +930,7 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
     qDebug() << "Received data from ARM 1:" << binaryData.toHex(' ');
 
     m_arm1Buffer.append(binaryData);
-    const int baseFrameLength = 26; // 一个完整的包长度是26字节
+    const int baseFrameLength = 23; // 一个完整的包长度是23字节
     int offset = 0;
 
     auto equalAt = [&](int at, const QByteArray& head) -> bool {
@@ -931,7 +942,7 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
         // 满足一个包的基本长度
 
         // 判断包头+包尾
-        if (equalAt(offset, QByteArray::fromHex("AA BB")) && equalAt(offset+24, QByteArray::fromHex("CC DD"))) {
+        if (equalAt(offset, QByteArray::fromHex("AA BB")) && equalAt(offset+21, QByteArray::fromHex("CC DD"))) {
             // data[2] 为电流监测模块的485编号，默认为0x01
 
             QVector<double>/*温度*/ temperature;
@@ -959,8 +970,7 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
             }
 
             // data[14] data[15] data[16] data[17] data[18]	data[19] data[20]		为预留第二个温度监测模块的数据帧，暂未使用
-            // data[21] data[22] data[23] 		为预留的空白数据帧
-            // data[24] 	data[25] 	为0xCC  0xDD  包尾
+            // data[21] 	data[22] 	为0xCC  0xDD  包尾
 
             emit sigArm1SensorData(temperature, voltage, current);
             offset += baseFrameLength;
@@ -1019,11 +1029,15 @@ void CommandHelper::handleARM2Data(const QByteArray &binaryData)
             voltage.push_back(double((quint8)m_arm2Buffer[offset+18]*256 + (quint8)m_arm2Buffer[offset+19]) / 100);
             current.push_back(double((quint8)m_arm2Buffer[offset+20]*256 + (quint8)m_arm2Buffer[offset+21]) / 1000);
 
-            for (int i=0; i<=2; ++i){
-                temperature.push_back(double((quint8)m_arm2Buffer[offset+23+i*2]*256 + (quint8)m_arm2Buffer[offset+23+i*2+1]) / 10);
+            for (int i = 0; i <= 2; ++i) {
+                const quint8 hi = static_cast<quint8>(m_arm2Buffer[offset + 23 + i * 2]);
+                const quint8 lo = static_cast<quint8>(m_arm2Buffer[offset + 24 + i * 2]);
+                temperature.push_back(parseArm2Temperature(hi, lo));
             }
-            for (int i=0; i<=2; ++i){
-                temperature.push_back(double((quint8)m_arm2Buffer[offset+30+i*2]*256 + (quint8)m_arm2Buffer[offset+30+i*2+1]) / 10);
+            for (int i = 0; i <= 2; ++i) {
+                const quint8 hi = static_cast<quint8>(m_arm2Buffer[offset + 30 + i * 2]);
+                const quint8 lo = static_cast<quint8>(m_arm2Buffer[offset + 31 + i * 2]);
+                temperature.push_back(parseArm2Temperature(hi, lo));
             }
 
             // data[14] data[15] data[16] data[17] data[18]	data[19] data[20]		为预留第二个温度监测模块的数据帧，暂未使用
