@@ -46,6 +46,8 @@ private slots:
 
     void on_bt_disconnectDet_clicked();
 
+    void on_btn_connectMonitor_clicked();
+
     void on_pushButton_clearSysLog_clicked();
 
     void on_pushButton_clearNetLog_clicked();
@@ -184,6 +186,12 @@ private:
     void showHardwareStartupWaitDialog();
     void syncPowerSwitchFromRelay(bool powerOn);
     void setPowerSwitchEnabled(bool enabled);
+    void syncDetectorConnectButton();
+    void syncArmMonitorButton();
+    void loadMonitorAlarmSettings();
+    void saveMonitorAlarmSettings();
+    void loadMeasureSettings();
+    void saveMeasureSettings();
     QString armMonitorSaveDir() const;
     void saveArmMonitorData(int armIndex, const QVector<double> &temperature,
                             const QVector<double> &voltage, const QVector<double> &current);

@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
     mw = &w;
     //打印软件版本号
     qInfo().noquote() << QObject::tr("系统启动，软件版本号: %1").arg(APP_VERSION);
+    qInfo().noquote() << QObject::tr("软件运行目录: %1").arg(QCoreApplication::applicationDirPath());
 
     w.show();
 

@@ -37,6 +37,13 @@ MainWindow::MainWindow(QWidget *parent)
     measureTimer->setSingleShot(true);
     connect(measureTimer, &QTimer::timeout, this, &MainWindow::onMeasureTimerTimeout);
     ui->setupUi(this);
+    loadMonitorAlarmSettings();
+    connect(ui->doubleSpinBox_temp, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { saveMonitorAlarmSettings(); });
+    connect(ui->doubleSpinBox_voltage, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { saveMonitorAlarmSettings(); });
+    connect(ui->doubleSpinBox_current, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { saveMonitorAlarmSettings(); });
 
     QAction *action = ui->le_savePath->addAction(QIcon(":/resource/open.png"), QLineEdit::TrailingPosition);
     QToolButton* button = qobject_cast<QToolButton*>(action->associatedWidgets().last());
@@ -183,9 +190,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::refreshSpectrumPlot);
     connect(ui->spb_profileID, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshProfilePlot);
-    updateSpectrumRefreshIntervalRange();
-    updateHxrDisplayBinControls();
-    updateProfileControls();
+    loadMeasureSettings();
 
     m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
 
@@ -202,6 +207,15 @@ MainWindow::MainWindow(QWidget *parent)
     ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
     ui->btn_relayNetClose->hide();
 
+    ui->bt_connectDet->setCheckable(true);
+    ui->bt_connectDet->setChecked(false);
+    ui->bt_connectDet->setText(QStringLiteral("连接采集系统"));
+    ui->bt_disconnectDet->hide();
+
+    ui->btn_connectMonitor->setCheckable(true);
+    ui->btn_connectMonitor->setChecked(false);
+    ui->btn_connectMonitor->setText(QStringLiteral("连接实时监测系统"));
+
     ui->switch_power->setAutoChecked(false);
     ui->switch_power->setText(QStringLiteral("远程上电"), QStringLiteral("远程断电"));
     ui->switch_power->setChecked(false);
@@ -216,7 +230,6 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     ui->bt_connectDet->setEnabled(false);
-    ui->bt_disconnectDet->setEnabled(false);
     ui->btn_startMeasure->setEnabled(false);
     ui->btn_stopMeasure->setEnabled(false);
 
@@ -226,6 +239,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    saveMonitorAlarmSettings();
+    saveMeasureSettings();
     delete ui;
 }
 
@@ -265,7 +280,6 @@ void MainWindow::onRelayStatusChanged(bool on)
         setPowerSwitchEnabled(false);
         syncPowerSwitchFromRelay(false);
         ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "继电器网络状态: 已断开";
@@ -278,13 +292,12 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
 
     if (on) {
         ui->bt_connectDet->setEnabled(true);
-        ui->bt_disconnectDet->setEnabled(false);
+        syncDetectorConnectButton();
 
         qInfo() << "继电器控制的电源状态: 已开启";
         replayPowerOn = true;
     } else {
         ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
 
@@ -307,105 +320,96 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         detectOnline[1] = false;
         detectOnline[2] = false;
         detectOnline[3] = false;
-        armSensorOnline[0] = false;
-        armSensorOnline[1] = false;
+        syncDetectorConnectButton();
     }
 }
 
 void MainWindow::onDetector1StatusChanged(bool on)
 {
     if (on) {
-        ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "水平相机主网口(控制/能谱)状态: 已连接";
         detectOnline[0] = true;
     } else {
-        ui->bt_connectDet->setEnabled(true);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "水平相机主网口(控制/能谱)状态: 已断开";
         detectOnline[0] = false;
     }
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector2StatusChanged(bool on)
 {
     if (on) {
-        ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已连接";
         detectOnline[1] = true;
     } else {
-        ui->bt_connectDet->setEnabled(true);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已断开";
         detectOnline[1] = false;
     }
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector3StatusChanged(bool on)
 {
     if (on) {
-        ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "水平相机副网口(波形接收)状态: 已连接";
         detectOnline[2] = true;
     } else {
-        ui->bt_connectDet->setEnabled(true);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "水平相机副网口(波形接收)状态: 已断开";
         detectOnline[2] = false;
     }
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector4StatusChanged(bool on)
 {
     if (on) {
-        ui->bt_connectDet->setEnabled(false);
-        ui->bt_disconnectDet->setEnabled(true);
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "垂直相机副网口(波形接收)状态: 已连接";
         detectOnline[3] = true;
     } else {
-        ui->bt_connectDet->setEnabled(true);
-        ui->bt_disconnectDet->setEnabled(false);
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(false);
         qInfo() << "垂直相机副网口(波形接收)状态: 已断开";
         detectOnline[3] = false;
     }
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector1ConnectFault()
 {
     detectOnline[0] = false;
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector2ConnectFault()
 {
     detectOnline[1] = false;
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector3ConnectFault()
 {
     detectOnline[2] = false;
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onDetector4ConnectFault()
 {
     detectOnline[3] = false;
+    syncDetectorConnectButton();
 }
 
 void MainWindow::onArm1StatusChanged(bool on)
@@ -417,6 +421,7 @@ void MainWindow::onArm1StatusChanged(bool on)
         qInfo() << "状态监测设备1网络：已断开";
         armSensorOnline[0] = false;
     }
+    syncArmMonitorButton();
 }
 
 void MainWindow::onArm2StatusChanged(bool on)
@@ -428,6 +433,7 @@ void MainWindow::onArm2StatusChanged(bool on)
         qInfo() << "状态监测设备2网络：已断开";
         armSensorOnline[1] = false;
     }
+    syncArmMonitorButton();
 }
 
 QString MainWindow::armMonitorSaveDir() const
@@ -1571,20 +1577,29 @@ void MainWindow::on_btn_startMeasure_clicked()
     startMeasureInternal();
 }
 
-//连接探测器网络
+//连接采集系统（FPGA1/FPGA2）
 void MainWindow::on_bt_connectDet_clicked()
 {
-    startUdpListening();
-    commandHelper->connectARM();
-    commandHelper->connectDetector();
+    if (ui->bt_connectDet->isChecked()) {
+        startUdpListening();
+        commandHelper->connectDetector();
+    } else {
+        stopUdpListening();
+        commandHelper->disconnectDetector();
+    }
 }
 
-//断开探测器网络
+//断开采集系统功能已合并至 bt_connectDet 切换按钮
 void MainWindow::on_bt_disconnectDet_clicked()
 {
-    stopUdpListening();
-    commandHelper->disconnectARM();
-    commandHelper->disconnectDetector();
+}
+
+void MainWindow::on_btn_connectMonitor_clicked()
+{
+    if (ui->btn_connectMonitor->isChecked())
+        commandHelper->connectARM();
+    else
+        commandHelper->disconnectARM();
 }
 
 
@@ -1714,6 +1729,128 @@ void MainWindow::setPowerSwitchEnabled(bool enabled)
     ui->switch_power->setEnabled(enabled);
 }
 
+void MainWindow::syncDetectorConnectButton()
+{
+    const bool anyConnected = detectOnline[0] || detectOnline[1] || detectOnline[2] || detectOnline[3];
+    ui->bt_connectDet->blockSignals(true);
+    ui->bt_connectDet->setChecked(anyConnected);
+    ui->bt_connectDet->setText(anyConnected ? QStringLiteral("断开采集系统")
+                                            : QStringLiteral("连接采集系统"));
+    ui->bt_connectDet->blockSignals(false);
+}
+
+void MainWindow::syncArmMonitorButton()
+{
+    const bool anyConnected = armSensorOnline[0] || armSensorOnline[1];
+    ui->btn_connectMonitor->blockSignals(true);
+    ui->btn_connectMonitor->setChecked(anyConnected);
+    ui->btn_connectMonitor->setText(anyConnected ? QStringLiteral("断开实时监测系统")
+                                                 : QStringLiteral("连接实时监测系统"));
+    ui->btn_connectMonitor->blockSignals(false);
+}
+
+void MainWindow::loadMonitorAlarmSettings()
+{
+    JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+
+    ui->doubleSpinBox_temp->blockSignals(true);
+    ui->doubleSpinBox_voltage->blockSignals(true);
+    ui->doubleSpinBox_current->blockSignals(true);
+
+    ui->doubleSpinBox_temp->setValue(
+        settings->getValueByPath(QStringLiteral("Monitor/tempAlarmThreshold"), 65.0).toDouble());
+    ui->doubleSpinBox_voltage->setValue(
+        settings->getValueByPath(QStringLiteral("Monitor/voltageAlarmThreshold"), 5.02).toDouble());
+    ui->doubleSpinBox_current->setValue(
+        settings->getValueByPath(QStringLiteral("Monitor/currentAlarmThreshold"), 1.25).toDouble());
+
+    ui->doubleSpinBox_temp->blockSignals(false);
+    ui->doubleSpinBox_voltage->blockSignals(false);
+    ui->doubleSpinBox_current->blockSignals(false);
+}
+
+void MainWindow::saveMonitorAlarmSettings()
+{
+    JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+
+    settings->setValueByPath(QStringLiteral("Monitor/tempAlarmThreshold"),
+                             ui->doubleSpinBox_temp->value());
+    settings->setValueByPath(QStringLiteral("Monitor/voltageAlarmThreshold"),
+                             ui->doubleSpinBox_voltage->value());
+    settings->setValueByPath(QStringLiteral("Monitor/currentAlarmThreshold"),
+                             ui->doubleSpinBox_current->value());
+    settings->save();
+}
+
+void MainWindow::loadMeasureSettings()
+{
+    JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+
+    ui->cmb_transferMode->blockSignals(true);
+    ui->comboBox_2->blockSignals(true);
+    ui->cmb_saveFormat->blockSignals(true);
+
+    ui->cmb_transferMode->setCurrentIndex(
+        settings->getValueByPath(QStringLiteral("Measure/transferMode"), 0).toInt());
+    ui->spb_measureTime->setValue(
+        settings->getValueByPath(QStringLiteral("Measure/measureTime"), 3000).toInt());
+    ui->le_savePath->setText(
+        settings->getValueByPath(QStringLiteral("Measure/savePath"), QStringLiteral("./波形测量"))
+            .toString());
+    ui->spb_specRefashTime->setValue(
+        settings->getValueByPath(QStringLiteral("Measure/specRefreshTime"), 10).toInt());
+    ui->cmb_saveFormat->setCurrentIndex(
+        settings->getValueByPath(QStringLiteral("Measure/saveFormat"), 0).toInt());
+    ui->comboBox_2->setCurrentIndex(
+        settings->getValueByPath(QStringLiteral("Measure/measureMode"), 0).toInt());
+
+    const QDateTime defaultAutoStart(QDate(2026, 3, 23), QTime(10, 0, 0));
+    const QDateTime defaultAutoStop(QDate(2026, 3, 23), QTime(12, 0, 0));
+    QDateTime autoStartTime = QDateTime::fromString(
+        settings->getValueByPath(QStringLiteral("Measure/autoStartTime"), defaultAutoStart.toString(Qt::ISODate))
+            .toString(),
+        Qt::ISODate);
+    QDateTime autoStopTime = QDateTime::fromString(
+        settings->getValueByPath(QStringLiteral("Measure/autoStopTime"), defaultAutoStop.toString(Qt::ISODate))
+            .toString(),
+        Qt::ISODate);
+    if (!autoStartTime.isValid())
+        autoStartTime = defaultAutoStart;
+    if (!autoStopTime.isValid())
+        autoStopTime = defaultAutoStop;
+    ui->dateTimeEdit->setDateTime(autoStartTime);
+    ui->dateTimeEdit_2->setDateTime(autoStopTime);
+
+    ui->cmb_transferMode->blockSignals(false);
+    ui->comboBox_2->blockSignals(false);
+    ui->cmb_saveFormat->blockSignals(false);
+
+    updateSpectrumRefreshIntervalRange();
+    updateHxrDisplayBinControls();
+    updateProfileControls();
+}
+
+void MainWindow::saveMeasureSettings()
+{
+    JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+
+    settings->setValueByPath(QStringLiteral("Measure/transferMode"), ui->cmb_transferMode->currentIndex());
+    settings->setValueByPath(QStringLiteral("Measure/measureTime"), ui->spb_measureTime->value());
+    settings->setValueByPath(QStringLiteral("Measure/savePath"), ui->le_savePath->text().trimmed());
+    settings->setValueByPath(QStringLiteral("Measure/specRefreshTime"), ui->spb_specRefashTime->value());
+    settings->setValueByPath(QStringLiteral("Measure/saveFormat"), ui->cmb_saveFormat->currentIndex());
+    settings->setValueByPath(QStringLiteral("Measure/measureMode"), ui->comboBox_2->currentIndex());
+    settings->setValueByPath(QStringLiteral("Measure/autoStartTime"),
+                             ui->dateTimeEdit->dateTime().toString(Qt::ISODate));
+    settings->setValueByPath(QStringLiteral("Measure/autoStopTime"),
+                             ui->dateTimeEdit_2->dateTime().toString(Qt::ISODate));
+    settings->save();
+}
+
 void MainWindow::showHardwareStartupWaitDialog()
 {
     QMessageBox box(this);
@@ -1728,7 +1865,6 @@ void MainWindow::showHardwareStartupWaitDialog()
 void MainWindow::on_action_connectDet_triggered()
 {
     startUdpListening();
-    commandHelper->connectARM();
     commandHelper->connectDetector();
 }
 
@@ -1737,7 +1873,6 @@ void MainWindow::on_action_connectDet_triggered()
 void MainWindow::on_action_disconnectDet_triggered()
 {
     stopUdpListening();
-    commandHelper->disconnectARM();
     commandHelper->disconnectDetector();
 }
 
