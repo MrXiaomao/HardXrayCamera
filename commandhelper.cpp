@@ -2,7 +2,7 @@
  * @Author: Maoxiaoqing
  * @Date: 2026-03-25 16:01:56
  * @LastEditors: Maoxiaoqing
- * @LastEditTime: 2026-06-10 18:32:06
+ * @LastEditTime: 2026-06-17 11:17:16
  * @Description: 请填写简介
  */
 #include "commandhelper.h"
@@ -927,7 +927,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
 void CommandHelper::handleARM1Data(const QByteArray &binaryData)
 {
     //信号采集机箱
-    qDebug() << "Received data from ARM 1:" << binaryData.toHex(' ');
+    // qDebug() << "Received data from ARM 1:" << binaryData.toHex(' ');
 
     m_arm1Buffer.append(binaryData);
     const int baseFrameLength = 23; // 一个完整的包长度是23字节
@@ -988,7 +988,7 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
 void CommandHelper::handleARM2Data(const QByteArray &binaryData)
 {    
     //对电源机箱
-    qDebug() << "Received data from ARM 2:" << binaryData.toHex(' ');
+    // qDebug() << "Received data from ARM 2:" << binaryData.toHex(' ');
 
     m_arm2Buffer.append(binaryData);
     const int baseFrameLength = 38; // 一个完整的包长度是38字节

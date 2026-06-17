@@ -180,6 +180,13 @@ private:
     void showHardwareStartupWaitDialog();
     void syncPowerSwitchFromRelay(bool powerOn);
     void setPowerSwitchEnabled(bool enabled);
+    QString armMonitorSaveDir() const;
+    void saveArmMonitorData(int armIndex, const QVector<double> &temperature,
+                            const QVector<double> &voltage, const QVector<double> &current);
+    void checkArmMonitorAlarm(int armIndex, const QVector<double> &temperature,
+                              const QVector<double> &voltage, const QVector<double> &current);
+    void handleArmSensorData(int armIndex, const QVector<double> &temperature,
+                             const QVector<double> &voltage, const QVector<double> &current);
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
@@ -214,6 +221,7 @@ private:
 
     //系统时钟，目前用来随机产生arm传感器数据
     bool armSensorOnline[2] = {false, false};
+    bool m_armMonitorInAlarm[2] = {false, false};
 
     // 无人值守
     QTimer *startTimer = nullptr;

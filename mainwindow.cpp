@@ -19,6 +19,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QTextStream>
+#include <QDateTime>
 #include <cmath>
 #include <algorithm>
 
@@ -424,100 +425,146 @@ void MainWindow::onArm2StatusChanged(bool on)
     }
 }
 
-void MainWindow::onArm1SensorData(const QVector<double>&/*温度*/ temperature, const QVector<double>&/*电压*/ voltage, const QVector<double>&/*电流*/ current)
+QString MainWindow::armMonitorSaveDir() const
 {
-    ui->plotTemp->appendPoints(0, temperature);
-    ui->plotVoltage->appendPoints(0, voltage);
-    ui->plotCurrent->appendPoints(0, current);
-    ui->plotTemp->refreshPlot();
-    ui->plotVoltage->refreshPlot();
-    ui->plotCurrent->refreshPlot();
+    const QString monitorPath = QDir(QCoreApplication::applicationDirPath())
+                                    .filePath(QStringLiteral("Monitor"));
+    if (!QDir(monitorPath).exists() && !QDir().mkpath(monitorPath)) {
+        qWarning() << tr("创建监测数据目录失败:") << monitorPath;
+        return {};
+    }
+    return monitorPath;
+}
 
-    // 超出阈值且探测器在线时，通过继电器切断电源
-    bool isAlarm = false;
-    for (int i=0; i<temperature.size(); ++i){
-        if (temperature[i] > ui->doubleSpinBox_temp->value())
-        {
-            isAlarm = true;
-            break;
+void MainWindow::saveArmMonitorData(int armIndex, const QVector<double> &temperature,
+                                    const QVector<double> &voltage, const QVector<double> &current)
+{
+    const QString monitorPath = armMonitorSaveDir();
+    if (monitorPath.isEmpty())
+        return;
+
+    const QString dateTag = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd"));
+    const QString filePath = QDir(monitorPath).filePath(
+        QStringLiteral("Arm%1Monitor_%2.csv").arg(armIndex).arg(dateTag));
+
+    const bool isNewFile = !QFile::exists(filePath);
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        return;
+
+    QTextStream out(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    out.setCodec("UTF-8");
+#endif
+
+    if (isNewFile) {
+        QStringList header;
+        header << QStringLiteral("Time");
+        for (int i = 0; i < voltage.size(); ++i)
+            header << QStringLiteral("Voltage%1(V)").arg(i + 1);
+        for (int i = 0; i < current.size(); ++i)
+            header << QStringLiteral("Current%1(A)").arg(i + 1);
+        for (int i = 0; i < temperature.size(); ++i)
+            header << QStringLiteral("Temp_CH%1(C)").arg(i + 1);
+        out << header.join(QStringLiteral(",")) << '\n';
+    }
+
+    QStringList values;
+    values << QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss"));
+    auto appendValues = [&](const QVector<double> &data) {
+        for (double value : data)
+            values << QString::number(value, 'f', 3);
+    };
+    appendValues(voltage);
+    appendValues(current);
+    appendValues(temperature);
+    out << values.join(QStringLiteral(",")) << '\n';
+}
+
+void MainWindow::checkArmMonitorAlarm(int armIndex, const QVector<double> &temperature,
+                                      const QVector<double> &voltage, const QVector<double> &current)
+{
+    const double tempLimit = ui->doubleSpinBox_temp->value();
+    const double voltageLimit = ui->doubleSpinBox_voltage->value();
+    const double currentLimit = ui->doubleSpinBox_current->value();
+
+    QStringList alarmDetails;
+    for (int i = 0; i < temperature.size(); ++i) {
+        if (temperature[i] > tempLimit) {
+            alarmDetails << tr("温度CH%1=%2°C>阈值%3°C")
+                                .arg(i + 1)
+                                .arg(temperature[i], 0, 'f', 1)
+                                .arg(tempLimit, 0, 'f', 1);
+        }
+    }
+    for (int i = 0; i < voltage.size(); ++i) {
+        if (voltage[i] > voltageLimit) {
+            alarmDetails << tr("电压CH%1=%2V>阈值%3V")
+                                .arg(i + 1)
+                                .arg(voltage[i], 0, 'f', 3)
+                                .arg(voltageLimit, 0, 'f', 3);
+        }
+    }
+    for (int i = 0; i < current.size(); ++i) {
+        if (current[i] > currentLimit) {
+            alarmDetails << tr("电流CH%1=%2A>阈值%3A")
+                                .arg(i + 1)
+                                .arg(current[i], 0, 'f', 3)
+                                .arg(currentLimit, 0, 'f', 3);
         }
     }
 
-    if (!isAlarm){
-        for (int i=0; i<voltage.size(); ++i){
-            if (voltage[i] > ui->doubleSpinBox_voltage->value())
-            {
-                isAlarm = true;
-                break;
-            }
-        }
-    }
+    const int alarmIndex = armIndex - 1;
+    if (alarmIndex < 0 || alarmIndex >= 2)
+        return;
 
-    if (!isAlarm){
-        for (int i=0; i<voltage.size(); ++i){
-            if (voltage[i] > ui->doubleSpinBox_current->value())
-            {
-                isAlarm = true;
-                break;
-            }
-        }
-    }
-
+    const bool isAlarm = !alarmDetails.isEmpty();
     if (isAlarm) {
-        // 判断是否无人值守模式
-        if (isTaskRunning)
-        {
+        if (!m_armMonitorInAlarm[alarmIndex]) {
+            m_armMonitorInAlarm[alarmIndex] = true;
+            const QString armName = (armIndex == 1)
+                                        ? QStringLiteral("信号采集机箱(ARM1)")
+                                        : QStringLiteral("电源机箱(ARM2)");
+            qWarning().noquote() << QStringLiteral("[%1]监测超限，断开继电器：%2")
+                                        .arg(armName, alarmDetails.join(QStringLiteral("；")));
             commandHelper->PowerOffRelay();
         }
+    } else {
+        m_armMonitorInAlarm[alarmIndex] = false;
     }
+}
+
+void MainWindow::handleArmSensorData(int armIndex, const QVector<double> &temperature,
+                                     const QVector<double> &voltage, const QVector<double> &current)
+{
+    if (armIndex == 1) {
+        ui->plotTemp->appendPoints(0, temperature);
+        ui->plotVoltage->appendPoints(0, voltage);
+        ui->plotCurrent->appendPoints(0, current);
+        ui->plotTemp->refreshPlot();
+        ui->plotVoltage->refreshPlot();
+        ui->plotCurrent->refreshPlot();
+    } else {
+        ui->plotTemp_2->appendPoints(0, temperature);
+        ui->plotVoltage_2->appendPoints(0, voltage);
+        ui->plotCurrent_2->appendPoints(0, current);
+        ui->plotTemp_2->refreshPlot();
+        ui->plotVoltage_2->refreshPlot();
+        ui->plotCurrent_2->refreshPlot();
+    }
+
+    saveArmMonitorData(armIndex, temperature, voltage, current);
+    checkArmMonitorAlarm(armIndex, temperature, voltage, current);
+}
+
+void MainWindow::onArm1SensorData(const QVector<double>&/*温度*/ temperature, const QVector<double>&/*电压*/ voltage, const QVector<double>&/*电流*/ current)
+{
+    handleArmSensorData(1, temperature, voltage, current);
 }
 
 void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, const QVector<double>&/*电压*/ voltage, const QVector<double>&/*电流*/ current)
 {
-    ui->plotTemp_2->appendPoints(0, temperature);
-    ui->plotVoltage_2->appendPoints(0, voltage);
-    ui->plotCurrent_2->appendPoints(0, current);
-    ui->plotTemp_2->refreshPlot();
-    ui->plotVoltage_2->refreshPlot();
-    ui->plotCurrent_2->refreshPlot();
-
-    // 超出阈值且探测器在线时，通过继电器切断电源
-    bool isAlarm = false;
-    for (int i=0; i<temperature.size(); ++i){
-        if (temperature[i] > ui->doubleSpinBox_temp->value())
-        {
-            isAlarm = true;
-            break;
-        }
-    }
-
-    if (!isAlarm){
-        for (int i=0; i<voltage.size(); ++i){
-            if (voltage[i] > ui->doubleSpinBox_voltage->value())
-            {
-                isAlarm = true;
-                break;
-            }
-        }
-    }
-
-    if (!isAlarm){
-        for (int i=0; i<voltage.size(); ++i){
-            if (voltage[i] > ui->doubleSpinBox_current->value())
-            {
-                isAlarm = true;
-                break;
-            }
-        }
-    }
-
-    if (isAlarm) {
-        // 判断是否无人值守模式
-        if (isTaskRunning)
-        {
-            commandHelper->PowerOffRelay();
-        }
-    }
+    handleArmSensorData(2, temperature, voltage, current);
 }
 
 void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
