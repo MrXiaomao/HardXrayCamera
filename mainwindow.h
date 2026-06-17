@@ -243,5 +243,6 @@ private:
 
     enum class AutoMeasureState { Idle, WaitingShot, Measuring };
     AutoMeasureState m_autoMeasureState = AutoMeasureState::Idle;
+    bool m_autoMeasureDurationTimerStarted = false;
 };
 #endif // MAINWINDOW_H

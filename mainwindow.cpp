@@ -210,12 +210,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->btn_relayNetOpen->setCheckable(true);
     ui->btn_relayNetOpen->setChecked(false);
     ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
-    ui->btn_relayNetClose->hide();
 
     ui->bt_connectDet->setCheckable(true);
     ui->bt_connectDet->setChecked(false);
     ui->bt_connectDet->setText(QStringLiteral("连接采集系统"));
-    ui->bt_disconnectDet->hide();
 
     ui->btn_connectMonitor->setCheckable(true);
     ui->btn_connectMonitor->setChecked(false);
@@ -262,6 +260,7 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (m_autoMeasureState == AutoMeasureState::Measuring) {
         m_autoMeasureState = AutoMeasureState::Idle;
+        m_autoMeasureDurationTimerStarted = false;
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
     }
@@ -313,11 +312,13 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
             m_autoMeasureState = AutoMeasureState::Idle;
+            m_autoMeasureDurationTimerStarted = false;
         } else if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
             measureTimer->stop();
             waveformPlotTimer->stop();
             commandHelper->closeMeasurementFiles();
             m_autoMeasureState = AutoMeasureState::Idle;
+            m_autoMeasureDurationTimerStarted = false;
         }
         
         // 断电后清除各设备在线标记
@@ -589,6 +590,14 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
     const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
     if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
         return;
+
+    if (m_autoMeasureState == AutoMeasureState::Measuring
+        && ui->comboBox_2->currentIndex() == 1
+        && !m_autoMeasureDurationTimerStarted) {
+        m_autoMeasureDurationTimerStarted = true;
+        measureTimer->start(mdetPara.measureTime);
+        qInfo() << "收到首个能谱数据，开始测量倒计时:" << mdetPara.measureTime << "ms";
+    }
 
     const int channelIndex = logicalChannel - 1;
     appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
@@ -1408,6 +1417,7 @@ bool MainWindow::buildDetParameter(DetParameter &detPara, Order::TriggerMode tri
 void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
 {
     commandHelper->setShotNumber(shotNumber);
+    m_autoMeasureDurationTimerStarted = false;
 
     clearWaveformData();
     clearSpectrumData();
@@ -1425,11 +1435,11 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     }
 
     waveformPlotTimer->start();
-    measureTimer->start(mdetPara.measureTime);
 
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->btn_stopMeasure->setEnabled(true);
-    qInfo() << "炮号" << shotNumber << "触发自动测量，时长:" << mdetPara.measureTime << "ms";
+    qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
+            << mdetPara.measureTime << "ms";
 }
 
 void MainWindow::stopMeasureSession(bool sendHardwareStop)
@@ -1455,6 +1465,7 @@ void MainWindow::stopMeasureSession(bool sendHardwareStop)
 
     if (m_autoMeasureState != AutoMeasureState::Idle) {
         m_autoMeasureState = AutoMeasureState::Idle;
+        m_autoMeasureDurationTimerStarted = false;
         ui->btn_startMeasure->setEnabled(true);
         ui->btn_stopMeasure->setEnabled(false);
     }
