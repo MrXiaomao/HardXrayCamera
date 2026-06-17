@@ -59,7 +59,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotWave->setTitle("波形");
     ui->plotWave->setXAxisLabel("时间(ns)");
     ui->plotWave->setYAxisLabel("幅值");
-    ui->plotWave->setXRange(0,10000);
 
     ui->plotSpec->setTitle("分时能谱");
     ui->plotSpec->setXAxisLabel("道址");
@@ -163,8 +162,14 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::refreshSpectrumPlot);
     connect(ui->spb_waveID, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshWaveformPlot);
+    connect(ui->spb_waveLen, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::refreshWaveformPlot);
     ui->spb_specID->setMinimum(0);
     ui->spb_waveID->setMinimum(0);
+    ui->spb_waveLen->setMinimum(static_cast<int>(kWaveformSampleIntervalNs));
+    ui->spb_waveLen->setMaximum(kWaveformMaxDisplayNs);
+    ui->spb_waveLen->setSingleStep(static_cast<int>(kWaveformSampleIntervalNs));
+    ui->spb_waveLen->setValue(10000);
     updateSpecIdSpinBoxRange();
     updateWaveIdSpinBoxRange();
 
@@ -1246,19 +1251,23 @@ void MainWindow::refreshWaveformPlot()
     const WaveformEntry &entry = waveforms.at(waveId);
     const QVector<quint16> &samples = entry.samples;
     const int n = samples.size();
-    QVector<double> xs(n), ys(n);
-    for (int i = 0; i < n; ++i) {
-        xs[i] = static_cast<double>(i) * 16.0;
+    const int waveLenNs = ui->spb_waveLen->value();
+    const int displayCount =
+        qMin(n, static_cast<int>(waveLenNs / kWaveformSampleIntervalNs) + 1);
+    QVector<double> xs(displayCount), ys(displayCount);
+    for (int i = 0; i < displayCount; ++i) {
+        xs[i] = static_cast<double>(i) * kWaveformSampleIntervalNs;
         ys[i] = static_cast<double>(samples.at(i));
     }
 
     ui->plotWave->setData(xs, ys);
+    ui->plotWave->setXRange(0, waveLenNs);
     ui->plotWave->setTitle(QString("波形 Det%1 CH%2 #%3 t=%4ms")
                                .arg(entry.detectorIndex)
                                .arg(channel)
                                .arg(waveId)
                                .arg(entry.timeUnits));
-    ui->plotWave->refreshPlot();
+    ui->plotWave->refreshPlot(false, true);
 }
 
 void MainWindow::appendUdpLog(const QString &line)

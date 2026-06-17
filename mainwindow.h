@@ -146,6 +146,10 @@ private:
     static constexpr int kVerticalCameraChannels = 16;
     static constexpr double kProfileZMin = -25.0;
     static constexpr double kProfileZMax = 25.0;
+    static constexpr double kWaveformSampleIntervalNs = 16.0;
+    static constexpr int kWaveformSampleCount = 1024;
+    static constexpr int kWaveformMaxDisplayNs =
+        static_cast<int>(kWaveformSampleCount * kWaveformSampleIntervalNs);
 
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
