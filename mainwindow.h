@@ -166,6 +166,7 @@ private:
     void updateSpectrumRefreshIntervalRange();
     void updateHxrDisplayBinControls();
     void updateProfileControls();
+    void updateUnattendedControls();
     int hxrDisplayBinCount() const;
     bool loadEnergyCalibration(QVector<EnergyCalibration> &calibration, QString *errorMessage) const;
     QString energyCalibrationFilePath() const;

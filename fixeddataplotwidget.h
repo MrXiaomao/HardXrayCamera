@@ -17,6 +17,8 @@ public:
     void setTitle(const QString& title);
     void setGraphColor(const QColor& color);
     void setGraphColor(int graphIndex, const QColor& color);
+    void setGraphName(int graphIndex, const QString& name);
+    void setLegendVisible(bool visible);
     void setXAxisLabel(const QString& text);
     void setYAxisLabel(const QString& text);
     void setXRange(double min, double max);

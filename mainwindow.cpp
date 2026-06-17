@@ -79,6 +79,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotProfile->ensureGraphCount(2);
     ui->plotProfile->setGraphColor(0, Qt::blue);
     ui->plotProfile->setGraphColor(1, Qt::red);
+    ui->plotProfile->setGraphName(0, QStringLiteral("垂直剖面"));
+    ui->plotProfile->setGraphName(1, QStringLiteral("水平剖面"));
+    ui->plotProfile->setLegendVisible(true);
 
     {
         //信号采集机箱
@@ -186,6 +189,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateHxrDisplayBinControls);
     connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::updateProfileControls);
+    connect(ui->comboBox_2, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::updateUnattendedControls);
     connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
     connect(ui->spb_profileID, QOverload<int>::of(&QSpinBox::valueChanged),
@@ -909,6 +914,15 @@ void MainWindow::updateProfileControls()
     ui->spb_profileID->setVisible(spectrum512Mode);
 }
 
+void MainWindow::updateUnattendedControls()
+{
+    const bool unattendedMode = ui->comboBox_2->currentIndex() == 2;
+    ui->label_9->setVisible(unattendedMode);
+    ui->dateTimeEdit->setVisible(unattendedMode);
+    ui->label_10->setVisible(unattendedMode);
+    ui->dateTimeEdit_2->setVisible(unattendedMode);
+}
+
 QString MainWindow::energyCalibrationFilePath() const
 {
     const QString fileName = QStringLiteral("能量刻度.csv");
@@ -1178,7 +1192,7 @@ void MainWindow::refreshProfilePlot()
 
     ui->plotProfile->setGraphData(0, verticalX, verticalY);
     ui->plotProfile->setGraphData(1, horizontalX, horizontalY);
-    ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 t=%2ms (垂直/水平)")
+    ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 t=%2ms")
                                   .arg(profileId)
                                   .arg(snapshot.timeMs));
     ui->plotProfile->setXRange(kProfileZMin, kProfileZMax);
@@ -1832,6 +1846,7 @@ void MainWindow::loadMeasureSettings()
     updateSpectrumRefreshIntervalRange();
     updateHxrDisplayBinControls();
     updateProfileControls();
+    updateUnattendedControls();
 }
 
 void MainWindow::saveMeasureSettings()

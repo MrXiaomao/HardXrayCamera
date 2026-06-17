@@ -56,6 +56,18 @@ void FixedDataPlotWidget::setGraphColor(int graphIndex, const QColor& color)
         m_graphs.at(graphIndex)->setPen(QPen(color));
 }
 
+void FixedDataPlotWidget::setGraphName(int graphIndex, const QString& name)
+{
+    if (graphIndex >= 0 && graphIndex < m_graphs.size() && m_graphs.at(graphIndex))
+        m_graphs.at(graphIndex)->setName(name);
+}
+
+void FixedDataPlotWidget::setLegendVisible(bool visible)
+{
+    if (m_plot && m_plot->legend)
+        m_plot->legend->setVisible(visible);
+}
+
 void FixedDataPlotWidget::ensureGraphCount(int count)
 {
     if (count <= 0)
