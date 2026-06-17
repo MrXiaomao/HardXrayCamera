@@ -73,7 +73,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotSpec->setXRange(1,512);
 
     ui->plotProfile->setTitle("剖面分布");
-    ui->plotProfile->setXAxisLabel("z轴位置");
+    ui->plotProfile->setXAxisLabel("编号");
     ui->plotProfile->setYAxisLabel("计数");
     ui->plotProfile->setXRange(kProfileZMin, kProfileZMax);
     ui->plotProfile->ensureGraphCount(2);
@@ -1040,14 +1040,14 @@ quint64 MainWindow::sumCountsInBinRange(const QVector<quint32> &counts,
     return total;
 }
 
-double MainWindow::profileChannelPosition(int logicalChannel) const
+double MainWindow::profilePointPosition(int pointIndex) const
 {
-    if (logicalChannel < 1 || logicalChannel > kProfileChannelCount)
+    if (pointIndex < 0 || pointIndex >= kVerticalCameraChannels)
         return 0.0;
 
     return kProfileZMin
-           + (logicalChannel - 1) * (kProfileZMax - kProfileZMin)
-                 / (kProfileChannelCount - 1);
+           + pointIndex * (kProfileZMax - kProfileZMin)
+                 / (kVerticalCameraChannels - 1);
 }
 
 void MainWindow::generateProfileSnapshots()
@@ -1168,10 +1168,11 @@ void MainWindow::refreshProfilePlot()
     QVector<double> horizontalY(kVerticalCameraChannels);
 
     for (int i = 0; i < kVerticalCameraChannels; ++i) {
-        verticalX[i] = profileChannelPosition(i + 1);
+        const double x = profilePointPosition(i);
+        verticalX[i] = x;
         verticalY[i] = static_cast<double>(snapshot.counts.at(i));
 
-        horizontalX[i] = profileChannelPosition(i + kVerticalCameraChannels + 1);
+        horizontalX[i] = x;
         horizontalY[i] = static_cast<double>(snapshot.counts.at(i + kVerticalCameraChannels));
     }
 

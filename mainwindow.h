@@ -146,8 +146,8 @@ private:
     static constexpr int kSpectrum512BinCount = 512;
     static constexpr int kProfileChannelCount = 32;
     static constexpr int kVerticalCameraChannels = 16;
-    static constexpr double kProfileZMin = -25.0;
-    static constexpr double kProfileZMax = 25.0;
+    static constexpr double kProfileZMin = -8.0;
+    static constexpr double kProfileZMax = 8.0;
     static constexpr double kWaveformSampleIntervalNs = 16.0;
     static constexpr int kWaveformSampleCount = 1024;
     static constexpr int kWaveformMaxDisplayNs =
@@ -172,7 +172,7 @@ private:
     void energyToBinRange(double energyLeft, double energyRight, const EnergyCalibration &cal,
                           int &binStart, int &binEnd) const;
     quint64 sumCountsInBinRange(const QVector<quint32> &counts, int binStart, int binEnd) const;
-    double profileChannelPosition(int logicalChannel) const;
+    double profilePointPosition(int pointIndex) const;
     void generateProfileSnapshots();
     void updateProfileIdSpinBoxRange();
     void clearProfileData();

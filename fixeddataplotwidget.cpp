@@ -71,9 +71,8 @@ void FixedDataPlotWidget::ensureGraphCount(int count)
         graph->setPen(QPen(color));
         graph->setLineStyle(QCPGraph::lsLine);
         graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
-        graph->setBrush(QBrush(color.lighter(180)));
+        graph->setBrush(Qt::NoBrush);
         graph->setAntialiased(true);
-        graph->setAntialiasedFill(true);
         m_graphs.append(graph);
     }
 

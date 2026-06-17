@@ -56,11 +56,11 @@ QString transferModeText(Order::TransferMode mode)
 {
     switch (mode) {
     case Order::Spectrum512:
-        return "512道能谱";
+        return QStringLiteral("分时能谱");
     case Order::Spectrum16:
-        return "16道能谱";
+        return QStringLiteral("HXR能量道");
     case Order::Waveform:
-        return "波形";
+        return QStringLiteral("波形");
     }
     return QString("未知模式(%1)").arg(static_cast<int>(mode));
 }
@@ -516,12 +516,13 @@ void CommandHelper::startMeasure(DetParameter detPara)
     beginRecording(measurement);
     sendSpectrumControl(measurement.trigMode);
 
-    qInfo() << "Measurement started with parameters:" << measurement.measureTime
-            << "ms, TransferMode:" << measurement.transferMode
-            << "SpectrumRefreshInterval:" << measurement.spectrumRefreshInterval
-            << "SpectrumTriggerThreshold:" << measurement.spectrumTriggerThreshold
-            << "SpectrumDeadTime(ns):" << measurement.spectrumDeadTime
-            << "TriggerMode:" << measurement.trigMode;
+    qInfo().noquote() << QStringLiteral("测量已开始，参数：时长 %1 ms，传输模式：%2，能谱刷新间隔：%3 ms，能谱触发阈值：%4，能谱死时间：%5 ns，触发模式：%6")
+                             .arg(measurement.measureTime)
+                             .arg(transferModeText(measurement.transferMode))
+                             .arg(measurement.spectrumRefreshInterval)
+                             .arg(measurement.spectrumTriggerThreshold)
+                             .arg(measurement.spectrumDeadTime)
+                             .arg(triggerModeText(measurement.trigMode));
 }
 
 void CommandHelper::stopMeasure()
