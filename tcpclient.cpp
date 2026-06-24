@@ -193,9 +193,9 @@ TcpClient::~TcpClient()
         m_thread->quit();
         m_thread->wait(10000);
     }
-    delete m_worker;
+    m_worker->deleteLater();
     m_worker = nullptr;
-    delete m_thread;
+    m_thread->deleteLater();
     m_thread = nullptr;
 }
 

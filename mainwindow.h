@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QVector>
+#include <QStateMachine>
 #include "globalsettings.h"
 class CommandHelper;
 class UdpShotReceiver;
@@ -115,6 +116,8 @@ private slots:
     void on_action_stopMeasure_triggered();
 
     void on_btn_generateProfile_clicked();
+
+    void on_comboBox_2_currentIndexChanged(int index);
 
 private:
     struct EnergyCalibration {
@@ -242,5 +245,19 @@ private:
 
     enum class AutoMeasureState { Idle, WaitingShot, Measuring };
     AutoMeasureState m_autoMeasureState = AutoMeasureState::Idle;
+
+public:
+    // 无人值守
+    bool m_enableAutoMated;
+    QStateMachine *machine;
+    QState *stIdle, *stStep1, *stStep2, *stStep3, *stStep4, *stFinish;
+    void initStateMachine();
+
+Q_SIGNALS:
+    // 无人值守共分四步：
+    void step1Finished();// 1、连接实时监测系统
+    void step2Finished();// 2、连接远程控制
+    void step3Finished();// 3、开启电源
+    void step4Finished();// 4、连接采集系统
 };
 #endif // MAINWINDOW_H

@@ -263,14 +263,14 @@ CommandHelper::CommandHelper(QObject *parent)
     connect(client_arm1, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("ARM设备1"), host, port, errorString);
+        logTcpConnectFailure(QStringLiteral("状态监测设备1"), host, port, errorString);
         emit sigARM1Fault();
     });
 
     connect(client_arm2, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError, const QString& host, quint16 port,
                 const QString& errorString) {
-        logTcpConnectFailure(QStringLiteral("ARM设备2"), host, port, errorString);
+        logTcpConnectFailure(QStringLiteral("状态监测设备2"), host, port, errorString);
         emit sigARM2Fault();
     });
 }

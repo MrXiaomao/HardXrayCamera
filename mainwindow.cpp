@@ -232,6 +232,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->bt_connectDet->setEnabled(false);
     ui->btn_startMeasure->setEnabled(false);
     ui->btn_stopMeasure->setEnabled(false);
+    emit ui->comboBox_2->currentIndexChanged(ui->comboBox_2->currentIndex());
+
+    // 初始化状态机
+    initStateMachine();
 
     // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
@@ -261,7 +265,16 @@ void MainWindow::onMeasureTimerTimeout()
         ui->btn_stopMeasure->setEnabled(false);
     }
 
-    qInfo() << "定时测量已停止";
+    ui->comboBox_2->setEnabled(true);
+    ui->dateTimeEdit->setEnabled(true);
+    ui->dateTimeEdit_2->setEnabled(true);
+
+    if (0 == ui->comboBox_2->currentIndex())
+        qInfo() << "手动测量时长已到，测量已停止";
+    else if (1 == ui->comboBox_2->currentIndex())
+        qInfo() << "自动测量时长已到，测量已停止";
+    else
+        qInfo() << "无人值守测量时长已到，测量已停止";
 }
 
 void MainWindow::onRelayStatusChanged(bool on)
@@ -275,6 +288,11 @@ void MainWindow::onRelayStatusChanged(bool on)
         setPowerSwitchEnabled(true);
 
         qInfo() << "继电器网络状态: 已连接";
+
+        QTimer::singleShot(500, this, [=]{
+            // 延迟打开电源，否则指令会发出去无响应
+            emit step2Finished();// 连接远程控制
+        });
     }
     else{
         setPowerSwitchEnabled(false);
@@ -327,8 +345,12 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
 void MainWindow::onDetector1StatusChanged(bool on)
 {
     if (on) {
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!m_enableAutoMated)
+        {
+            ui->btn_startMeasure->setEnabled(true);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
+
         qInfo() << "水平相机主网口(控制/能谱)状态: 已连接";
         detectOnline[0] = true;
     } else {
@@ -343,8 +365,11 @@ void MainWindow::onDetector1StatusChanged(bool on)
 void MainWindow::onDetector2StatusChanged(bool on)
 {
     if (on) {
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!m_enableAutoMated)
+        {
+            ui->btn_startMeasure->setEnabled(true);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已连接";
         detectOnline[1] = true;
     } else {
@@ -359,8 +384,11 @@ void MainWindow::onDetector2StatusChanged(bool on)
 void MainWindow::onDetector3StatusChanged(bool on)
 {
     if (on) {
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!m_enableAutoMated)
+        {
+            ui->btn_startMeasure->setEnabled(true);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "水平相机副网口(波形接收)状态: 已连接";
         detectOnline[2] = true;
     } else {
@@ -375,8 +403,11 @@ void MainWindow::onDetector3StatusChanged(bool on)
 void MainWindow::onDetector4StatusChanged(bool on)
 {
     if (on) {
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!m_enableAutoMated)
+        {
+            ui->btn_startMeasure->setEnabled(true);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "垂直相机副网口(波形接收)状态: 已连接";
         detectOnline[3] = true;
     } else {
@@ -428,7 +459,7 @@ void MainWindow::onArm2StatusChanged(bool on)
 {
     if (on) {
         qInfo() << "状态监测设备2网络：已连接";
-        armSensorOnline[1] = true;
+        armSensorOnline[1] = true;        
     } else {
         qInfo() << "状态监测设备2网络：已断开";
         armSensorOnline[1] = false;
@@ -495,6 +526,9 @@ void MainWindow::saveArmMonitorData(int armIndex, const QVector<double> &tempera
 void MainWindow::checkArmMonitorAlarm(int armIndex, const QVector<double> &temperature,
                                       const QVector<double> &voltage, const QVector<double> &current)
 {
+    if (!ui->checkBox_alarm->isChecked())
+        return ;
+
     const double tempLimit = ui->doubleSpinBox_temp->value();
     const double voltageLimit = ui->doubleSpinBox_voltage->value();
     const double currentLimit = ui->doubleSpinBox_current->value();
@@ -1446,6 +1480,7 @@ void MainWindow::stopMeasureSession(bool sendHardwareStop)
     }
 }
 
+#include <QtConcurrent>
 bool MainWindow::startMeasureInternal()
 {
     const int measureMode = ui->comboBox_2->currentIndex();
@@ -1485,6 +1520,7 @@ bool MainWindow::startMeasureInternal()
     commandHelper->setSavePath(QDir::toNativeSeparators(QFileInfo(savePath).absoluteFilePath()));
     commandHelper->setShotNumber(shotNumber);
 
+    // 自动测量
     if (measureMode == 1) {
         if (!commandHelper->configureMeasure(detPara))
             return false;
@@ -1498,11 +1534,15 @@ bool MainWindow::startMeasureInternal()
         m_autoMeasureState = AutoMeasureState::WaitingShot;
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(true);
+        ui->comboBox_2->setEnabled(false);
+        ui->dateTimeEdit->setEnabled(false);
+        ui->dateTimeEdit_2->setEnabled(false);
         qInfo() << "自动测量已就绪，等待炮号...";
         return true;
     }
 
-    if (measureMode == 2){
+    m_enableAutoMated = (measureMode == 2);
+    if (m_enableAutoMated){
         // 开启无人值守模式
         // 1. 定义两个定时器和成员变量
         if (startTimer == nullptr)
@@ -1524,38 +1564,66 @@ bool MainWindow::startMeasureInternal()
             return false;
         }
 
+        ui->spb_measureTime->setValue(detPara.measureTime);
         ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(true);
+        ui->comboBox_2->setEnabled(false);
+        ui->dateTimeEdit->setEnabled(false);
+        ui->dateTimeEdit_2->setEnabled(false);
 
         // 4. 绑定信号槽：时间A到了启动任务
         connect(startTimer, &QTimer::timeout, this, [=]() {
+            //qDebug() << "1111111111";
+            ui->btn_startMeasure->setEnabled(false);
+            ui->btn_stopMeasure->setEnabled(true);
             startTimer->stop();
-
-            // 启动工作定
-            commandHelper->startMeasure(detPara);
-            measureTimer->start(detPara.measureTime);
-            qInfo() << "系统开机，测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+            //qDebug() << "22222";
+            machine->start();
+            qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
         });
 
         // 5. 绑定信号槽：时间B到了停止任务
         connect(stopTimer, &QTimer::timeout, this, [&]() {
             isTaskRunning = false;
-            stopTimer->stop();
-            ui->btn_startMeasure->setEnabled(true);
+            m_enableAutoMated = false;
+            machine->stop();
+
+            stopMeasureSession(true);
+            if (startTimer->isActive())
+                startTimer->stop();
+
+            if (stopTimer->isActive())
+                stopTimer->stop();
+
+            if (measureTimer->isActive())
+                measureTimer->stop();
 
             // 停止工作定
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
-            printSpectrumSequenceSummary();
-            measureTimer->stop();
-            qInfo() << "系统自动退出";
+            printSpectrumSequenceSummary();            
+
+            m_autoMeasureState = AutoMeasureState::Idle;
+            ui->btn_startMeasure->setEnabled(true);
+            ui->btn_stopMeasure->setEnabled(false);
+            ui->comboBox_2->setEnabled(true);
+            ui->dateTimeEdit->setEnabled(true);
+            ui->dateTimeEdit_2->setEnabled(true);
+
+            qInfo() << "无人值守时间到，系统将自动退出";
+            QTimer::singleShot(3000, this, [=]{
+                this->close();
+            });
         });
 
         startTimer->start(msecToA);
         stopTimer->start(msecToB);
+        qInfo() << "程序已进入无人值守模式，超出用户自定义的监测参数范围，软件将自动切断前端硬件供电。";
     }
     else
     {
+        // 手动测量
         waveformPlotTimer->start();
 
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
@@ -1566,6 +1634,11 @@ bool MainWindow::startMeasureInternal()
 
         commandHelper->startMeasure(detPara);
         measureTimer->start(detPara.measureTime);
+        ui->btn_startMeasure->setEnabled(false);
+        ui->btn_stopMeasure->setEnabled(true);
+        ui->comboBox_2->setEnabled(false);
+        ui->dateTimeEdit->setEnabled(false);
+        ui->dateTimeEdit_2->setEnabled(false);
         qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
     }
 
@@ -1661,8 +1734,15 @@ void MainWindow::on_btn_stopMeasure_clicked()
             stopTimer->stop();
 
         isTaskRunning = false;
-        ui->btn_startMeasure->setEnabled(true);
     }
+
+    m_enableAutoMated = false;
+    machine->stop();
+    ui->btn_startMeasure->setEnabled(true);
+    ui->btn_stopMeasure->setEnabled(false);
+    ui->comboBox_2->setEnabled(true);
+    ui->dateTimeEdit->setEnabled(true);
+    ui->dateTimeEdit_2->setEnabled(true);
 
     waveformPlotTimer->stop();
     commandHelper->stopMeasure();
@@ -1723,6 +1803,13 @@ void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
     ui->switch_power->blockSignals(true);
     ui->switch_power->setChecked(powerOn);
     ui->switch_power->blockSignals(false);
+
+    if (powerOn){
+        QTimer::singleShot(500, this, [=]{
+            // 延迟连接采集系统，否则连接可能会失败
+            emit step3Finished();//
+        });
+    }
 }
 
 void MainWindow::setPowerSwitchEnabled(bool enabled)
@@ -1738,6 +1825,13 @@ void MainWindow::syncDetectorConnectButton()
     ui->bt_connectDet->setText(anyConnected ? QStringLiteral("断开采集系统")
                                             : QStringLiteral("连接采集系统"));
     ui->bt_connectDet->blockSignals(false);
+
+    if (anyConnected){
+        QTimer::singleShot(500, this, [=]{
+            // 延迟连接采集系统，否则连接可能会失败
+            emit step4Finished();
+        });
+    }
 }
 
 void MainWindow::syncArmMonitorButton()
@@ -1748,6 +1842,9 @@ void MainWindow::syncArmMonitorButton()
     ui->btn_connectMonitor->setText(anyConnected ? QStringLiteral("断开实时监测系统")
                                                  : QStringLiteral("连接实时监测系统"));
     ui->btn_connectMonitor->blockSignals(false);
+
+    if (anyConnected)
+        emit step1Finished();
 }
 
 void MainWindow::loadMonitorAlarmSettings()
@@ -1889,3 +1986,112 @@ void MainWindow::on_action_stopMeasure_triggered()
     on_btn_stopMeasure_clicked();
 }
 
+
+void MainWindow::on_comboBox_2_currentIndexChanged(int index)
+{
+    if (index == 2){
+        // 无人值守
+        ui->btn_startMeasure->setEnabled(true);
+        ui->checkBox_alarm->setEnabled(false);
+        ui->checkBox_alarm->setChecked(true);
+        ui->dateTimeEdit->setEnabled(true);
+        ui->dateTimeEdit_2->setEnabled(true);
+    }
+    else{
+        ui->btn_startMeasure->setEnabled(ui->bt_connectDet->isChecked());
+        ui->checkBox_alarm->setEnabled(true);
+        ui->checkBox_alarm->setChecked(false);
+        ui->dateTimeEdit->setEnabled(false);
+        ui->dateTimeEdit_2->setEnabled(false);
+    }
+}
+
+#include <QSignalTransition>
+void MainWindow::initStateMachine()
+{
+    machine = new QStateMachine(this);
+
+    // 初始化各个状态
+    stIdle = new QState(machine);
+    stStep1 = new QState(machine);
+    stStep2 = new QState(machine);
+    stStep3 = new QState(machine);
+    stStep4 = new QState(machine);
+    stFinish = new QState(machine);
+    machine->setInitialState(stIdle);
+
+    // 从空闲到Step1，启动后执行任务
+    stIdle->addTransition(stIdle, &QState::entered, stStep1);
+
+    stStep1->addTransition(this, &MainWindow::step1Finished, stStep2);
+    connect(stStep1, &QState::entered, this, [this](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 开启电源
+        if (!ui->btn_connectMonitor->isChecked()){
+            ui->btn_connectMonitor->setChecked(true);
+            emit ui->btn_connectMonitor->clicked(true);
+        }
+        else{
+            emit step1Finished();
+        }
+    });
+
+    // 后面两个步骤以此类推
+    stStep2->addTransition(this, &MainWindow::step2Finished, stStep3);
+    connect(stStep2, &QState::entered, this, [this](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 连接远程控制
+        if (!ui->btn_relayNetOpen->isChecked()){
+            ui->btn_relayNetOpen->setChecked(true);
+            emit ui->btn_relayNetOpen->clicked(true);
+        }
+        else{
+            emit step2Finished();
+        }
+    });
+
+    stStep3->addTransition(this, &MainWindow::step3Finished, stStep4);
+    connect(stStep3, &QState::entered, this, [this](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 开启电源
+        if (!ui->switch_power->getChecked()){
+            emit ui->switch_power->clicked(true);
+        }
+        else{
+            emit step3Finished();
+        }
+    });
+
+    stStep4->addTransition(this, &MainWindow::step4Finished, stFinish);
+    connect(stStep4, &QState::entered, this, [this](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 连接采集系统
+        if (!ui->bt_connectDet->isChecked()){
+            ui->bt_connectDet->setChecked(true);
+            emit ui->bt_connectDet->clicked(true);
+        }
+        else{
+            emit step4Finished();
+        }
+    });
+
+    connect(stFinish, &QState::entered, this, [=](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 启动工作定
+        ui->btn_startMeasure->setEnabled(false);
+        commandHelper->startMeasure(mdetPara);
+        measureTimer->start(mdetPara.measureTime);
+        waveformPlotTimer->start();
+        qInfo() << "系统开机，测量已开始，炮号:" << m_currentShotNumber << "时长:" << mdetPara.measureTime << "ms";
+    });
+}
