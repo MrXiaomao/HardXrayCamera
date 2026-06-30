@@ -412,7 +412,7 @@
       </widget>
       <widget class="QWidget" name="tab_4">
        <attribute name="title">
-        <string>运行状态监测</string>
+        <string>实时监测</string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_5">
         <item>
@@ -493,7 +493,7 @@
               </sizepolicy>
              </property>
              <property name="title">
-              <string>运行状态监测</string>
+              <string>异常阈值设置</string>
              </property>
              <layout class="QHBoxLayout" name="horizontalLayout_6">
               <property name="topMargin">

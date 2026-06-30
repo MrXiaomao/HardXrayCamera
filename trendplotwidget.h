@@ -23,6 +23,9 @@ public:
     
     void setTitle(const QString& title);
     void setGraphColor(const QColor& color);
+    void setGraphName(int graphIndex, const QString& name);
+    void setLegendVisible(bool visible);
+    void setupNumericLegend();
     void setXAxisLabel(const QString& text);
     void setYAxisLabel(const QString& text);
     void setTimeWindow(int seconds);
@@ -30,11 +33,13 @@ public:
     void appendPoints(double x, const QVector<double>& y);
     void clearData();
     void refreshPlot();
+    void ensureGraphCount(int count);
     void addGraph(int count = 1);
 
 signals:
 
 private:
+    void styleGraph(QCPGraph *graph, int colorIndex);
     QCustomPlot *m_plot;
     // QVector<double> m_xData;
     // QVector<double> m_yData;

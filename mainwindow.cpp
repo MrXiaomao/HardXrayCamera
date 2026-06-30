@@ -86,41 +86,48 @@ MainWindow::MainWindow(QWidget *parent)
     {
         //信号采集机箱
         // ui->plotVoltage->setTitle("电压曲线");
+        ui->plotVoltage->ensureGraphCount(1);
         ui->plotVoltage->setXAxisLabel("时间");
         ui->plotVoltage->setYAxisLabel("电压 (V)");
         ui->plotVoltage->setTimeWindow(180);
+        ui->plotVoltage->setupNumericLegend();
 
         // ui->plotCurrent->setTitle("电流曲线");
+        ui->plotCurrent->ensureGraphCount(1);
         ui->plotCurrent->setXAxisLabel("时间");
         ui->plotCurrent->setYAxisLabel("电流 (A)");
         ui->plotCurrent->setTimeWindow(180);
+        ui->plotCurrent->setupNumericLegend();
 
         // ui->plotTemp->setTitle("温度曲线");// 共3条
-        ui->plotTemp->addGraph();
-        ui->plotTemp->addGraph();
+        ui->plotTemp->ensureGraphCount(3);
         ui->plotTemp->setXAxisLabel("时间");
         ui->plotTemp->setYAxisLabel("温度 (℃)");
         ui->plotTemp->setTimeWindow(180);
+        ui->plotTemp->setupNumericLegend();
     }
     {
         //电源机箱
         // ui->plotVoltage->setTitle("电压曲线");
-        ui->plotVoltage_2->addGraph(3);
+        ui->plotVoltage_2->ensureGraphCount(4);
         ui->plotVoltage_2->setXAxisLabel("时间");
         ui->plotVoltage_2->setYAxisLabel("电压 (V)");
         ui->plotVoltage_2->setTimeWindow(180);
+        ui->plotVoltage_2->setupNumericLegend();
 
         // ui->plotCurrent->setTitle("电流曲线");
-        ui->plotCurrent_2->addGraph(3);
+        ui->plotCurrent_2->ensureGraphCount(4);
         ui->plotCurrent_2->setXAxisLabel("时间");
         ui->plotCurrent_2->setYAxisLabel("电流 (A)");
         ui->plotCurrent_2->setTimeWindow(180);
+        ui->plotCurrent_2->setupNumericLegend();
 
         // ui->plotTemp->setTitle("温度曲线");// 共6条
-        ui->plotTemp_2->addGraph(5);
+        ui->plotTemp_2->ensureGraphCount(6);
         ui->plotTemp_2->setXAxisLabel("时间");
         ui->plotTemp_2->setYAxisLabel("温度 (℃)");
         ui->plotTemp_2->setTimeWindow(180);
+        ui->plotTemp_2->setupNumericLegend();
     }
     commandHelper = CommandHelper::instance();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);

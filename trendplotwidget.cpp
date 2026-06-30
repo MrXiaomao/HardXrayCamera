@@ -28,16 +28,25 @@ TrendPlotWidget::TrendPlotWidget(QWidget *parent)
     timeTicker->setDateTimeFormat("hh:mm:ss");
     timeTicker->setDateTimeSpec(Qt::LocalTime);
     m_plot->xAxis->setTicker(timeTicker);
+    m_plot->setAutoAddPlottableToLegend(false);
 
     //创建一条曲线
     m_graph = m_plot->addGraph();
-    m_graph->setPen(QPen(Qt::black));
-    m_graph->setLineStyle(QCPGraph::lsLine);
-    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
-    m_graph->setBrush(QBrush(QColor(0, 0, 255, 20)));
-    m_graph->setAntialiased(true);
-    m_graph->setAntialiasedFill(true);
-    m_graph->setAntialiasedFill(true);
+    styleGraph(m_graph, 0);
+}
+
+void TrendPlotWidget::styleGraph(QCPGraph *graph, int colorIndex)
+{
+    static const QVector<QColor> kColors = {
+        Qt::black, Qt::red, Qt::green, Qt::blue, Qt::cyan, Qt::magenta
+    };
+
+    graph->setPen(QPen(kColors.at(colorIndex % kColors.size())));
+    graph->setLineStyle(QCPGraph::lsLine);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
+    graph->setBrush(QBrush(QColor(0, 0, 255, 20)));
+    graph->setAntialiased(true);
+    graph->setAntialiasedFill(true);
 }
 
 TrendPlotWidget::~TrendPlotWidget()
@@ -61,6 +70,34 @@ void TrendPlotWidget::setGraphColor(const QColor& color)
     if (m_graph) {
         m_graph->setPen(QPen(color));
     }
+}
+
+void TrendPlotWidget::setGraphName(int graphIndex, const QString& name)
+{
+    if (!m_plot || graphIndex < 0 || graphIndex >= m_plot->graphCount())
+        return;
+    m_plot->graph(graphIndex)->setName(name);
+}
+
+void TrendPlotWidget::setLegendVisible(bool visible)
+{
+    if (m_plot && m_plot->legend)
+        m_plot->legend->setVisible(visible);
+}
+
+void TrendPlotWidget::setupNumericLegend()
+{
+    if (!m_plot || !m_plot->legend)
+        return;
+
+    m_plot->legend->clearItems();
+    for (int i = 0; i < m_plot->graphCount(); ++i) {
+        QCPGraph *graph = m_plot->graph(i);
+        graph->setName(QString::number(i + 1));
+        graph->addToLegend();
+    }
+
+    setLegendVisible(m_plot->graphCount() > 0);
 }
 
 void TrendPlotWidget::setXAxisLabel(const QString& text)
@@ -109,7 +146,8 @@ void TrendPlotWidget::appendPoints(double x, const QVector<double>& y)
     Q_UNUSED(x);
 
     const double now = QDateTime::currentDateTime().toSecsSinceEpoch();
-    for (int i=0; i<y.size(); ++i)
+    const int graphCount = qMin(y.size(), m_plot->graphCount());
+    for (int i = 0; i < graphCount; ++i)
     {
         m_plot->graph(i)->addData(now, y[i]);
         m_plot->graph(i)->data()->removeBefore(now - m_timeWindowSeconds);
@@ -141,23 +179,25 @@ void TrendPlotWidget::refreshPlot()
     }
 }
 
+void TrendPlotWidget::ensureGraphCount(int count)
+{
+    if (!m_plot || count <= 0)
+        return;
+
+    while (m_plot->graphCount() < count) {
+        QCPGraph *graph = m_plot->addGraph();
+        styleGraph(graph, m_plot->graphCount() - 1);
+    }
+    while (m_plot->graphCount() > count)
+        m_plot->removeGraph(m_plot->graph(m_plot->graphCount() - 1));
+
+    m_graph = m_plot->graph(0);
+}
+
 void TrendPlotWidget::addGraph(int count)
 {
-    QVector<QColor> colors;
-    colors.push_back(Qt::black);
-    colors.push_back(Qt::red);
-    colors.push_back(Qt::green);
-    colors.push_back(Qt::blue);
-    colors.push_back(Qt::cyan);
-    colors.push_back(Qt::magenta);
-    for (int i=0; i<count; ++i){
-        QCPGraph* graph = m_plot->addGraph();
-        graph->setPen(QPen(colors[m_plot->graphCount() - 1]));
-        graph->setLineStyle(QCPGraph::lsLine);
-        graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
-        graph->setBrush(QBrush(QColor(0, 0, 255, 20)));
-        graph->setAntialiased(true);
-        graph->setAntialiasedFill(true);
-        graph->setAntialiasedFill(true);
-    }
+    if (!m_plot || count <= 0)
+        return;
+
+    ensureGraphCount(m_plot->graphCount() + count);
 }
