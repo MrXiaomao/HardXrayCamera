@@ -812,6 +812,25 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>spinBox_portFpga1Main</tabstop>
+  <tabstop>spinBox_portFpga1Wave</tabstop>
+  <tabstop>spinBox_portFpga2Main</tabstop>
+  <tabstop>spinBox_portFpga2Wave</tabstop>
+  <tabstop>spinBox_armPort1</tabstop>
+  <tabstop>spinBox_armPort2</tabstop>
+  <tabstop>spinBox_portRelay</tabstop>
+  <tabstop>spb_udpPort</tabstop>
+  <tabstop>spb_specRefashTime</tabstop>
+  <tabstop>spb_threshold</tabstop>
+  <tabstop>spb_deadTime</tabstop>
+  <tabstop>lineEdit_csvPath</tabstop>
+  <tabstop>bt_selectCsv</tabstop>
+  <tabstop>spb_waveThreshold1</tabstop>
+  <tabstop>pushButton</tabstop>
+  <tabstop>pushButton_2</tabstop>
+  <tabstop>tableThreshold</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

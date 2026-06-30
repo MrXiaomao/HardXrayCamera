@@ -24,7 +24,7 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
@@ -503,6 +503,19 @@
                <number>5</number>
               </property>
               <item>
+               <widget class="QCheckBox" name="checkBox_alarm">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="text">
+                 <string>启用报警联动</string>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QLabel" name="label_16">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -645,6 +658,9 @@
        </size>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QGroupBox" name="groupBox_4">
          <property name="sizePolicy">
@@ -1140,7 +1156,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>21</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">
@@ -1283,6 +1299,44 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>tabWidget_2</tabstop>
+  <tabstop>btn_connectMonitor</tabstop>
+  <tabstop>btn_relayNetOpen</tabstop>
+  <tabstop>btn_relayNetClose</tabstop>
+  <tabstop>bt_connectDet</tabstop>
+  <tabstop>bt_disconnectDet</tabstop>
+  <tabstop>lineEdit_shotID</tabstop>
+  <tabstop>cmb_transferMode</tabstop>
+  <tabstop>spb_measureTime</tabstop>
+  <tabstop>spb_specRefashTime</tabstop>
+  <tabstop>le_savePath</tabstop>
+  <tabstop>cmb_saveFormat</tabstop>
+  <tabstop>comboBox_2</tabstop>
+  <tabstop>dateTimeEdit</tabstop>
+  <tabstop>dateTimeEdit_2</tabstop>
+  <tabstop>btn_startMeasure</tabstop>
+  <tabstop>btn_stopMeasure</tabstop>
+  <tabstop>spb_channel</tabstop>
+  <tabstop>spinBox_4</tabstop>
+  <tabstop>spb_specID</tabstop>
+  <tabstop>spb_hxrDisplayBins</tabstop>
+  <tabstop>spb_waveID</tabstop>
+  <tabstop>spb_waveLen</tabstop>
+  <tabstop>dsbx_energyLeft</tabstop>
+  <tabstop>dsbx_energyRight</tabstop>
+  <tabstop>btn_generateProfile</tabstop>
+  <tabstop>spb_profileID</tabstop>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>plainTextEdit_log</tabstop>
+  <tabstop>pushButton_clearSysLog</tabstop>
+  <tabstop>tbLog_UDP</tabstop>
+  <tabstop>pushButton_clearNetLog</tabstop>
+  <tabstop>checkBox_alarm</tabstop>
+  <tabstop>doubleSpinBox_temp</tabstop>
+  <tabstop>doubleSpinBox_voltage</tabstop>
+  <tabstop>doubleSpinBox_current</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
