@@ -93,6 +93,8 @@ private slots:
     void triggerAutoMeasureFromShot(const QString &shotNumber);
     void stopAutoMeasureSession();
     bool isMeasureSessionActive() const;
+    int measureDurationMs() const;
+    void startMeasureDurationTimer();
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
 

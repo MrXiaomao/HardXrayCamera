@@ -22,7 +22,7 @@
 
 namespace {
 
-double generateArm2StubTemperature()
+/*double generateArm2StubTemperature()
 {
     static std::mt19937 gen(static_cast<unsigned>(
         std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -31,12 +31,13 @@ double generateArm2StubTemperature()
     double delta = dist(gen);
     delta = std::max(-ARM2_TEMP_STUB_DELTA, std::min(delta, ARM2_TEMP_STUB_DELTA));
     return ARM2_TEMP_STUB_BASE + delta;
-}
+}*/
 
 double parseArm2Temperature(quint8 highByte, quint8 lowByte)
 {
-    if (highByte == 0xFF && lowByte == 0xFF)
-        return generateArm2StubTemperature();
+    //不再使用占位温度，直接返回 0xFF 0xFF 时的模拟温度
+    // if (highByte == 0xFF && lowByte == 0xFF)
+    //     return generateArm2StubTemperature();
     return double(highByte * 256 + lowByte) / 10.0;
 }
 

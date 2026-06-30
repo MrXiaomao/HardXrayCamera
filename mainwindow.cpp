@@ -258,10 +258,30 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+int MainWindow::measureDurationMs() const
+{
+    return qMax(1, ui->spb_measureTime->value());
+}
+
+void MainWindow::startMeasureDurationTimer()
+{
+    measureTimer->stop();
+    const int durationMs = measureDurationMs();
+    measureTimer->start(durationMs);
+}
+
 void MainWindow::onMeasureTimerTimeout()
 {
     if (!commandHelper)
         return;
+
+    const int measureMode = ui->comboBox_2->currentIndex();
+
+    if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
+        stopAutoMeasureSession();
+        qInfo() << "自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+        return;
+    }
 
     waveformPlotTimer->stop();
     commandHelper->stopMeasure();
@@ -269,25 +289,16 @@ void MainWindow::onMeasureTimerTimeout()
     printSpectrumSequenceSummary();
     measureTimer->stop();
 
-    if (m_autoMeasureState == AutoMeasureState::Measuring) {
-        m_autoMeasureState = AutoMeasureState::Idle;
-        m_autoMeasureDurationTimerStarted = false;
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
-    }
-
     ui->btn_startMeasure->setEnabled(true);
     ui->btn_stopMeasure->setEnabled(false);
     ui->comboBox_2->setEnabled(true);
     ui->dateTimeEdit->setEnabled(true);
     ui->dateTimeEdit_2->setEnabled(true);
 
-    if (0 == ui->comboBox_2->currentIndex())
-        qInfo() << "手动测量时长已到，测量已停止";
-    else if (1 == ui->comboBox_2->currentIndex())
-        qInfo() << "自动测量时长已到，测量已停止";
-    else
-        qInfo() << "无人值守测量时长已到，测量已停止";
+    if (measureMode == 0)
+        qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+    else if (measureMode == 2)
+        qInfo() << "无人值守测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
 }
 
 void MainWindow::onRelayStatusChanged(bool on)
@@ -638,17 +649,17 @@ void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, 
 void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
                                         const QVector<quint32> &counts)
 {
-    const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
-    if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
-        return;
-
     if (m_autoMeasureState == AutoMeasureState::Measuring
         && ui->comboBox_2->currentIndex() == 1
         && !m_autoMeasureDurationTimerStarted) {
         m_autoMeasureDurationTimerStarted = true;
-        measureTimer->start(mdetPara.measureTime);
-        qInfo() << "收到首个能谱数据，开始测量倒计时:" << mdetPara.measureTime << "ms";
+        startMeasureDurationTimer();
+        qInfo() << "收到首个能谱数据，开始测量倒计时:" << measureDurationMs() << "ms";
     }
+
+    const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
+    if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
+        return;
 
     const int channelIndex = logicalChannel - 1;
     appendSpectrumData(detectorIndex, channelNumber, timeMs, counts);
@@ -1490,7 +1501,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->btn_stopMeasure->setEnabled(true);
     qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
-            << mdetPara.measureTime << "ms";
+            << measureDurationMs() << "ms";
 }
 
 bool MainWindow::isMeasureSessionActive() const
@@ -1583,6 +1594,7 @@ bool MainWindow::startMeasureInternal()
 
     // 自动测量
     if (measureMode == 1) {
+        m_autoMeasureDurationTimerStarted = false;
         if (!commandHelper->configureMeasure(detPara))
             return false;
 
@@ -1606,10 +1618,14 @@ bool MainWindow::startMeasureInternal()
     if (m_enableAutoMated){
         // 开启无人值守模式
         // 1. 定义两个定时器和成员变量
-        if (startTimer == nullptr)
+        if (startTimer == nullptr) {
             startTimer = new QTimer(this);
-        if (stopTimer == nullptr)
+            startTimer->setSingleShot(true);
+        }
+        if (stopTimer == nullptr) {
             stopTimer = new QTimer(this);
+            stopTimer->setSingleShot(true);
+        }
         isTaskRunning = true;
 
         // 2. 设置时间点A（启动时间），计算时间差后启动启动定时器
@@ -1693,13 +1709,13 @@ bool MainWindow::startMeasureInternal()
         }
 
         commandHelper->startMeasure(detPara);
-        measureTimer->start(detPara.measureTime);
+        startMeasureDurationTimer();
         ui->btn_startMeasure->setEnabled(false);
         ui->btn_stopMeasure->setEnabled(true);
         ui->comboBox_2->setEnabled(false);
         ui->dateTimeEdit->setEnabled(false);
         ui->dateTimeEdit_2->setEnabled(false);
-        qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+        qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << measureDurationMs() << "ms";
     }
 
     return true;
@@ -2151,8 +2167,8 @@ void MainWindow::initStateMachine()
         // 启动工作定
         ui->btn_startMeasure->setEnabled(false);
         commandHelper->startMeasure(mdetPara);
-        measureTimer->start(mdetPara.measureTime);
+        startMeasureDurationTimer();
         waveformPlotTimer->start();
-        qInfo() << "系统开机，测量已开始，炮号:" << m_currentShotNumber << "时长:" << mdetPara.measureTime << "ms";
+        qInfo() << "系统开机，测量已开始，炮号:" << m_currentShotNumber << "时长:" << measureDurationMs() << "ms";
     });
 }
