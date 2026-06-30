@@ -261,10 +261,10 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (m_autoMeasureState == AutoMeasureState::Measuring) {
         m_autoMeasureState = AutoMeasureState::Idle;
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
     }
 
+    ui->btn_startMeasure->setEnabled(true);
+    ui->btn_stopMeasure->setEnabled(false);
     ui->comboBox_2->setEnabled(true);
     ui->dateTimeEdit->setEnabled(true);
     ui->dateTimeEdit_2->setEnabled(true);
@@ -345,7 +345,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
 void MainWindow::onDetector1StatusChanged(bool on)
 {
     if (on) {
-        if (!m_enableAutoMated)
+        if (!isMeasureSessionActive())
         {
             ui->btn_startMeasure->setEnabled(true);
             ui->btn_stopMeasure->setEnabled(false);
@@ -354,8 +354,10 @@ void MainWindow::onDetector1StatusChanged(bool on)
         qInfo() << "水平相机主网口(控制/能谱)状态: 已连接";
         detectOnline[0] = true;
     } else {
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!isMeasureSessionActive()) {
+            ui->btn_startMeasure->setEnabled(false);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "水平相机主网口(控制/能谱)状态: 已断开";
         detectOnline[0] = false;
     }
@@ -365,7 +367,7 @@ void MainWindow::onDetector1StatusChanged(bool on)
 void MainWindow::onDetector2StatusChanged(bool on)
 {
     if (on) {
-        if (!m_enableAutoMated)
+        if (!isMeasureSessionActive())
         {
             ui->btn_startMeasure->setEnabled(true);
             ui->btn_stopMeasure->setEnabled(false);
@@ -373,8 +375,10 @@ void MainWindow::onDetector2StatusChanged(bool on)
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已连接";
         detectOnline[1] = true;
     } else {
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!isMeasureSessionActive()) {
+            ui->btn_startMeasure->setEnabled(false);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已断开";
         detectOnline[1] = false;
     }
@@ -384,7 +388,7 @@ void MainWindow::onDetector2StatusChanged(bool on)
 void MainWindow::onDetector3StatusChanged(bool on)
 {
     if (on) {
-        if (!m_enableAutoMated)
+        if (!isMeasureSessionActive())
         {
             ui->btn_startMeasure->setEnabled(true);
             ui->btn_stopMeasure->setEnabled(false);
@@ -392,8 +396,10 @@ void MainWindow::onDetector3StatusChanged(bool on)
         qInfo() << "水平相机副网口(波形接收)状态: 已连接";
         detectOnline[2] = true;
     } else {
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!isMeasureSessionActive()) {
+            ui->btn_startMeasure->setEnabled(false);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "水平相机副网口(波形接收)状态: 已断开";
         detectOnline[2] = false;
     }
@@ -403,7 +409,7 @@ void MainWindow::onDetector3StatusChanged(bool on)
 void MainWindow::onDetector4StatusChanged(bool on)
 {
     if (on) {
-        if (!m_enableAutoMated)
+        if (!isMeasureSessionActive())
         {
             ui->btn_startMeasure->setEnabled(true);
             ui->btn_stopMeasure->setEnabled(false);
@@ -411,8 +417,10 @@ void MainWindow::onDetector4StatusChanged(bool on)
         qInfo() << "垂直相机副网口(波形接收)状态: 已连接";
         detectOnline[3] = true;
     } else {
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        if (!isMeasureSessionActive()) {
+            ui->btn_startMeasure->setEnabled(false);
+            ui->btn_stopMeasure->setEnabled(false);
+        }
         qInfo() << "垂直相机副网口(波形接收)状态: 已断开";
         detectOnline[3] = false;
     }
@@ -1452,8 +1460,22 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     qInfo() << "炮号" << shotNumber << "触发自动测量，时长:" << mdetPara.measureTime << "ms";
 }
 
-void MainWindow::stopMeasureSession(bool sendHardwareStop)
+bool MainWindow::isMeasureSessionActive() const
 {
+    return measureTimer->isActive()
+        || m_autoMeasureState != AutoMeasureState::Idle
+        || isTaskRunning;
+}
+
+void MainWindow::stopAutoMeasureSession()
+{
+    const AutoMeasureState stateBeforeStop = m_autoMeasureState;
+    if (stateBeforeStop == AutoMeasureState::Idle)
+        return;
+
+    // 先退出等待/测量状态，防止已排队的炮号消息在停止过程中再次启动测量。
+    m_autoMeasureState = AutoMeasureState::Idle;
+
     if (isTaskRunning) {
         if (startTimer && startTimer->isActive())
             startTimer->stop();
@@ -1465,19 +1487,21 @@ void MainWindow::stopMeasureSession(bool sendHardwareStop)
     measureTimer->stop();
     waveformPlotTimer->stop();
 
-    if (sendHardwareStop) {
+    if (stateBeforeStop == AutoMeasureState::Measuring) {
+        // 炮号已到，开始测量指令已经发出，此时必须向硬件发送停止指令。
         commandHelper->stopMeasure();
         printWaveformCollectionSummary();
         printSpectrumSequenceSummary();
     } else {
+        // 炮号未到，硬件尚未开始测量，只取消等待，不发送停止指令。
         commandHelper->closeMeasurementFiles();
     }
 
-    if (m_autoMeasureState != AutoMeasureState::Idle) {
-        m_autoMeasureState = AutoMeasureState::Idle;
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
-    }
+    ui->btn_startMeasure->setEnabled(true);
+    ui->btn_stopMeasure->setEnabled(false);
+    ui->comboBox_2->setEnabled(true);
+    ui->dateTimeEdit->setEnabled(true);
+    ui->dateTimeEdit_2->setEnabled(true);
 }
 
 #include <QtConcurrent>
@@ -1588,7 +1612,6 @@ bool MainWindow::startMeasureInternal()
             m_enableAutoMated = false;
             machine->stop();
 
-            stopMeasureSession(true);
             if (startTimer->isActive())
                 startTimer->stop();
 
@@ -1715,14 +1738,14 @@ double generateValue(double base, double maxDelta, double& lastValue) {
 void MainWindow::on_btn_stopMeasure_clicked()
 {
     if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
-        stopMeasureSession(false);
+        stopAutoMeasureSession();
         qInfo() << "自动测量已取消，未收到炮号";
         return;
     }
 
     if (m_autoMeasureState == AutoMeasureState::Measuring) {
-        stopMeasureSession(true);
-        qInfo() << "手动停止测量";
+        stopAutoMeasureSession();
+        qInfo() << "自动测量已手动停止，已发送硬件停止指令";
         return;
     }
 
