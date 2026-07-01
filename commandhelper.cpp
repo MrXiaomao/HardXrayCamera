@@ -41,15 +41,15 @@ double parseArm2Temperature(quint8 highByte, quint8 lowByte)
     return double(highByte * 256 + lowByte) / 10.0;
 }
 
-constexpr int Spectrum512PacketSize = 2064;
+constexpr int Spectrum512PacketSize = 1032;
 constexpr int Spectrum512BinCount = 512;
-constexpr int Spectrum16PacketSize = 80; // 4+4+4+16*4+4
+constexpr int Spectrum16PacketSize = 40; // 2+2+2+16*2+2
 constexpr int Spectrum16BinCount = 16;
-const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb 00 00");
-const QByteArray SpectrumTail = QByteArray::fromHex("cc dd 00 00");
+const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb");
+const QByteArray SpectrumTail = QByteArray::fromHex("cc dd");
 
 // Waveform packet constants
-constexpr int WaveformPacketSize = 2056;
+constexpr int WaveformPacketSize = 1176;
 const QByteArray WaveformHeader = QByteArray::fromHex("aa bb");
 const QByteArray WaveformTail = QByteArray::fromHex("cc dd");
 
@@ -800,23 +800,23 @@ bool CommandHelper::parseSpectrum512Packet(int detectorIndex, const QByteArray& 
     if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
         return false;
 
-    const quint32 timeMs = readUInt32BE(packet.constData() + 4);
-    const quint32 channelMask = readUInt32BE(packet.constData() + 8);
+    const quint32 timeMs = readUInt16BE(packet.constData() + 4);
+    const quint32 channelMask = readUInt16BE(packet.constData() + 2);
     const int channelNumber = channelNumberFromMask(channelMask);
 
     QVector<quint32> counts;
     counts.reserve(Spectrum512BinCount);
 
-    const char* spectrumData = packet.constData() + 12;
+    const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum512BinCount; ++i) {
-        counts.append(readUInt32BE(spectrumData + i * 4));
+        counts.append(readUInt16BE(spectrumData + i * 2));
     }
 
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
     return true;
 }
 
-// 16道能谱：包头(4) + 时间(4) + 通道号(4) + 16道计数(64) + 包尾(4) = 80 字节
+// 16道能谱：包头(2) + 时间(2) + 通道号(2) + 16道计数(32) + 包尾(2) = 40 字节
 void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data)
 {
     buffer.append(data);
@@ -853,8 +853,8 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
         return false;
 
-    const quint32 timeMs = readUInt32BE(packet.constData() + 4);
-    const quint32 channelRaw = readUInt32BE(packet.constData() + 8);
+    const quint32 timeMs = readUInt16BE(packet.constData() + 4);
+    const quint32 channelRaw = readUInt16BE(packet.constData() + 2);
     int channelNumber = 0;
     if (channelRaw >= 1 && channelRaw <= 16) {
         channelNumber = static_cast<int>(channelRaw);
@@ -870,9 +870,9 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     QVector<quint32> counts;
     counts.reserve(Spectrum16BinCount);
 
-    const char* spectrumData = packet.constData() + 12;
+    const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum16BinCount; ++i) {
-        counts.append(readUInt32BE(spectrumData + i * 4));
+        counts.append(readUInt16BE(spectrumData + i * 2));
     }
 
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
@@ -902,7 +902,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
             //打印通道号和时间戳
             const char* p = packet.constData();
             const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
-            const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，ms
+            const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
             const int channelNumber = channelNumberFromMask(channelMask);
             qDebug() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
@@ -911,13 +911,13 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
         // parse
         const char* p = packet.constData();
         const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
-        const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2);
+        const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2)*10;
         const int channelNumber = channelNumberFromMask(channelMask);
 
         QVector<quint16> samples;
-        samples.reserve(1024);
+        samples.reserve(584);
         const char* sampleData = p + WaveformHeader.size() + 4;
-        for (int i = 0; i < 1024; ++i) {
+        for (int i = 0; i < 584; ++i) {
             samples.append(readUInt16BE(sampleData + i * 2));
         }
 

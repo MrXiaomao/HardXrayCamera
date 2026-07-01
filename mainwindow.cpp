@@ -707,7 +707,7 @@ void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, qu
     const int channelIndex = logicalChannel - 1;
     appendWaveformData(detectorIndex, channelNumber, timeUnits, samples);
 
-    const quint32 waveformSequence = timeUnits;
+    const quint32 waveformSequence = timeUnits/ui->spb_specRefashTime->value();
     m_waveformSequenceNumbersByChannel[channelIndex].append(waveformSequence);
     if (!m_hasWaveformSequenceByChannel[channelIndex]) {
         m_hasWaveformSequenceByChannel[channelIndex] = true;
@@ -824,9 +824,9 @@ void MainWindow::printWaveformCollectionSummary() const
         for (quint32 missingSequence : missingSequences)
             missingLabels << QString::number(missingSequence);
 
-        qInfo() << QString("通道%1缺失波形序号: %2")
-            .arg(channel)
-            .arg(missingLabels.join(", "));
+        // qInfo() << QString("通道%1缺失波形序号: %2")
+        //     .arg(channel)
+        //     .arg(missingLabels.join(", "));
     }
 }
 
@@ -842,9 +842,9 @@ void MainWindow::printSpectrumSequenceSummary() const
         for (quint32 missingSequence : missingSequences)
             missingLabels << QString::number(missingSequence);
 
-        qInfo() << QString("通道%1缺失能谱序号: %2")
-            .arg(channel)
-            .arg(missingLabels.join(", "));
+        // qInfo() << QString("通道%1缺失能谱序号: %2")
+        //     .arg(channel)
+        //     .arg(missingLabels.join(", "));
     }
 }
 
