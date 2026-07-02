@@ -255,7 +255,7 @@ public:
     // 无人值守
     bool m_enableAutoMated;
     QStateMachine *machine;
-    QState *stIdle, *stStep1, *stStep2, *stStep3, *stStep4, *stFinish;
+    QState *stIdle, *stStep1, *stStep2, *stStep3, *stStep4, *stStep5, *stFinish;
     void initStateMachine();
 
 Q_SIGNALS:
@@ -263,6 +263,7 @@ Q_SIGNALS:
     void step1Finished();// 1、连接远程控制
     void step2Finished();// 2、开启电源
     void step3Finished();// 3、连接采集系统
-    void step4Finished();// 4、连接实时监测系统
+    void step4Finished();// 4、开始测量
+    void step5Finished();// 5、连接实时监测系统
 };
 #endif // MAINWINDOW_H

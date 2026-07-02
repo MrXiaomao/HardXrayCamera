@@ -960,7 +960,7 @@
                </size>
               </property>
               <property name="text">
-               <string>分时积分/ms</string>
+               <string>分时积分/ms：</string>
               </property>
              </widget>
             </item>

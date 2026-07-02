@@ -289,6 +289,11 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
+        ui->action_startMeasure->setEnabled(true);
+        ui->action_stopMeasure->setEnabled(false);
+        ui->comboBox_measureMode->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
         qInfo() << "自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
         return;
     }
@@ -2096,6 +2101,7 @@ void MainWindow::initStateMachine()
     stStep2 = new QState(machine);
     stStep3 = new QState(machine);
     stStep4 = new QState(machine);
+    stStep5 = new QState(machine);
     stFinish = new QState(machine);
     machine->setInitialState(stIdle);
 
@@ -2146,8 +2152,24 @@ void MainWindow::initStateMachine()
         }
     });
 
-    stStep4->addTransition(this, &MainWindow::step4Finished, stFinish);
+    stStep4->addTransition(this, &MainWindow::step4Finished, stStep5);
     connect(stStep4, &QState::entered, this, [this](){
+        if (!m_enableAutoMated)
+            return;
+
+        // 开始测量
+        startMeasureInternal();
+        // if (ui->action_startMeasure->isEnabled()){
+        //     emit ui->action_startMeasure->triggered(true);
+        // }
+        // else{
+        //     emit step4Finished();
+        // }
+        emit step4Finished();
+    });
+
+    stStep5->addTransition(this, &MainWindow::step5Finished, stFinish);
+    connect(stStep5, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
@@ -2156,7 +2178,7 @@ void MainWindow::initStateMachine()
             emit ui->action_connectMonitor->triggered(true);
         }
         else{
-            emit step4Finished();
+            emit step5Finished();
         }
     });
 
@@ -2164,7 +2186,7 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 启动工作定
+        // 启动工作
         ui->action_startMeasure->setEnabled(false);
         commandHelper->startMeasure(mdetPara);
         startMeasureDurationTimer();
@@ -2230,3 +2252,4 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     event->accept();
     qApp->quit();
 }
+
