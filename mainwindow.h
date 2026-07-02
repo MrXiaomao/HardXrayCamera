@@ -34,26 +34,15 @@ public:
 signals:
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
 
+public:
+    virtual void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void slotAppendMsg(const QString &msg, QtMsgType msgType);
-
-    void on_btn_relayNetOpen_clicked();
-
-    void on_btn_relayNetClose_clicked();
-
-    void on_btn_startMeasure_clicked();
-
-    void on_bt_connectDet_clicked();
-
-    void on_bt_disconnectDet_clicked();
-
-    void on_btn_connectMonitor_clicked();
 
     void on_pushButton_clearSysLog_clicked();
 
     void on_pushButton_clearNetLog_clicked();
-
-    void on_btn_stopMeasure_clicked();
 
     // 测量定时器到时自动停止
     void onMeasureTimerTimeout();
@@ -121,6 +110,16 @@ private slots:
     void on_btn_generateProfile_clicked();
 
     void on_comboBox_2_currentIndexChanged(int index);
+
+    void on_action_connectMonitor_triggered();
+
+    void on_action_disconnectMonitor_triggered();
+
+    void on_action_exit_triggered();
+
+    void on_action_about_triggered();
+
+    void on_action_analyze_triggered();
 
 private:
     struct EnergyCalibration {
@@ -235,6 +234,7 @@ private:
 
     // 继电器电源开关状态
     bool replayPowerOn = false;
+    bool replayOnline = false;
     // 探测器在线状态
     bool detectOnline[4] = {false, false, false, false};
 
@@ -260,9 +260,9 @@ public:
 
 Q_SIGNALS:
     // 无人值守共分四步：
-    void step1Finished();// 1、连接实时监测系统
-    void step2Finished();// 2、连接远程控制
-    void step3Finished();// 3、开启电源
-    void step4Finished();// 4、连接采集系统
+    void step1Finished();// 1、连接远程控制
+    void step2Finished();// 2、开启电源
+    void step3Finished();// 3、连接采集系统
+    void step4Finished();// 4、连接实时监测系统
 };
 #endif // MAINWINDOW_H

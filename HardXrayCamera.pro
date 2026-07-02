@@ -66,19 +66,32 @@ contains(QT_ARCH, x86_64) {
 
 
 # 获取QT版本
+#############################################################################################################
 exists (./.git) {
     GIT_BRANCH   = $$system(git rev-parse --abbrev-ref HEAD)
-    GIT_TIME     = $$system(git show --oneline --format=\"%ci%H\" -s HEAD)
-    APP_VERSION = "Git: $${GIT_BRANCH}: $${GIT_TIME}"
+    GIT_DATE = $$system(git show --oneline --format=\"%ci\" -s HEAD)
+    GIT_HASH     = $$system(git show --oneline --format=\"%H\" -s HEAD)
+    GIT_VERSION = "Git: $${GIT_BRANCH}: $${GIT_DATE} $${GIT_HASH}"
 } else {
     GIT_BRANCH      = None
-    GIT_TIME        = None
-    APP_VERSION     = None
+    GIT_DATE        = None
+    GIT_HASH        = None
+    GIT_VERSION     = None
 }
 
+# git 日期含空格时不能直接进 -D，否则 MSVC/clangd 会拆成多个宏（问题项里 Expected ')'）
+GIT_DATE ~= s/ /_/g
+GIT_DATE ~= s/:/-/g
+GIT_DATE ~= s/+//g
+GIT_VERSION ~= s/ /_/g
+GIT_VERSION ~= s/:/-/g
+GIT_VERSION ~= s/+//g
+
 DEFINES += GIT_BRANCH=\"\\\"$$GIT_BRANCH\\\"\"
-DEFINES += GIT_TIME=\"\\\"$$GIT_TIME\\\"\"
-DEFINES += APP_VERSION=\"\\\"$$APP_VERSION\\\"\"
+DEFINES += GIT_DATE=\"\\\"$$GIT_DATE\\\"\"
+DEFINES += GIT_HASH=\"\\\"$$GIT_HASH\\\"\"
+DEFINES += GIT_VERSION=\"\\\"$$GIT_VERSION\\\"\"
+DEFINES += APP_VERSION="\\\"V1.0.0\\\""
 
 message(GIT_BRANCH":  ""$$GIT_BRANCH")
 message(GIT_TIME":  ""$$GIT_TIME")
@@ -95,8 +108,11 @@ DISTFILES +=
 RESOURCES += \
     resource.qrc
 
+RC_ICONS = $$PWD/resource/LOGO.ico
+
 #把所有警告都关掉眼不见为净
 # CONFIG += warn_off
 
 # 第三方库
 include($$PWD/log4qt/Include/log4qt.pri)
+include($$PWD/QGoodWindow/QGoodWindowHelper/QGoodWindowHelper.pri)

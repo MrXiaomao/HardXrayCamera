@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 10:31:29
  * @LastEditors: Maoxiaoqing
@@ -23,6 +23,7 @@
 #include <log4qt/loggerrepository.h>
 #include <log4qt/fileappender.h>
 
+#include "QGoodWindowHelper"
 MainWindow *mw = nullptr;
 QMutex mutexMsg;
 QtMessageHandler system_default_message_handler = NULL;// 用来保存系统默认的输出接口
@@ -68,8 +69,37 @@ void shutdownRootLogger()
     logger->loggerRepository()->shutdown();
 }
 
+static void setLog4QtAppenderUtf8Encoding(Log4Qt::WriterAppender *appender)
+{
+    if (!appender)
+        return;
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    appender->setEncoding(QTextCodec::codecForName("UTF-8"));
+#else
+    appender->setEncoding(QStringConverter::Encoding::Utf8);
+#endif
+}
+
+static void applyUtf8EncodingToAllLog4QtAppenders()
+{
+    const QList<Log4Qt::AppenderSharedPtr> appenders = Log4Qt::Logger::rootLogger()->appenders();
+    for (const Log4Qt::AppenderSharedPtr &appender : appenders) {
+        setLog4QtAppenderUtf8Encoding(qobject_cast<Log4Qt::WriterAppender *>(appender.data()));
+    }
+}
+
+#include <QTranslator>
+#include <QLibraryInfo>
+static QTranslator qtTranslator;
+static QTranslator qtbaseTranslator;
+static QTranslator appTranslator;
 int main(int argc, char *argv[])
 {
+#ifdef QGOODWINDOW
+    QGoodWindow::setup();
+    QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif //QGOODWINDOW
+
     QApplication a(argc, argv);
 
     //全局代码都采用该编码方式。
@@ -115,6 +145,8 @@ int main(int argc, char *argv[])
         }
     }
 
+    applyUtf8EncodingToAllLog4QtAppenders();
+
     // 确保logs目录存在
     QDir dir(QDir::currentPath() + "/logs");
     if (!dir.exists()) {
@@ -126,12 +158,34 @@ int main(int argc, char *argv[])
     //安装日志，主要用户主界面刷新日志信息，日志写文件改为log4qt模块来实现了
     system_default_message_handler = qInstallMessageHandler(AppMessageHandler);
 
+    QString qlibpath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+    if(qtTranslator.load("qt_zh_CN.qm",qlibpath))
+        qApp->installTranslator(&qtTranslator);
+    if(qtbaseTranslator.load("qtbase_zh_CN.qm",qlibpath))
+        qApp->installTranslator(&qtbaseTranslator);
+
+#ifdef QGOODWINDOW
+    QGoodWindowHelper w;
+    MainWindow *mMainWindow = new MainWindow(&w);
+    mw = mMainWindow;
+    w.setupUiHelper(mMainWindow, false);
+#else
     MainWindow w;
     mw = &w;
+#endif
+
     //打印软件版本号
     qInfo().noquote() << QObject::tr("系统启动，软件版本号: %1").arg(APP_VERSION);
     qInfo().noquote() << QObject::tr("软件运行目录: %1").arg(QCoreApplication::applicationDirPath());
 
+    w.show();
+
+    //居中显示
+    QRect screenRect = QGuiApplication::primaryScreen()->availableGeometry();
+    int x = (screenRect.width() - w.width()) / 2;
+    int y = (screenRect.height() - w.height()) / 2;
+    w.move(x, y);
+    w.setWindowState(w.windowState() | Qt::WindowMaximized);
     w.show();
 
     int ret = a.exec();

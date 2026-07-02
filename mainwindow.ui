@@ -13,8 +13,24 @@
   <property name="windowTitle">
    <string>硬X射线相机软件</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="resource.qrc">
+    <normaloff>:/resource/LOGO.ico</normaloff>:/resource/LOGO.ico</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
     <item>
      <widget class="QTabWidget" name="tabWidget_2">
       <property name="minimumSize">
@@ -365,6 +381,10 @@
                   <property name="text">
                    <string>生成剖面分布</string>
                   </property>
+                  <property name="icon">
+                   <iconset resource="resource.qrc">
+                    <normaloff>:/resource/surface.png</normaloff>:/resource/surface.png</iconset>
+                  </property>
                  </widget>
                 </item>
                 <item>
@@ -658,101 +678,18 @@
        </size>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
        <property name="bottomMargin">
         <number>0</number>
        </property>
-       <item>
-        <widget class="QGroupBox" name="groupBox_4">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>118</height>
-          </size>
-         </property>
-         <property name="title">
-          <string>连接控制</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <property name="leftMargin">
-           <number>6</number>
-          </property>
-          <property name="topMargin">
-           <number>6</number>
-          </property>
-          <property name="rightMargin">
-           <number>6</number>
-          </property>
-          <item>
-           <layout class="QGridLayout" name="gridLayout">
-            <item row="3" column="0">
-             <widget class="QPushButton" name="bt_connectDet">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>120</width>
-                <height>0</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>连接采集系统</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QPushButton" name="btn_relayNetOpen">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>连接远程控制</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="0">
-             <widget class="QPushButton" name="btn_connectMonitor">
-              <property name="text">
-               <string>连接实时监测系统</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="SwitchButton" name="switch_power" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>120</width>
-                <height>32</height>
-               </size>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </widget>
-       </item>
        <item>
         <widget class="QGroupBox" name="groupBox_3">
          <property name="sizePolicy">
@@ -760,12 +697,6 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>300</height>
-          </size>
          </property>
          <property name="title">
           <string>测量参数</string>
@@ -1092,12 +1023,20 @@
             <property name="text">
              <string>开始测量</string>
             </property>
+            <property name="icon">
+             <iconset resource="resource.qrc">
+              <normaloff>:/resource/work-on.png</normaloff>:/resource/work-on.png</iconset>
+            </property>
            </widget>
           </item>
           <item>
            <widget class="QPushButton" name="btn_stopMeasure">
             <property name="text">
              <string>停止测量</string>
+            </property>
+            <property name="icon">
+             <iconset resource="resource.qrc">
+              <normaloff>:/resource/work-off.png</normaloff>:/resource/work-off.png</iconset>
             </property>
            </widget>
           </item>
@@ -1114,6 +1053,9 @@
            <string>系统运行日志</string>
           </attribute>
           <layout class="QVBoxLayout" name="verticalLayout">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
            <item>
             <widget class="QPlainTextEdit" name="plainTextEdit_log"/>
            </item>
@@ -1121,6 +1063,10 @@
             <widget class="QPushButton" name="pushButton_clearSysLog">
              <property name="text">
               <string>清空日志</string>
+             </property>
+             <property name="icon">
+              <iconset resource="resource.qrc">
+               <normaloff>:/resource/empty.png</normaloff>:/resource/empty.png</iconset>
              </property>
             </widget>
            </item>
@@ -1131,6 +1077,9 @@
            <string>炮号广播日志</string>
           </attribute>
           <layout class="QVBoxLayout" name="verticalLayout_2">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
            <item>
             <widget class="QTextBrowser" name="tbLog_UDP"/>
            </item>
@@ -1138,6 +1087,10 @@
             <widget class="QPushButton" name="pushButton_clearNetLog">
              <property name="text">
               <string>清空日志</string>
+             </property>
+             <property name="icon">
+              <iconset resource="resource.qrc">
+               <normaloff>:/resource/empty.png</normaloff>:/resource/empty.png</iconset>
              </property>
             </widget>
            </item>
@@ -1163,7 +1116,7 @@
     <property name="title">
      <string>文件</string>
     </property>
-    <addaction name="action_4"/>
+    <addaction name="action_analyze"/>
    </widget>
    <widget class="QMenu" name="menu_2">
     <property name="title">
@@ -1175,7 +1128,7 @@
     <property name="title">
      <string>帮助</string>
     </property>
-    <addaction name="action_3"/>
+    <addaction name="action_about"/>
    </widget>
    <widget class="QMenu" name="menu_4">
     <property name="title">
@@ -1189,32 +1142,78 @@
    <addaction name="menu_3"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonTextUnderIcon</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="action_hardwareSetting"/>
+   <addaction name="separator"/>
+   <addaction name="action_relayNetOpen"/>
+   <addaction name="action_relayNetClose"/>
+   <addaction name="action_powerOn"/>
+   <addaction name="action_powerOff"/>
+   <addaction name="separator"/>
+   <addaction name="action_connectDet"/>
+   <addaction name="action_disconnectDet"/>
+   <addaction name="action_startMeasure"/>
+   <addaction name="action_stopMeasure"/>
+   <addaction name="separator"/>
+   <addaction name="action_connectMonitor"/>
+   <addaction name="action_disconnectMonitor"/>
+   <addaction name="separator"/>
+   <addaction name="action_exit"/>
+  </widget>
   <action name="action_setting">
    <property name="text">
     <string>网络配置</string>
    </property>
   </action>
   <action name="action_hardwareSetting">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/setting.png</normaloff>:/resource/setting.png</iconset>
+   </property>
    <property name="text">
     <string>硬件参数配置</string>
    </property>
   </action>
-  <action name="action_3">
+  <action name="action_about">
    <property name="text">
     <string>关于</string>
    </property>
   </action>
-  <action name="action_4">
+  <action name="action_analyze">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/analyze.png</normaloff>:/resource/analyze.png</iconset>
+   </property>
    <property name="text">
     <string>数据分析</string>
    </property>
   </action>
   <action name="actionFPGA">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/upgrade.png</normaloff>:/resource/upgrade.png</iconset>
+   </property>
    <property name="text">
     <string>远程程序更新（FPGA）</string>
    </property>
   </action>
   <action name="action_relayNetOpen">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/connect.png</normaloff>:/resource/connect.png</iconset>
+   </property>
    <property name="text">
     <string>连接远程控制</string>
    </property>
@@ -1223,6 +1222,10 @@
    </property>
   </action>
   <action name="action_relayNetClose">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/disconnect.png</normaloff>:/resource/disconnect.png</iconset>
+   </property>
    <property name="text">
     <string>断开远程控制</string>
    </property>
@@ -1231,6 +1234,10 @@
    </property>
   </action>
   <action name="action_powerOn">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/power-on.png</normaloff>:/resource/power-on.png</iconset>
+   </property>
    <property name="text">
     <string>远程上电</string>
    </property>
@@ -1239,6 +1246,10 @@
    </property>
   </action>
   <action name="action_powerOff">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/power-off.png</normaloff>:/resource/power-off.png</iconset>
+   </property>
    <property name="text">
     <string>远程断电</string>
    </property>
@@ -1247,6 +1258,10 @@
    </property>
   </action>
   <action name="action_connectDet">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/connect.png</normaloff>:/resource/connect.png</iconset>
+   </property>
    <property name="text">
     <string>连接采集系统</string>
    </property>
@@ -1255,6 +1270,10 @@
    </property>
   </action>
   <action name="action_disconnectDet">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/disconnect.png</normaloff>:/resource/disconnect.png</iconset>
+   </property>
    <property name="text">
     <string>断开采集系统</string>
    </property>
@@ -1263,6 +1282,10 @@
    </property>
   </action>
   <action name="action_startMeasure">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/work-on.png</normaloff>:/resource/work-on.png</iconset>
+   </property>
    <property name="text">
     <string>开始测量</string>
    </property>
@@ -1271,8 +1294,48 @@
    </property>
   </action>
   <action name="action_stopMeasure">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/work-off.png</normaloff>:/resource/work-off.png</iconset>
+   </property>
    <property name="text">
     <string>停止测量</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_connectMonitor">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/connect.png</normaloff>:/resource/connect.png</iconset>
+   </property>
+   <property name="text">
+    <string>连接监测系统</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_exit">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/exit.png</normaloff>:/resource/exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>退出软件</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_disconnectMonitor">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/disconnect.png</normaloff>:/resource/disconnect.png</iconset>
+   </property>
+   <property name="text">
+    <string>断开监控系统</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
@@ -1292,20 +1355,9 @@
    <header>trendplotwidget.h</header>
    <container>1</container>
   </customwidget>
-  <customwidget>
-   <class>SwitchButton</class>
-   <extends>QWidget</extends>
-   <header>switchbutton.h</header>
-   <container>1</container>
-  </customwidget>
  </customwidgets>
  <tabstops>
   <tabstop>tabWidget_2</tabstop>
-  <tabstop>btn_connectMonitor</tabstop>
-  <tabstop>btn_relayNetOpen</tabstop>
-  <tabstop>btn_relayNetClose</tabstop>
-  <tabstop>bt_connectDet</tabstop>
-  <tabstop>bt_disconnectDet</tabstop>
   <tabstop>lineEdit_shotID</tabstop>
   <tabstop>cmb_transferMode</tabstop>
   <tabstop>spb_measureTime</tabstop>
@@ -1337,6 +1389,8 @@
   <tabstop>doubleSpinBox_voltage</tabstop>
   <tabstop>doubleSpinBox_current</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="resource.qrc"/>
+ </resources>
  <connections/>
 </ui>

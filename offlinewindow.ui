@@ -191,7 +191,7 @@
      <x>0</x>
      <y>0</y>
      <width>1364</width>
-     <height>21</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menus">
@@ -204,6 +204,10 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="action_chooseFile">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/open.png</normaloff>:/resource/open.png</iconset>
+   </property>
    <property name="text">
     <string>选择文件</string>
    </property>
@@ -215,6 +219,8 @@
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="resource.qrc"/>
+ </resources>
  <connections/>
 </ui>

@@ -133,10 +133,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
-        ui->btn_relayNetOpen->blockSignals(true);
-        ui->btn_relayNetOpen->setChecked(false);
-        ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
-        ui->btn_relayNetOpen->blockSignals(false);
+        // ui->action_relayNetOpen->blockSignals(true);
+        // ui->action_relayNetOpen->setEnabled(false);
+        // ui->action_relayNetOpen->setText(QStringLiteral("连接远程控制"));
+        // ui->action_relayNetOpen->blockSignals(false);
+
+        ui->action_relayNetOpen->setEnabled(true);
+        ui->action_relayNetClose->setEnabled(false);
     });
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
@@ -214,34 +217,39 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_udpShotReceiver, &UdpShotReceiver::bindStateChanged,
             this, &MainWindow::onUdpBindStateChanged);
 
-    ui->btn_relayNetOpen->setCheckable(true);
-    ui->btn_relayNetOpen->setChecked(false);
-    ui->btn_relayNetOpen->setText(QStringLiteral("连接远程控制"));
+    // ui->action_relayNetOpen->setCheckable(true);
+    // ui->action_relayNetOpen->setChecked(false);
+    // ui->action_relayNetOpen->setText(QStringLiteral("连接远程控制"));
+    ui->action_relayNetOpen->setEnabled(true);
+    ui->action_relayNetClose->setEnabled(false);
 
-    ui->bt_connectDet->setCheckable(true);
-    ui->bt_connectDet->setChecked(false);
-    ui->bt_connectDet->setText(QStringLiteral("连接采集系统"));
+    // ui->action_connectDet->setCheckable(true);
+    // ui->action_connectDet->setChecked(false);
+    // ui->action_connectDet->setText(QStringLiteral("连接采集系统"));
+    ui->action_connectDet->setEnabled(false);
+    ui->action_disconnectDet->setEnabled(false);
 
-    ui->btn_connectMonitor->setCheckable(true);
-    ui->btn_connectMonitor->setChecked(false);
-    ui->btn_connectMonitor->setText(QStringLiteral("连接实时监测系统"));
-
-    ui->switch_power->setAutoChecked(false);
-    ui->switch_power->setText(QStringLiteral("远程上电"), QStringLiteral("远程断电"));
-    ui->switch_power->setChecked(false);
-    setPowerSwitchEnabled(false);
-    connect(ui->switch_power, &SwitchButton::clicked, this, [this]() {
-        if (!ui->switch_power->getChecked()) {
-            commandHelper->PowerOnRelay();
-            showHardwareStartupWaitDialog();
-        } else {
-            commandHelper->PowerOffRelay();
-        }
+    ui->btn_startMeasure->addAction(ui->action_startMeasure);
+    ui->btn_stopMeasure->addAction(ui->action_stopMeasure);
+    connect(ui->action_startMeasure, &QAction::changed, this, [=](){
+        ui->btn_startMeasure->setEnabled(ui->action_startMeasure->isEnabled());
     });
+    connect(ui->action_stopMeasure, &QAction::changed, this, [=](){
+        ui->btn_stopMeasure->setEnabled(ui->action_stopMeasure->isEnabled());
+    });
+    ui->action_startMeasure->setEnabled(false);
+    ui->action_stopMeasure->setEnabled(false);
 
-    ui->bt_connectDet->setEnabled(false);
-    ui->btn_startMeasure->setEnabled(false);
-    ui->btn_stopMeasure->setEnabled(false);
+    // ui->action_connectMonitor->setCheckable(true);
+    // ui->action_connectMonitor->setChecked(false);
+    // ui->action_connectMonitor->setText(QStringLiteral("连接实时监测系统"));
+    ui->action_connectMonitor->setEnabled(false);
+    ui->action_disconnectMonitor->setEnabled(false);
+
+    ui->action_powerOn->setText(QStringLiteral("远程上电"));
+    ui->action_powerOff->setText(QStringLiteral("远程断电"));
+    setPowerSwitchEnabled(false);
+
     emit ui->comboBox_2->currentIndexChanged(ui->comboBox_2->currentIndex());
 
     // 初始化状态机
@@ -289,8 +297,8 @@ void MainWindow::onMeasureTimerTimeout()
     printSpectrumSequenceSummary();
     measureTimer->stop();
 
-    ui->btn_startMeasure->setEnabled(true);
-    ui->btn_stopMeasure->setEnabled(false);
+    ui->action_startMeasure->setEnabled(true);
+    ui->action_stopMeasure->setEnabled(false);
     ui->comboBox_2->setEnabled(true);
     ui->dateTimeEdit->setEnabled(true);
     ui->dateTimeEdit_2->setEnabled(true);
@@ -303,11 +311,13 @@ void MainWindow::onMeasureTimerTimeout()
 
 void MainWindow::onRelayStatusChanged(bool on)
 {
-    ui->btn_relayNetOpen->blockSignals(true);
-    ui->btn_relayNetOpen->setChecked(on);
-    ui->btn_relayNetOpen->setText(on ? QStringLiteral("断开远程控制") : QStringLiteral("连接远程控制"));
-    ui->btn_relayNetOpen->blockSignals(false);
+    // ui->action_relayNetOpen->blockSignals(true);
+    // ui->action_relayNetOpen->setChecked(on);
+    // ui->action_relayNetOpen->setEnabled(on);
+    // ui->action_relayNetOpen->setText(on ? QStringLiteral("断开远程控制") : QStringLiteral("连接远程控制"));
+    // ui->action_relayNetOpen->blockSignals(false);
 
+    replayOnline = on;
     if (on){
         setPowerSwitchEnabled(true);
 
@@ -321,9 +331,11 @@ void MainWindow::onRelayStatusChanged(bool on)
     else{
         setPowerSwitchEnabled(false);
         syncPowerSwitchFromRelay(false);
-        ui->bt_connectDet->setEnabled(false);
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        ui->action_connectDet->setEnabled(false);
+        ui->action_connectMonitor->setEnabled(false);
+        ui->action_disconnectMonitor->setEnabled(false);
+        ui->action_startMeasure->setEnabled(false);
+        ui->action_stopMeasure->setEnabled(false);
         qInfo() << "继电器网络状态: 已断开";
     }
 }
@@ -331,17 +343,28 @@ void MainWindow::onRelayStatusChanged(bool on)
 void MainWindow::onRelayPowerStatusChanged(bool on)
 {
     syncPowerSwitchFromRelay(on);
+    // ui->action_relayNetOpen->setEnabled(!on);
+    // ui->action_relayNetClose->setEnabled(on);
+    ui->action_powerOn->setEnabled(!on);
+    ui->action_powerOff->setEnabled(on);
 
     if (on) {
-        ui->bt_connectDet->setEnabled(true);
+        ui->action_connectDet->setEnabled(true);
+        ui->action_disconnectDet->setEnabled(true);
+        ui->action_connectMonitor->setEnabled(true);
+        ui->action_disconnectMonitor->setEnabled(false);
+
+        replayPowerOn = true;
         syncDetectorConnectButton();
 
         qInfo() << "继电器控制的电源状态: 已开启";
-        replayPowerOn = true;
     } else {
-        ui->bt_connectDet->setEnabled(false);
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(false);
+        ui->action_connectDet->setEnabled(false);
+        ui->action_disconnectDet->setEnabled(false);
+        ui->action_connectMonitor->setEnabled(false);
+        ui->action_disconnectMonitor->setEnabled(false);
+        ui->action_startMeasure->setEnabled(false);
+        ui->action_stopMeasure->setEnabled(false);
 
         qInfo() << "继电器控制的电源状态: 已关闭";
         replayPowerOn = false;
@@ -373,16 +396,16 @@ void MainWindow::onDetector1StatusChanged(bool on)
     if (on) {
         if (!isMeasureSessionActive())
         {
-            ui->btn_startMeasure->setEnabled(true);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(true);
+            ui->action_stopMeasure->setEnabled(false);
         }
 
         qInfo() << "水平相机主网口(控制/能谱)状态: 已连接";
         detectOnline[0] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->btn_startMeasure->setEnabled(false);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(false);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机主网口(控制/能谱)状态: 已断开";
         detectOnline[0] = false;
@@ -395,15 +418,15 @@ void MainWindow::onDetector2StatusChanged(bool on)
     if (on) {
         if (!isMeasureSessionActive())
         {
-            ui->btn_startMeasure->setEnabled(true);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(true);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已连接";
         detectOnline[1] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->btn_startMeasure->setEnabled(false);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(false);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已断开";
         detectOnline[1] = false;
@@ -416,15 +439,15 @@ void MainWindow::onDetector3StatusChanged(bool on)
     if (on) {
         if (!isMeasureSessionActive())
         {
-            ui->btn_startMeasure->setEnabled(true);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(true);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机副网口(波形接收)状态: 已连接";
         detectOnline[2] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->btn_startMeasure->setEnabled(false);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(false);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机副网口(波形接收)状态: 已断开";
         detectOnline[2] = false;
@@ -437,15 +460,15 @@ void MainWindow::onDetector4StatusChanged(bool on)
     if (on) {
         if (!isMeasureSessionActive())
         {
-            ui->btn_startMeasure->setEnabled(true);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(true);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机副网口(波形接收)状态: 已连接";
         detectOnline[3] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->btn_startMeasure->setEnabled(false);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(false);
+            ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机副网口(波形接收)状态: 已断开";
         detectOnline[3] = false;
@@ -764,20 +787,6 @@ void MainWindow::slotAppendMsg(const QString &msg, QtMsgType msgType)
     ui->plainTextEdit_log->setTextCursor(cursor);
 }
 
-
-void MainWindow::on_btn_relayNetOpen_clicked()
-{
-    if (ui->btn_relayNetOpen->isChecked())
-        commandHelper->connectRelay();
-    else
-        commandHelper->disconnectRelay();
-}
-
-
-void MainWindow::on_btn_relayNetClose_clicked()
-{
-    // 功能已合并至 btn_relayNetOpen 切换按钮，保留此槽避免 UI 变更时链接报错
-}
 
 int MainWindow::logicalChannelNumber(int detectorIndex, int channelNumber) const
 {
@@ -1499,7 +1508,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     waveformPlotTimer->start();
 
     m_autoMeasureState = AutoMeasureState::Measuring;
-    ui->btn_stopMeasure->setEnabled(true);
+    ui->action_stopMeasure->setEnabled(true);
     qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
             << measureDurationMs() << "ms";
 }
@@ -1544,8 +1553,8 @@ void MainWindow::stopAutoMeasureSession()
     if (m_autoMeasureState != AutoMeasureState::Idle) {
         m_autoMeasureState = AutoMeasureState::Idle;
         m_autoMeasureDurationTimerStarted = false;
-        ui->btn_startMeasure->setEnabled(true);
-        ui->btn_stopMeasure->setEnabled(false);
+        ui->action_startMeasure->setEnabled(true);
+        ui->action_stopMeasure->setEnabled(false);
         ui->comboBox_2->setEnabled(true);
         ui->dateTimeEdit->setEnabled(true);
         ui->dateTimeEdit_2->setEnabled(true);
@@ -1605,8 +1614,8 @@ bool MainWindow::startMeasureInternal()
         }
 
         m_autoMeasureState = AutoMeasureState::WaitingShot;
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(true);
+        ui->action_startMeasure->setEnabled(false);
+        ui->action_stopMeasure->setEnabled(true);
         ui->comboBox_2->setEnabled(false);
         ui->dateTimeEdit->setEnabled(false);
         ui->dateTimeEdit_2->setEnabled(false);
@@ -1642,8 +1651,8 @@ bool MainWindow::startMeasureInternal()
         }
 
         ui->spb_measureTime->setValue(detPara.measureTime);
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(true);
+        ui->action_startMeasure->setEnabled(false);
+        ui->action_stopMeasure->setEnabled(true);
         ui->comboBox_2->setEnabled(false);
         ui->dateTimeEdit->setEnabled(false);
         ui->dateTimeEdit_2->setEnabled(false);
@@ -1651,8 +1660,8 @@ bool MainWindow::startMeasureInternal()
         // 4. 绑定信号槽：时间A到了启动任务
         connect(startTimer, &QTimer::timeout, this, [=]() {
             //qDebug() << "1111111111";
-            ui->btn_startMeasure->setEnabled(false);
-            ui->btn_stopMeasure->setEnabled(true);
+            ui->action_startMeasure->setEnabled(false);
+            ui->action_stopMeasure->setEnabled(true);
             startTimer->stop();
             //qDebug() << "22222";
             machine->start();
@@ -1681,8 +1690,8 @@ bool MainWindow::startMeasureInternal()
             printSpectrumSequenceSummary();            
 
             m_autoMeasureState = AutoMeasureState::Idle;
-            ui->btn_startMeasure->setEnabled(true);
-            ui->btn_stopMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(true);
+            ui->action_stopMeasure->setEnabled(false);
             ui->comboBox_2->setEnabled(true);
             ui->dateTimeEdit->setEnabled(true);
             ui->dateTimeEdit_2->setEnabled(true);
@@ -1710,8 +1719,8 @@ bool MainWindow::startMeasureInternal()
 
         commandHelper->startMeasure(detPara);
         startMeasureDurationTimer();
-        ui->btn_startMeasure->setEnabled(false);
-        ui->btn_stopMeasure->setEnabled(true);
+        ui->action_startMeasure->setEnabled(false);
+        ui->action_stopMeasure->setEnabled(true);
         ui->comboBox_2->setEnabled(false);
         ui->dateTimeEdit->setEnabled(false);
         ui->dateTimeEdit_2->setEnabled(false);
@@ -1719,37 +1728,6 @@ bool MainWindow::startMeasureInternal()
     }
 
     return true;
-}
-
-// 开始测量
-void MainWindow::on_btn_startMeasure_clicked()
-{
-    startMeasureInternal();
-}
-
-//连接采集系统（FPGA1/FPGA2）
-void MainWindow::on_bt_connectDet_clicked()
-{
-    if (ui->bt_connectDet->isChecked()) {
-        startUdpListening();
-        commandHelper->connectDetector();
-    } else {
-        stopUdpListening();
-        commandHelper->disconnectDetector();
-    }
-}
-
-//断开采集系统功能已合并至 bt_connectDet 切换按钮
-void MainWindow::on_bt_disconnectDet_clicked()
-{
-}
-
-void MainWindow::on_btn_connectMonitor_clicked()
-{
-    if (ui->btn_connectMonitor->isChecked())
-        commandHelper->connectARM();
-    else
-        commandHelper->disconnectARM();
 }
 
 
@@ -1788,47 +1766,6 @@ double generateValue(double base, double maxDelta, double& lastValue) {
 }
 
 
-void MainWindow::on_btn_stopMeasure_clicked()
-{
-    if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
-        stopAutoMeasureSession();
-        qInfo() << "自动测量已取消，未收到炮号";
-        return;
-    }
-
-    if (m_autoMeasureState == AutoMeasureState::Measuring) {
-        stopAutoMeasureSession();
-        qInfo() << "自动测量已手动停止，已发送硬件停止指令";
-        return;
-    }
-
-    if (isTaskRunning){
-        if (startTimer->isActive())
-            startTimer->stop();
-
-        if (stopTimer->isActive())
-            stopTimer->stop();
-
-        isTaskRunning = false;
-    }
-
-    m_enableAutoMated = false;
-    machine->stop();
-    ui->btn_startMeasure->setEnabled(true);
-    ui->btn_stopMeasure->setEnabled(false);
-    ui->comboBox_2->setEnabled(true);
-    ui->dateTimeEdit->setEnabled(true);
-    ui->dateTimeEdit_2->setEnabled(true);
-
-    waveformPlotTimer->stop();
-    commandHelper->stopMeasure();
-    printWaveformCollectionSummary();
-    printSpectrumSequenceSummary();
-    measureTimer->stop();
-    qInfo() << "手动停止测量";
-}
-
-
 void MainWindow::on_action_hardwareSetting_triggered()
 {
     // 硬件参数设置
@@ -1858,6 +1795,8 @@ void MainWindow::on_action_relayNetOpen_triggered()
 
 void MainWindow::on_action_relayNetClose_triggered()
 {
+    if (replayPowerOn)
+        emit ui->action_powerOff->triggered();
     commandHelper->disconnectRelay();
 }
 
@@ -1866,19 +1805,26 @@ void MainWindow::on_action_powerOn_triggered()
 {
     commandHelper->PowerOnRelay();
     showHardwareStartupWaitDialog();
+    ui->action_powerOn->setEnabled(false);
+    ui->action_powerOff->setEnabled(true);
 }
 
 
 void MainWindow::on_action_powerOff_triggered()
 {
     commandHelper->PowerOffRelay();
+    ui->action_powerOn->setEnabled(true);
+    ui->action_powerOff->setEnabled(false);
 }
 
 void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
 {
-    ui->switch_power->blockSignals(true);
-    ui->switch_power->setChecked(powerOn);
-    ui->switch_power->blockSignals(false);
+    // ui->action_powerOn->blockSignals(true);
+    // ui->action_powerOn->setEnabled(powerOn);
+    // ui->action_powerOff->setEnabled(powerOn);
+    // ui->action_powerOn->blockSignals(false);
+    // ui->action_powerOn->setEnabled(!powerOn);
+    // ui->action_powerOff->setEnabled(powerOn);
 
     if (powerOn){
         QTimer::singleShot(500, this, [=]{
@@ -1890,17 +1836,27 @@ void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
 
 void MainWindow::setPowerSwitchEnabled(bool enabled)
 {
-    ui->switch_power->setEnabled(enabled);
+    ui->action_powerOn->setEnabled(replayOnline ? !enabled : false);
+    ui->action_powerOff->setEnabled(enabled);
+
+    ui->action_relayNetOpen->setEnabled(!enabled);
+    ui->action_relayNetClose->setEnabled(enabled);
 }
 
 void MainWindow::syncDetectorConnectButton()
 {
     const bool anyConnected = detectOnline[0] || detectOnline[1] || detectOnline[2] || detectOnline[3];
-    ui->bt_connectDet->blockSignals(true);
-    ui->bt_connectDet->setChecked(anyConnected);
-    ui->bt_connectDet->setText(anyConnected ? QStringLiteral("断开采集系统")
-                                            : QStringLiteral("连接采集系统"));
-    ui->bt_connectDet->blockSignals(false);
+    const bool allConnected = detectOnline[0] && detectOnline[1] && detectOnline[2] && detectOnline[3];
+    // ui->action_connectDet->blockSignals(true);
+    // ui->action_connectDet->setChecked(anyConnected);
+    // ui->action_connectDet->setText(anyConnected ? QStringLiteral("断开采集系统")
+    //                                         : QStringLiteral("连接采集系统"));
+    // ui->action_connectDet->blockSignals(false);
+    ui->action_connectDet->setEnabled(!allConnected && replayPowerOn);
+    ui->action_disconnectDet->setEnabled(anyConnected);
+
+    ui->action_startMeasure->setEnabled(anyConnected);
+    ui->action_stopMeasure->setEnabled(anyConnected);
 
     if (anyConnected){
         QTimer::singleShot(500, this, [=]{
@@ -1913,11 +1869,14 @@ void MainWindow::syncDetectorConnectButton()
 void MainWindow::syncArmMonitorButton()
 {
     const bool anyConnected = armSensorOnline[0] || armSensorOnline[1];
-    ui->btn_connectMonitor->blockSignals(true);
-    ui->btn_connectMonitor->setChecked(anyConnected);
-    ui->btn_connectMonitor->setText(anyConnected ? QStringLiteral("断开实时监测系统")
-                                                 : QStringLiteral("连接实时监测系统"));
-    ui->btn_connectMonitor->blockSignals(false);
+    const bool allConnected = armSensorOnline[0] && armSensorOnline[1];
+    // ui->action_connectMonitor->blockSignals(true);
+    // ui->action_connectMonitor->setChecked(anyConnected);
+    // ui->action_connectMonitor->setText(anyConnected ? QStringLiteral("断开实时监测系统")
+    //                                              : QStringLiteral("连接实时监测系统"));
+    // ui->action_connectMonitor->blockSignals(false);
+    ui->action_connectMonitor->setEnabled(!allConnected);
+    ui->action_disconnectMonitor->setEnabled(anyConnected);
 
     if (anyConnected)
         emit step1Finished();
@@ -2060,7 +2019,42 @@ void MainWindow::on_action_startMeasure_triggered()
 
 void MainWindow::on_action_stopMeasure_triggered()
 {
-    on_btn_stopMeasure_clicked();
+    if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
+        stopAutoMeasureSession();
+        qInfo() << "自动测量已取消，未收到炮号";
+        return;
+    }
+
+    if (m_autoMeasureState == AutoMeasureState::Measuring) {
+        stopAutoMeasureSession();
+        qInfo() << "自动测量已手动停止，已发送硬件停止指令";
+        return;
+    }
+
+    if (isTaskRunning){
+        if (startTimer->isActive())
+            startTimer->stop();
+
+        if (stopTimer->isActive())
+            stopTimer->stop();
+
+        isTaskRunning = false;
+    }
+
+    m_enableAutoMated = false;
+    machine->stop();
+    ui->action_startMeasure->setEnabled(true);
+    ui->action_stopMeasure->setEnabled(false);
+    ui->comboBox_2->setEnabled(true);
+    ui->dateTimeEdit->setEnabled(true);
+    ui->dateTimeEdit_2->setEnabled(true);
+
+    waveformPlotTimer->stop();
+    commandHelper->stopMeasure();
+    printWaveformCollectionSummary();
+    printSpectrumSequenceSummary();
+    measureTimer->stop();
+    qInfo() << "手动停止测量";
 }
 
 
@@ -2068,14 +2062,14 @@ void MainWindow::on_comboBox_2_currentIndexChanged(int index)
 {
     if (index == 2){
         // 无人值守
-        ui->btn_startMeasure->setEnabled(true);
+        ui->action_startMeasure->setEnabled(true);
         ui->checkBox_alarm->setEnabled(false);
         ui->checkBox_alarm->setChecked(true);
         ui->dateTimeEdit->setEnabled(true);
         ui->dateTimeEdit_2->setEnabled(true);
     }
     else{
-        ui->btn_startMeasure->setEnabled(ui->bt_connectDet->isChecked());
+        ui->action_startMeasure->setEnabled(replayPowerOn ? !ui->action_connectDet->isEnabled() : false);
         ui->checkBox_alarm->setEnabled(true);
         ui->checkBox_alarm->setChecked(false);
         ui->dateTimeEdit->setEnabled(false);
@@ -2105,10 +2099,9 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 开启电源
-        if (!ui->btn_connectMonitor->isChecked()){
-            ui->btn_connectMonitor->setChecked(true);
-            emit ui->btn_connectMonitor->clicked(true);
+        // 连接远程控制
+        if (ui->action_relayNetOpen->isEnabled()){
+            emit ui->action_relayNetOpen->triggered(true);
         }
         else{
             emit step1Finished();
@@ -2121,14 +2114,14 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 连接远程控制
-        if (!ui->btn_relayNetOpen->isChecked()){
-            ui->btn_relayNetOpen->setChecked(true);
-            emit ui->btn_relayNetOpen->clicked(true);
+        // 开启电源
+        if (ui->action_powerOn->isEnabled()){
+            emit ui->action_powerOn->triggered(true);
         }
         else{
             emit step2Finished();
         }
+
     });
 
     stStep3->addTransition(this, &MainWindow::step3Finished, stStep4);
@@ -2136,9 +2129,9 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 开启电源
-        if (!ui->switch_power->getChecked()){
-            emit ui->switch_power->clicked(true);
+        // 连接采集系统
+        if (ui->action_connectDet->isEnabled()){
+            emit ui->action_connectDet->triggered(true);
         }
         else{
             emit step3Finished();
@@ -2150,10 +2143,9 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 连接采集系统
-        if (!ui->bt_connectDet->isChecked()){
-            ui->bt_connectDet->setChecked(true);
-            emit ui->bt_connectDet->clicked(true);
+        // 连接实时监测系统
+        if (ui->action_connectMonitor->isEnabled()){
+            emit ui->action_connectMonitor->triggered(true);
         }
         else{
             emit step4Finished();
@@ -2165,10 +2157,65 @@ void MainWindow::initStateMachine()
             return;
 
         // 启动工作定
-        ui->btn_startMeasure->setEnabled(false);
+        ui->action_startMeasure->setEnabled(false);
         commandHelper->startMeasure(mdetPara);
         startMeasureDurationTimer();
         waveformPlotTimer->start();
         qInfo() << "系统开机，测量已开始，炮号:" << m_currentShotNumber << "时长:" << measureDurationMs() << "ms";
     });
+}
+
+void MainWindow::on_action_connectMonitor_triggered()
+{
+    commandHelper->connectARM();
+}
+
+
+void MainWindow::on_action_disconnectMonitor_triggered()
+{
+    commandHelper->disconnectARM();
+}
+
+
+void MainWindow::on_action_exit_triggered()
+{
+    this->close();
+}
+
+
+void MainWindow::on_action_about_triggered()
+{
+    QString filename = QFileInfo(QCoreApplication::applicationFilePath()).baseName();
+    QMessageBox::about(this, tr("关于"),
+                       QString("<p>") +
+                           tr("版本") +
+                           QString("</p><span style='color:blue;'>%1</span><p>").arg(filename, APP_VERSION) +
+                           tr("提交") +
+                           QString("</p><span style='color:blue;'>%1: %2</span><p>").arg(GIT_BRANCH, GIT_HASH) +
+                           tr("日期") +
+                           QString("</p><span style='color:blue;'>%1</span><p>").arg(GIT_DATE) +
+                           tr("开发者") +
+                           QString("</p><span style='color:blue;'>MaoXiaoqing</span><p>") +
+                           "</p><p>版权所有 (C) 2026</p>"
+                       );
+}
+
+
+void MainWindow::on_action_analyze_triggered()
+{
+
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+
+    //确认是否退出
+    int ret = QMessageBox::question(this, tr("系统退出提示"), tr("确定要退出软件系统吗？"),
+                                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (ret == QMessageBox::No) {
+        event->ignore();
+        return;
+    }
+
+    event->accept();
+    qApp->quit();
 }
