@@ -780,7 +780,7 @@
              </widget>
             </item>
             <item row="8" column="1">
-             <widget class="QComboBox" name="comboBox_2">
+             <widget class="QComboBox" name="comboBox_measureMode">
               <item>
                <property name="text">
                 <string>手动测量</string>
@@ -928,7 +928,7 @@
              </widget>
             </item>
             <item row="9" column="1">
-             <widget class="QDateTimeEdit" name="dateTimeEdit">
+             <widget class="QDateTimeEdit" name="dateTimeEdit_startup">
               <property name="date">
                <date>
                 <year>2026</year>
@@ -965,7 +965,7 @@
              </widget>
             </item>
             <item row="10" column="1">
-             <widget class="QDateTimeEdit" name="dateTimeEdit_2">
+             <widget class="QDateTimeEdit" name="dateTimeEdit_shutdown">
               <property name="date">
                <date>
                 <year>2026</year>
@@ -1388,9 +1388,9 @@
   <tabstop>spb_specRefashTime</tabstop>
   <tabstop>le_savePath</tabstop>
   <tabstop>cmb_saveFormat</tabstop>
-  <tabstop>comboBox_2</tabstop>
-  <tabstop>dateTimeEdit</tabstop>
-  <tabstop>dateTimeEdit_2</tabstop>
+  <tabstop>comboBox_measureMode</tabstop>
+  <tabstop>dateTimeEdit_startup</tabstop>
+  <tabstop>dateTimeEdit_shutdown</tabstop>
   <tabstop>btn_startMeasure</tabstop>
   <tabstop>btn_stopMeasure</tabstop>
   <tabstop>spb_channel</tabstop>

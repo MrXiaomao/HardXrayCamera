@@ -199,7 +199,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateHxrDisplayBinControls);
     connect(ui->cmb_transferMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::updateProfileControls);
-    connect(ui->comboBox_2, QOverload<int>::of(&QComboBox::currentIndexChanged),
+    connect(ui->comboBox_measureMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::updateUnattendedControls);
     connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
@@ -237,6 +237,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->action_stopMeasure, &QAction::changed, this, [=](){
         ui->btn_stopMeasure->setEnabled(ui->action_stopMeasure->isEnabled());
     });
+    connect(ui->btn_startMeasure, &QPushButton::clicked, ui->action_startMeasure, &QAction::trigger);
+    connect(ui->btn_stopMeasure, &QPushButton::clicked, ui->action_stopMeasure, &QAction::trigger);
     ui->action_startMeasure->setEnabled(false);
     ui->action_stopMeasure->setEnabled(false);
 
@@ -250,7 +252,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_powerOff->setText(QStringLiteral("远程断电"));
     setPowerSwitchEnabled(false);
 
-    emit ui->comboBox_2->currentIndexChanged(ui->comboBox_2->currentIndex());
+    emit ui->comboBox_measureMode->currentIndexChanged(ui->comboBox_measureMode->currentIndex());
 
     // 初始化状态机
     initStateMachine();
@@ -283,7 +285,7 @@ void MainWindow::onMeasureTimerTimeout()
     if (!commandHelper)
         return;
 
-    const int measureMode = ui->comboBox_2->currentIndex();
+    const int measureMode = ui->comboBox_measureMode->currentIndex();
 
     if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
@@ -299,9 +301,9 @@ void MainWindow::onMeasureTimerTimeout()
 
     ui->action_startMeasure->setEnabled(true);
     ui->action_stopMeasure->setEnabled(false);
-    ui->comboBox_2->setEnabled(true);
-    ui->dateTimeEdit->setEnabled(true);
-    ui->dateTimeEdit_2->setEnabled(true);
+    ui->comboBox_measureMode->setEnabled(true);
+    ui->dateTimeEdit_startup->setEnabled(true);
+    ui->dateTimeEdit_shutdown->setEnabled(true);
 
     if (measureMode == 0)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
@@ -674,7 +676,7 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
                                         const QVector<quint32> &counts)
 {
     if (m_autoMeasureState == AutoMeasureState::Measuring
-        && ui->comboBox_2->currentIndex() == 1
+        && ui->comboBox_measureMode->currentIndex() == 1
         && !m_autoMeasureDurationTimerStarted) {
         m_autoMeasureDurationTimerStarted = true;
         startMeasureDurationTimer();
@@ -997,11 +999,11 @@ void MainWindow::updateProfileControls()
 
 void MainWindow::updateUnattendedControls()
 {
-    const bool unattendedMode = ui->comboBox_2->currentIndex() == 2;
+    const bool unattendedMode = ui->comboBox_measureMode->currentIndex() == 2;
     ui->label_9->setVisible(unattendedMode);
-    ui->dateTimeEdit->setVisible(unattendedMode);
+    ui->dateTimeEdit_startup->setVisible(unattendedMode);
     ui->label_10->setVisible(unattendedMode);
-    ui->dateTimeEdit_2->setVisible(unattendedMode);
+    ui->dateTimeEdit_shutdown->setVisible(unattendedMode);
 }
 
 QString MainWindow::energyCalibrationFilePath() const
@@ -1304,8 +1306,8 @@ void MainWindow::refreshSpectrumPlot()
     }
 
     const SpectrumEntry &entry = spectra.at(specId);
-    ui->plotSpec->setTitle(QString("能谱 Det%1 CH%2 #%3 t=%4ms")
-                               .arg(entry.detectorIndex)
+    ui->plotSpec->setTitle(QString("能谱 %1 CH%2 #%3 t=%4ms")
+                               .arg(entry.detectorIndex==1  ? QStringLiteral("水平") : QStringLiteral("垂直"))
                                .arg(channel)
                                .arg(specId)
                                .arg(entry.timeMs)
@@ -1364,8 +1366,8 @@ void MainWindow::refreshWaveformPlot()
 
     ui->plotWave->setData(xs, ys);
     ui->plotWave->setXRange(0, waveLenNs);
-    ui->plotWave->setTitle(QString("波形 Det%1 CH%2 #%3 t=%4ms")
-                               .arg(entry.detectorIndex)
+    ui->plotWave->setTitle(QString("波形 %1 CH%2 #%3 t=%4ms")
+                               .arg(entry.detectorIndex==1 ? QStringLiteral("水平") : QStringLiteral("垂直"))
                                .arg(channel)
                                .arg(waveId)
                                .arg(entry.timeUnits));
@@ -1452,7 +1454,7 @@ void MainWindow::onUdpShotNumberChanged(const QString &shotNumber)
     qInfo() << info;
     appendUdpLog(info);
 
-    if (ui->comboBox_2->currentIndex() == 1
+    if (ui->comboBox_measureMode->currentIndex() == 1
         && m_autoMeasureState == AutoMeasureState::WaitingShot) {
         triggerAutoMeasureFromShot(shotNumber);
     }
@@ -1556,16 +1558,16 @@ void MainWindow::stopAutoMeasureSession()
         m_autoMeasureDurationTimerStarted = false;
         ui->action_startMeasure->setEnabled(true);
         ui->action_stopMeasure->setEnabled(false);
-        ui->comboBox_2->setEnabled(true);
-        ui->dateTimeEdit->setEnabled(true);
-        ui->dateTimeEdit_2->setEnabled(true);
+        ui->comboBox_measureMode->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
     }
 }
 
 #include <QtConcurrent>
 bool MainWindow::startMeasureInternal()
 {
-    const int measureMode = ui->comboBox_2->currentIndex();
+    const int measureMode = ui->comboBox_measureMode->currentIndex();
     if (measureMode == 1 && m_autoMeasureState != AutoMeasureState::Idle)
         return true;
 
@@ -1617,9 +1619,9 @@ bool MainWindow::startMeasureInternal()
         m_autoMeasureState = AutoMeasureState::WaitingShot;
         ui->action_startMeasure->setEnabled(false);
         ui->action_stopMeasure->setEnabled(true);
-        ui->comboBox_2->setEnabled(false);
-        ui->dateTimeEdit->setEnabled(false);
-        ui->dateTimeEdit_2->setEnabled(false);
+        ui->comboBox_measureMode->setEnabled(false);
+        ui->dateTimeEdit_startup->setEnabled(false);
+        ui->dateTimeEdit_shutdown->setEnabled(false);
         qInfo() << "自动测量已就绪，等待炮号...";
         return true;
     }
@@ -1639,11 +1641,11 @@ bool MainWindow::startMeasureInternal()
         isTaskRunning = true;
 
         // 2. 设置时间点A（启动时间），计算时间差后启动启动定时器
-        QDateTime targetA = ui->dateTimeEdit->dateTime();
+        QDateTime targetA = ui->dateTimeEdit_startup->dateTime();
         int msecToA = QDateTime::currentDateTime().msecsTo(targetA);
 
         // 3. 设置时间点B（停止时间）
-        QDateTime targetB = ui->dateTimeEdit_2->dateTime();
+        QDateTime targetB = ui->dateTimeEdit_shutdown->dateTime();
         int msecToB = QDateTime::currentDateTime().msecsTo(targetB);
 
         if (msecToA < 0 || msecToA > msecToB){
@@ -1654,9 +1656,9 @@ bool MainWindow::startMeasureInternal()
         ui->spb_measureTime->setValue(detPara.measureTime);
         ui->action_startMeasure->setEnabled(false);
         ui->action_stopMeasure->setEnabled(true);
-        ui->comboBox_2->setEnabled(false);
-        ui->dateTimeEdit->setEnabled(false);
-        ui->dateTimeEdit_2->setEnabled(false);
+        ui->comboBox_measureMode->setEnabled(false);
+        ui->dateTimeEdit_startup->setEnabled(false);
+        ui->dateTimeEdit_shutdown->setEnabled(false);
 
         // 4. 绑定信号槽：时间A到了启动任务
         connect(startTimer, &QTimer::timeout, this, [=]() {
@@ -1693,9 +1695,9 @@ bool MainWindow::startMeasureInternal()
             m_autoMeasureState = AutoMeasureState::Idle;
             ui->action_startMeasure->setEnabled(true);
             ui->action_stopMeasure->setEnabled(false);
-            ui->comboBox_2->setEnabled(true);
-            ui->dateTimeEdit->setEnabled(true);
-            ui->dateTimeEdit_2->setEnabled(true);
+            ui->comboBox_measureMode->setEnabled(true);
+            ui->dateTimeEdit_startup->setEnabled(true);
+            ui->dateTimeEdit_shutdown->setEnabled(true);
 
             qInfo() << "无人值守时间到，系统将自动退出";
             QTimer::singleShot(3000, this, [=]{
@@ -1722,9 +1724,9 @@ bool MainWindow::startMeasureInternal()
         startMeasureDurationTimer();
         ui->action_startMeasure->setEnabled(false);
         ui->action_stopMeasure->setEnabled(true);
-        ui->comboBox_2->setEnabled(false);
-        ui->dateTimeEdit->setEnabled(false);
-        ui->dateTimeEdit_2->setEnabled(false);
+        ui->comboBox_measureMode->setEnabled(false);
+        ui->dateTimeEdit_startup->setEnabled(false);
+        ui->dateTimeEdit_shutdown->setEnabled(false);
         qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << measureDurationMs() << "ms";
     }
 
@@ -1924,7 +1926,7 @@ void MainWindow::loadMeasureSettings()
     ScopedFileLock lock(settings);
 
     ui->cmb_transferMode->blockSignals(true);
-    ui->comboBox_2->blockSignals(true);
+    ui->comboBox_measureMode->blockSignals(true);
     ui->cmb_saveFormat->blockSignals(true);
 
     ui->cmb_transferMode->setCurrentIndex(
@@ -1938,7 +1940,7 @@ void MainWindow::loadMeasureSettings()
         settings->getValueByPath(QStringLiteral("Measure/specRefreshTime"), 10).toInt());
     ui->cmb_saveFormat->setCurrentIndex(
         settings->getValueByPath(QStringLiteral("Measure/saveFormat"), 0).toInt());
-    ui->comboBox_2->setCurrentIndex(
+    ui->comboBox_measureMode->setCurrentIndex(
         settings->getValueByPath(QStringLiteral("Measure/measureMode"), 0).toInt());
 
     const QDateTime defaultAutoStart(QDate(2026, 3, 23), QTime(10, 0, 0));
@@ -1955,11 +1957,11 @@ void MainWindow::loadMeasureSettings()
         autoStartTime = defaultAutoStart;
     if (!autoStopTime.isValid())
         autoStopTime = defaultAutoStop;
-    ui->dateTimeEdit->setDateTime(autoStartTime);
-    ui->dateTimeEdit_2->setDateTime(autoStopTime);
+    ui->dateTimeEdit_startup->setDateTime(autoStartTime);
+    ui->dateTimeEdit_shutdown->setDateTime(autoStopTime);
 
     ui->cmb_transferMode->blockSignals(false);
-    ui->comboBox_2->blockSignals(false);
+    ui->comboBox_measureMode->blockSignals(false);
     ui->cmb_saveFormat->blockSignals(false);
 
     updateSpectrumRefreshIntervalRange();
@@ -1978,11 +1980,11 @@ void MainWindow::saveMeasureSettings()
     settings->setValueByPath(QStringLiteral("Measure/savePath"), ui->le_savePath->text().trimmed());
     settings->setValueByPath(QStringLiteral("Measure/specRefreshTime"), ui->spb_specRefashTime->value());
     settings->setValueByPath(QStringLiteral("Measure/saveFormat"), ui->cmb_saveFormat->currentIndex());
-    settings->setValueByPath(QStringLiteral("Measure/measureMode"), ui->comboBox_2->currentIndex());
+    settings->setValueByPath(QStringLiteral("Measure/measureMode"), ui->comboBox_measureMode->currentIndex());
     settings->setValueByPath(QStringLiteral("Measure/autoStartTime"),
-                             ui->dateTimeEdit->dateTime().toString(Qt::ISODate));
+                             ui->dateTimeEdit_startup->dateTime().toString(Qt::ISODate));
     settings->setValueByPath(QStringLiteral("Measure/autoStopTime"),
-                             ui->dateTimeEdit_2->dateTime().toString(Qt::ISODate));
+                             ui->dateTimeEdit_shutdown->dateTime().toString(Qt::ISODate));
     settings->save();
 }
 
@@ -2022,6 +2024,11 @@ void MainWindow::on_action_stopMeasure_triggered()
 {
     if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
         stopAutoMeasureSession();
+        ui->comboBox_measureMode->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
+        ui->action_startMeasure->setEnabled(true);
+        ui->action_stopMeasure->setEnabled(false);
         qInfo() << "自动测量已取消，未收到炮号";
         return;
     }
@@ -2046,9 +2053,9 @@ void MainWindow::on_action_stopMeasure_triggered()
     machine->stop();
     ui->action_startMeasure->setEnabled(true);
     ui->action_stopMeasure->setEnabled(false);
-    ui->comboBox_2->setEnabled(true);
-    ui->dateTimeEdit->setEnabled(true);
-    ui->dateTimeEdit_2->setEnabled(true);
+    ui->comboBox_measureMode->setEnabled(true);
+    ui->dateTimeEdit_startup->setEnabled(true);
+    ui->dateTimeEdit_shutdown->setEnabled(true);
 
     waveformPlotTimer->stop();
     commandHelper->stopMeasure();
@@ -2059,22 +2066,22 @@ void MainWindow::on_action_stopMeasure_triggered()
 }
 
 
-void MainWindow::on_comboBox_2_currentIndexChanged(int index)
+void MainWindow::on_comboBox_measureMode_currentIndexChanged(int index)
 {
     if (index == 2){
         // 无人值守
         ui->action_startMeasure->setEnabled(true);
         ui->checkBox_alarm->setEnabled(false);
         ui->checkBox_alarm->setChecked(true);
-        ui->dateTimeEdit->setEnabled(true);
-        ui->dateTimeEdit_2->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
     }
     else{
         ui->action_startMeasure->setEnabled(replayPowerOn ? !ui->action_connectDet->isEnabled() : false);
         ui->checkBox_alarm->setEnabled(true);
         ui->checkBox_alarm->setChecked(false);
-        ui->dateTimeEdit->setEnabled(false);
-        ui->dateTimeEdit_2->setEnabled(false);
+        ui->dateTimeEdit_startup->setEnabled(false);
+        ui->dateTimeEdit_shutdown->setEnabled(false);
     }
 }
 
@@ -2168,6 +2175,8 @@ void MainWindow::initStateMachine()
 
 void MainWindow::on_action_connectMonitor_triggered()
 {
+    m_armMonitorInAlarm[0] = false;
+    m_armMonitorInAlarm[1] = false;
     commandHelper->connectARM();
 }
 

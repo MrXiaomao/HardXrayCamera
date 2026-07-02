@@ -109,7 +109,7 @@ private slots:
 
     void on_btn_generateProfile_clicked();
 
-    void on_comboBox_2_currentIndexChanged(int index);
+    void on_comboBox_measureMode_currentIndexChanged(int index);
 
     void on_action_connectMonitor_triggered();
 
