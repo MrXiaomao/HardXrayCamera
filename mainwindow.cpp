@@ -330,10 +330,12 @@ void MainWindow::onRelayStatusChanged(bool on)
 
         qInfo() << "继电器网络状态: 已连接";
 
-        QTimer::singleShot(500, this, [=]{
-            // 延迟打开电源，否则指令会发出去无响应
-            emit step2Finished();// 连接远程控制
-        });
+        if (m_enableAutoMated) {
+            QTimer::singleShot(500, this, [this] {
+                // 延迟进入下一步，否则指令会发出去无响应
+                emit step1Finished();
+            });
+        }
     }
     else{
         setPowerSwitchEnabled(false);
@@ -1666,17 +1668,18 @@ bool MainWindow::startMeasureInternal()
         ui->dateTimeEdit_shutdown->setEnabled(false);
 
         // 4. 绑定信号槽：时间A到了启动任务
+        disconnect(startTimer, nullptr, this, nullptr);
         connect(startTimer, &QTimer::timeout, this, [=]() {
-            //qDebug() << "1111111111";
             ui->action_startMeasure->setEnabled(false);
             ui->action_stopMeasure->setEnabled(true);
             startTimer->stop();
-            //qDebug() << "22222";
             machine->start();
-            qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << detPara.measureTime << "ms";
+            qInfo() << "无人值守开机时刻已到，自动开机流程已启动，炮号:" << shotNumber
+                    << "计划测量时长:" << detPara.measureTime << "ms";
         });
 
         // 5. 绑定信号槽：时间B到了停止任务
+        disconnect(stopTimer, nullptr, this, nullptr);
         connect(stopTimer, &QTimer::timeout, this, [&]() {
             isTaskRunning = false;
             m_enableAutoMated = false;
@@ -1834,10 +1837,9 @@ void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
     // ui->action_powerOn->setEnabled(!powerOn);
     // ui->action_powerOff->setEnabled(powerOn);
 
-    if (powerOn){
-        QTimer::singleShot(500, this, [=]{
-            // 延迟连接采集系统，否则连接可能会失败
-            emit step3Finished();//
+    if (powerOn && m_enableAutoMated) {
+        QTimer::singleShot(500, this, [this] {
+            emit step2Finished();
         });
     }
 }
@@ -1866,10 +1868,9 @@ void MainWindow::syncDetectorConnectButton()
     ui->action_startMeasure->setEnabled(anyConnected);
     ui->action_stopMeasure->setEnabled(anyConnected);
 
-    if (anyConnected){
-        QTimer::singleShot(500, this, [=]{
-            // 延迟连接采集系统，否则连接可能会失败
-            emit step4Finished();
+    if (allConnected && m_enableAutoMated) {
+        QTimer::singleShot(500, this, [this] {
+            emit step3Finished();
         });
     }
 }
@@ -1886,8 +1887,8 @@ void MainWindow::syncArmMonitorButton()
     ui->action_connectMonitor->setEnabled(!allConnected);
     ui->action_disconnectMonitor->setEnabled(anyConnected);
 
-    if (anyConnected)
-        emit step1Finished();
+    if (allConnected && m_enableAutoMated)
+        emit step5Finished();
 }
 
 void MainWindow::loadMonitorAlarmSettings()
@@ -2157,14 +2158,7 @@ void MainWindow::initStateMachine()
         if (!m_enableAutoMated)
             return;
 
-        // 开始测量
-        startMeasureInternal();
-        // if (ui->action_startMeasure->isEnabled()){
-        //     emit ui->action_startMeasure->triggered(true);
-        // }
-        // else{
-        //     emit step4Finished();
-        // }
+        // 进入测量准备阶段，实际测量在 stFinish 中启动
         emit step4Finished();
     });
 

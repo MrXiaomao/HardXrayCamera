@@ -943,6 +943,9 @@
                 <second>0</second>
                </time>
               </property>
+              <property name="displayFormat">
+               <string>yyyy/M/d H:mm:ss</string>
+              </property>
              </widget>
             </item>
             <item row="3" column="0">
@@ -979,6 +982,9 @@
                 <minute>0</minute>
                 <second>0</second>
                </time>
+              </property>
+              <property name="displayFormat">
+               <string>yyyy/M/d H:mm:ss</string>
               </property>
              </widget>
             </item>
@@ -1133,7 +1139,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>18</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">
