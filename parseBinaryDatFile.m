@@ -9,13 +9,12 @@ close all;
 %功能：①观测一定数量的波形
 
 %% step1 参数设置[采样点数：分析波形个数]
-sample_deepth=1024;  %56 每个波形的采样深度（256个采样点）
+sample_deepth=16;  %56 每个波形的采样深度（256个采样点）
 data_start=3;  % 波形数据在每一帧的第3个16位整数开始（跳过帧头）
 win_10us=625;
 win_100us=6250;
 %% step2 读取文件并绘刿
-initialPath = 'C:\Users\12074\Desktop\QT_software\build_HardXrayCamera\x64\波形测试\'; % 替换为你的起始路径
-[FileName1,PathName1]=uigetfile('*.dat','OpenFile',initialPath); % 弹窗选择要解析的.dat文件
+[FileName1,PathName1]=uigetfile('*.dat','OpenFile'); % 弹窗选择要解析的.dat文件
 FileName_1=[PathName1,FileName1];
 fid = fopen(FileName_1, 'r','b');  % 以二进制只读模式打开文件
 rawData = fread(fid, Inf, 'uint8'); % 读取所有数据，按8位无符号整数解析
@@ -63,9 +62,10 @@ for i = 1:length(headerPositions)
         packetCount = packetCount + 1;
         extractedPackets{packetCount} = rawData(headerIdx:packetEnd); % 提取完整数据包
     end
+
+
 end
 extractedPackets = extractedPackets(1:packetCount); % 只保留有效数据包
-    
 
 
 if packetCount > 0
@@ -88,8 +88,27 @@ else
     combinedValue = [];
 end
 combinedValue=combinedValue'; % 转置为“采样点×数据包数”的矩阵
-temp = log2(double(combinedValue(2,:))); % 转化序号
-combinedValue(2,:) = uint16(temp);
+%% 基于 combinedValue 第3行检测丢包
+seq = double(combinedValue(3,:));   % 第3行数据
+
+lost_idx = [];
+
+for i = 1:length(seq)-16
+
+    diff_val = seq(i+16) - seq(i);
+
+    % 正常情况下应该等于1
+    if diff_val ~= 100
+
+        lost_idx(end+1) = i;
+
+        fprintf('疑似丢包: index=%d -> %d, value=%d -> %d, diff=%d\n', ...
+            i, i+16, seq(i), seq(i+16), diff_val);
+
+    end
+end
+
+fprintf('检测完成，异常点数量: %d\n', length(lost_idx));
 
     %WAVE=combinedValue;
     %WAVE(1:3,:)=[];
@@ -223,6 +242,13 @@ switch data_part(1)
 end
 end
 
+
+%% 噪声水平计算
+MEAN=mean(double(Wave_CH16(:,1)));
+STD=std(double(Wave_CH16(:,1)));
+
+NOISE = 660*STD./16384;
+
 waveform=reshape(Wave_CH1,1,[]);
 for i=1:1:fix(length(waveform)/625-1)
 window_10us(i,:)=waveform(((i-1)*625+1):(i*625));
@@ -323,15 +349,9 @@ end
 % 
 %     val_16=find(combinedValue(2,:)==32768);
 
-%% 噪声水平计算
-MEAN=mean(double(Wave_CH16(:,1)))
-STD=std(double(Wave_CH16(:,1)))
-
-NOISE = 660*STD./16384
-
 
 h=double(waveform);
-BinWidth=1
+BinWidth = 1;
 histogram(h,BinWidth);
 xlabel("幅度值LSB")
 ylabel("count")

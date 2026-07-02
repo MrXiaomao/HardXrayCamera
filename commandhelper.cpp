@@ -12,9 +12,9 @@
 #include <QFile>
 #include <QDir>
 #include <QMutexLocker>
-#include <algorithm>
-#include <chrono>
-#include <random>
+// #include <algorithm>
+// #include <chrono>
+// #include <random>
 
 // ARM2 无温度传感器时硬件回传 0xFF，临时使用占位温度（高斯分布，约 38℃ ±2℃）
 #define ARM2_TEMP_STUB_BASE   38.0
@@ -38,7 +38,8 @@ double parseArm2Temperature(quint8 highByte, quint8 lowByte)
     //不再使用占位温度，直接返回 0xFF 0xFF 时的模拟温度
     // if (highByte == 0xFF && lowByte == 0xFF)
     //     return generateArm2StubTemperature();
-    return double(highByte * 256 + lowByte) / 10.0;
+    const quint16 rawValue = (static_cast<quint16>(highByte) << 8) | static_cast<quint16>(lowByte);
+    return static_cast<double>(rawValue) / 10.0;
 }
 
 constexpr int Spectrum512PacketSize = 1032;
@@ -816,7 +817,7 @@ bool CommandHelper::parseSpectrum512Packet(int detectorIndex, const QByteArray& 
     return true;
 }
 
-// 16道能谱：包头(2) + 时间(2) + 通道号(2) + 16道计数(32) + 包尾(2) = 40 字节
+// 16道能谱：包头(2) + 通道号(2) + 时间(2) + 16道计数(32) + 包尾(2) = 40 字节
 void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data)
 {
     buffer.append(data);
@@ -853,17 +854,12 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     if (!packet.startsWith(SpectrumHeader) || !packet.endsWith(SpectrumTail))
         return false;
 
+    const quint32 channelMask = readUInt16BE(packet.constData() + 2);
     const quint32 timeMs = readUInt16BE(packet.constData() + 4);
-    const quint32 channelRaw = readUInt16BE(packet.constData() + 2);
-    int channelNumber = 0;
-    if (channelRaw >= 1 && channelRaw <= 16) {
-        channelNumber = static_cast<int>(channelRaw);
-    } else {
-        channelNumber = channelNumberFromMask(channelRaw);
-    }
+    const int channelNumber = channelNumberFromMask(channelMask);
     if (channelNumber < 1 || channelNumber > 16) {
         qWarning() << "Invalid 16-bin spectrum channel from detector" << detectorIndex
-                   << "raw:" << channelRaw;
+                   << "raw:" << channelMask;
         return false;
     }
 
@@ -953,11 +949,13 @@ void CommandHelper::handleARM1Data(const QByteArray &binaryData)
 
             // 电压数据：=  (data[3]*256 +data[4]) / 100
             //             data[3]为高8位，data[4]为低8位
-            voltage.push_back(double((quint8)m_arm1Buffer[offset+3]*256 + (quint8)m_arm1Buffer[offset+4]) / 100);
+            const quint16 voltageRaw = readUInt16BE(m_arm1Buffer.constData() + offset + 3);
+            voltage.push_back(static_cast<double>(voltageRaw) / 100.0);
 
             // 电流数据：=  (data[5]*256 +data[6]) / 1000
             //             data[5]为高8位，data[6]为低8位
-            current.push_back(double((quint8)m_arm1Buffer[offset+5]*256 + (quint8)m_arm1Buffer[offset+6]) / 1000);
+            const quint16 currentRaw = readUInt16BE(m_arm1Buffer.constData() + offset + 5);
+            current.push_back(static_cast<double>(currentRaw) / 1000.0);
 
             // data[7] data[8] data[9] data[10] data[11]	data[12] data[13]		为第一个温度监测模块的数据帧
             //         data[7] 为第一个温度监测模块的485编号，默认为0x02
@@ -1013,23 +1011,31 @@ void CommandHelper::handleARM2Data(const QByteArray &binaryData)
             // data[17] data[18] data[19] data[20] data[21]		为电流监测4数据帧
             // data[22] data[23] data[24] data[25] data[26] data[27] data[28]		为温度监测1数据帧
             // data[29] data[30] data[31] data[32] data[33] data[34] data[35]		为温度监测2数据帧
-            // data[24] data[25]		为0xCC  0xDD  包尾
+            // data[36] data[37]		为0xCC  0xDD  包尾
 
             QVector<double>/*温度*/ temperature;
             QVector<double>/*电压*/ voltage;
             QVector<double>/*电流*/ current;
 
-            voltage.push_back(double((quint8)m_arm2Buffer[offset+3]*256 + (quint8)m_arm2Buffer[offset+4]) / 100);
-            current.push_back(double((quint8)m_arm2Buffer[offset+5]*256 + (quint8)m_arm2Buffer[offset+6]) / 1000);
+            const quint16 voltageRaw1 = readUInt16BE(m_arm2Buffer.constData() + offset + 3);
+            const quint16 currentRaw1 = readUInt16BE(m_arm2Buffer.constData() + offset + 5);
+            voltage.push_back(static_cast<double>(voltageRaw1) / 100.0);
+            current.push_back(static_cast<double>(currentRaw1) / 1000.0);
 
-            voltage.push_back(double((quint8)m_arm2Buffer[offset+8]*256 + (quint8)m_arm2Buffer[offset+9]) / 100);
-            current.push_back(double((quint8)m_arm2Buffer[offset+10]*256 + (quint8)m_arm2Buffer[offset+11]) / 1000);
+            const quint16 voltageRaw2 = readUInt16BE(m_arm2Buffer.constData() + offset + 8);
+            const quint16 currentRaw2 = readUInt16BE(m_arm2Buffer.constData() + offset + 10);
+            voltage.push_back(static_cast<double>(voltageRaw2) / 100.0);
+            current.push_back(static_cast<double>(currentRaw2) / 1000.0);
 
-            voltage.push_back(double((quint8)m_arm2Buffer[offset+13]*256 + (quint8)m_arm2Buffer[offset+14]) / 100);
-            current.push_back(double((quint8)m_arm2Buffer[offset+15]*256 + (quint8)m_arm2Buffer[offset+16]) / 1000);
+            const quint16 voltageRaw3 = readUInt16BE(m_arm2Buffer.constData() + offset + 13);
+            const quint16 currentRaw3 = readUInt16BE(m_arm2Buffer.constData() + offset + 15);
+            voltage.push_back(static_cast<double>(voltageRaw3) / 100.0);
+            current.push_back(static_cast<double>(currentRaw3) / 1000.0);
 
-            voltage.push_back(double((quint8)m_arm2Buffer[offset+18]*256 + (quint8)m_arm2Buffer[offset+19]) / 100);
-            current.push_back(double((quint8)m_arm2Buffer[offset+20]*256 + (quint8)m_arm2Buffer[offset+21]) / 1000);
+            const quint16 voltageRaw4 = readUInt16BE(m_arm2Buffer.constData() + offset + 18);
+            const quint16 currentRaw4 = readUInt16BE(m_arm2Buffer.constData() + offset + 20);
+            voltage.push_back(static_cast<double>(voltageRaw4) / 100.0);
+            current.push_back(static_cast<double>(currentRaw4) / 1000.0);
 
             for (int i = 0; i <= 2; ++i) {
                 const quint8 hi = static_cast<quint8>(m_arm2Buffer[offset + 23 + i * 2]);
