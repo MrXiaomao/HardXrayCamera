@@ -666,11 +666,13 @@ void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
         }
 
         //存储数据到mfileNameFpga1Main文件中。
-        if (m_fpga1MainFile.isOpen()) {
-            m_fpga1MainFile.write(binaryData);
-            m_fpga1MainFile.flush();
-        } else {
-            qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
+        if (mfileFormat == Binary){
+            if (m_fpga1MainFile.isOpen()) {
+                m_fpga1MainFile.write(binaryData);
+                m_fpga1MainFile.flush();
+            } else {
+                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
+            }
         }
         // 处理水平相机主网口能谱数据，根据当前传输模式选择解析器
         if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
@@ -697,12 +699,15 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
     }
 
     //存储数据到mfileNameFpga2Main文件中。
-    if (m_fpga2MainFile.isOpen()) {
-        m_fpga2MainFile.write(binaryData);
-        m_fpga2MainFile.flush();
-    } else {
-        qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
+    if (mfileFormat == Binary){
+        if (m_fpga2MainFile.isOpen()) {
+            m_fpga2MainFile.write(binaryData);
+            m_fpga2MainFile.flush();
+        } else {
+            qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
+        }
     }
+
     // 处理垂直相机主网口能谱数据，根据当前传输模式选择解析器
     if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
         processSpec16Data(2, m_fpga2MainBuffer, binaryData);
@@ -727,12 +732,15 @@ void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
     }
 
     //存储数据到mfileNameFpga1Wave文件中。
-    if (m_fpga1WaveFile.isOpen()) {
-        m_fpga1WaveFile.write(binaryData);
-        m_fpga1WaveFile.flush();
-    } else {
-        qWarning() << "水平相机副网口 file is not open:" << mfileNameFpga1Wave;
+    if (mfileFormat == Binary){
+        if (m_fpga1WaveFile.isOpen()) {
+            m_fpga1WaveFile.write(binaryData);
+            m_fpga1WaveFile.flush();
+        } else {
+            qWarning() << "水平相机副网口 file is not open:" << mfileNameFpga1Wave;
+        }
     }
+
     // 处理水平相机副网口波形数据
     processWaveformData(1, m_fpga1WaveBuffer, binaryData);
 }
@@ -753,12 +761,15 @@ void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
     }
 
     //存储数据到mfileNameFpga2Wave文件中。
-    if (m_fpga2WaveFile.isOpen()) {
-        m_fpga2WaveFile.write(binaryData);
-        m_fpga2WaveFile.flush();
-    } else {
-        qWarning() << "垂直相机副网口 file is not open:" << mfileNameFpga2Wave;
+    if (mfileFormat == Binary){
+        if (m_fpga2WaveFile.isOpen()) {
+            m_fpga2WaveFile.write(binaryData);
+            m_fpga2WaveFile.flush();
+        } else {
+            qWarning() << "垂直相机副网口 file is not open:" << mfileNameFpga2Wave;
+        }
     }
+
     // 处理垂直相机副网口波形数据
     processWaveformData(2, m_fpga2WaveBuffer, binaryData);
 }
@@ -785,7 +796,7 @@ void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, co
         if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             // 包尾不对，继续寻找下一个包头
             buffer.remove(0, SpectrumHeader.size());
-            qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
+            //qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
             continue;
         }
 
@@ -808,9 +819,26 @@ bool CommandHelper::parseSpectrum512Packet(int detectorIndex, const QByteArray& 
     QVector<quint32> counts;
     counts.reserve(Spectrum512BinCount);
 
+    QStringList strCounts;
+    strCounts << QString::number(timeMs) << QString::number(channelNumber);
     const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum512BinCount; ++i) {
         counts.append(readUInt16BE(spectrumData + i * 2));
+        strCounts << QString::number(readUInt16BE(spectrumData + i * 2));
+    }
+
+    if (mfileFormat == Text){
+        QFile* fpgaMainFile[] = {&m_fpga1MainFile, &m_fpga2MainFile};
+        if (fpgaMainFile[detectorIndex-1]->isOpen()) {
+            fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
+            fpgaMainFile[detectorIndex-1]->write("\n");
+            fpgaMainFile[detectorIndex-1]->flush();
+        } else {
+            if (1==detectorIndex)
+                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
+            else
+                qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
+        }
     }
 
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
@@ -838,7 +866,7 @@ void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, con
         const QByteArray packet = buffer.left(Spectrum16PacketSize);
         if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             buffer.remove(0, SpectrumHeader.size());
-            qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+            //qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
             continue;
         }
 
@@ -866,9 +894,26 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     QVector<quint32> counts;
     counts.reserve(Spectrum16BinCount);
 
+    QStringList strCounts;
+    strCounts << QString::number(timeMs) << QString::number(channelNumber);
     const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum16BinCount; ++i) {
         counts.append(readUInt16BE(spectrumData + i * 2));
+        strCounts << QString::number(readUInt16BE(spectrumData + i * 2));
+    }
+
+    if (mfileFormat == Text){
+        QFile* fpgaMainFile[] = {&m_fpga1MainFile, &m_fpga2MainFile};
+        if (fpgaMainFile[detectorIndex-1]->isOpen()) {
+            fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
+            fpgaMainFile[detectorIndex-1]->write("\n");
+            fpgaMainFile[detectorIndex-1]->flush();
+        } else {
+            if (1==detectorIndex)
+                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
+            else
+                qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
+        }
     }
 
     emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
@@ -912,9 +957,27 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
 
         QVector<quint16> samples;
         samples.reserve(584);
+
+        QStringList strCounts;
+        strCounts << QString::number(timeUnits-10) << QString::number(channelNumber);
         const char* sampleData = p + WaveformHeader.size() + 4;
         for (int i = 0; i < 584; ++i) {
             samples.append(readUInt16BE(sampleData + i * 2));
+            strCounts << QString::number(readUInt16BE(sampleData + i * 2));
+        }
+
+        if (mfileFormat == Text){
+            QFile* fpgaWaveFile[] = {&m_fpga1WaveFile, &m_fpga2WaveFile};
+            if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
+                fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
+                fpgaWaveFile[detectorIndex-1]->write("\n");
+                fpgaWaveFile[detectorIndex-1]->flush();
+            } else {
+                if (1==detectorIndex)
+                    qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Wave;
+                else
+                    qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Wave;
+            }
         }
 
         emit sigWaveformData(detectorIndex, channelNumber, timeUnits, samples);

@@ -1446,16 +1446,16 @@ void MainWindow::onUdpShotNumberChanged(const QString &shotNumber)
     if (shotNumber == m_currentShotNumber)
         return;
 
-    m_currentShotNumber = shotNumber;
-    ui->lineEdit_shotID->setText(shotNumber);
-    saveShotNumberFile(shotNumber);
-
     const QString info = tr("炮号已刷新：%1").arg(shotNumber);
-    qInfo() << info;
     appendUdpLog(info);
 
     if (ui->comboBox_measureMode->currentIndex() == 1
         && m_autoMeasureState == AutoMeasureState::WaitingShot) {
+        qInfo() << info;
+
+        m_currentShotNumber = shotNumber;
+        ui->lineEdit_shotID->setText(shotNumber);
+        saveShotNumberFile(shotNumber);
         triggerAutoMeasureFromShot(shotNumber);
     }
 }
