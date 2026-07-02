@@ -332,6 +332,7 @@ void MainWindow::onRelayStatusChanged(bool on)
         setPowerSwitchEnabled(false);
         syncPowerSwitchFromRelay(false);
         ui->action_connectDet->setEnabled(false);
+        ui->action_disconnectDet->setEnabled(false);
         ui->action_connectMonitor->setEnabled(false);
         ui->action_disconnectMonitor->setEnabled(false);
         ui->action_startMeasure->setEnabled(false);
@@ -2216,6 +2217,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         return;
     }
 
+    this->hide();
     event->accept();
     qApp->quit();
 }

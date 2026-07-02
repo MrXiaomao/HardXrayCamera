@@ -44,9 +44,21 @@
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
-        <string>测量数据预览</string>
+        <string>  数据预览  </string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_5">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QWidget" name="widget_2" native="true">
           <property name="sizePolicy">
@@ -432,9 +444,21 @@
       </widget>
       <widget class="QWidget" name="tab_4">
        <attribute name="title">
-        <string>实时监测</string>
+        <string>  实时监测  </string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_5">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QWidget" name="widget_monitor" native="true">
           <property name="sizePolicy">

@@ -1,0 +1,568 @@
+/* 单行文本输入框基础样式 */
+QLineEdit{
+  color:palette(text); /* 文本颜色：系统文本色（跟随系统主题） */
+}
+
+/* 单行文本输入框空文本状态（当前样式与默认一致，可能用于预留扩展） */
+QLineEdit[text=""]{ 
+  color:palette(text); /* 文本颜色：系统文本色 */
+}
+
+/* 行文本编辑框只读属性样式 */
+QLineEdit:read-only{
+  background:palette(window); /* 文字颜色使用系统文本色 */
+}
+
+/* 行文本编辑框禁用属性样式 */
+QLineEdit:disabled{
+  background:palette(base); /* 文字颜色使用系统文本色 */
+}
+
+/* 多行富文本编辑框基础样式 */
+QTextEdit{
+  color:palette(text); /* 文本颜色：系统文本色 */
+  border:0px solid palette(highlight); /* 边框：2px系统高亮色实线 */
+  border-radius:0px; /* 边框无圆角（直角） */
+}
+
+/* 多行富文本编辑框只读属性样式 */
+QTextEdit:read-only{
+  background:palette(window); /* 文字颜色使用系统文本色 */
+}
+
+/* 多行富文本编辑框禁用属性样式 */
+QTextEdit:disabled{
+  background:palette(base); /* 文字颜色使用系统文本色 */
+}
+
+/* 多行富文本编辑框空文本状态（当前样式与默认一致，可能用于预留扩展） */
+QTextEdit[text=""]{ 
+  color:palette(text); /* 文本颜色：系统文本色 */
+  border:0px solid palette(highlight); /* 保持边框样式不变 */
+  border-radius:0px; /* 保持直角边框 */
+}
+
+/* 多行纯文本编辑框基础样式 */
+QPlainTextEdit{
+  color:palette(text); /* 文本颜色：系统文本色 */
+}
+
+/* 多行纯文本编辑框空文本状态（当前样式与默认一致，可能用于预留扩展） */
+QPlainTextEdit[text=""]{ 
+  color:palette(text); /* 文本颜色：系统文本色 */
+}
+
+/* 工具提示样式 */
+QToolTip{
+  color:palette(text); /* 文本颜色：系统文本色 */
+  background-color:palette(base); /* 背景色：系统基础色（跟随系统主题） */
+  border:1px solid palette(highlight); /* 边框：1px系统高亮色 */
+  border-radius:0px; /* 圆角：0px（直角） */
+}
+
+/* 状态栏基础样式 */
+QStatusBar{
+  background-color:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 背景：垂直渐变浅灰（上浅下稍深） */
+  color:palette(text); /* 文字颜色使用系统文本色 */
+}
+
+/* 状态栏内标签样式 */
+QStatusBar::item QLabel {
+  /* font-size: 12px; 字体大小：16px */
+}
+
+/* 菜单栏基础样式 */
+QMenuBar{
+  background-color:transparent; /* 背景透明 */
+  spacing:0px; /* 菜单项间距：0px */
+}
+
+/* 菜单项基础样式 */
+QMenuBar::item{
+  spacing:2px; /* 菜单项内间距：2px */
+  padding:0px 4px; /* 内边距：上下0px，左右4px */
+  background:transparent; /* 背景透明 */
+}
+
+/* 菜单栏选项选中状态（鼠标悬停时） */
+QMenuBar::item:selected{
+  background-color:rgba(220,220,220,255); /* 背景色：浅灰色不透明 */
+}
+
+/* 工具按钮悬停状态 */
+QToolButton:hover{
+  background-color:rgba(220,220,220,255); /* 悬停时背景色：浅灰色不透明 */
+}
+
+/* 菜单栏选项按下状态（鼠标点击时） */
+QMenuBar::item:pressed{
+  background-color:palette(highlight); /* 背景色使用系统高亮色 */
+  color:rgba(255,255,255,255); /* 文字颜色为纯白色 */
+  border-left:1px solid rgba(200,200,200,127); /* 左侧边框：1px浅灰色半透明 */
+  border-right:1px solid rgba(200,200,200,127); /* 右侧边框：同上 */
+}
+
+/* 菜单基础样式 */
+QMenu{
+  background-color:palette(window); /* 背景色：系统窗口色（如白色或深色） */
+  border:1px solid palette(shadow); /* 边框：1px系统阴影色（如灰色） */
+}
+
+/* 菜单项基础样式 */
+QMenu::item{
+  padding:3px 15px 3px 15px; /* 内边距：上下3px，左右15px（增大点击区域） */
+  border:1px solid transparent; /* 边框：1px透明（预留选中状态边框） */
+}
+
+/* 菜单项禁用状态 */
+QMenu::item:disabled{
+  background-color:rgba(235,235,235,127); /* 背景色：极浅灰色半透明 */
+  color:palette(disabled); /* 文字颜色使用系统禁用色 */
+}
+
+/* 菜单项选中状态（鼠标悬停或键盘导航选中时） */
+QMenu::item:selected{
+  border-color:rgba(147,191,236,127); /* 边框色：半透明浅蓝色 */
+  background:palette(highlight); /* 背景色：系统高亮色 */
+  color:rgba(255,255,255,255); /* 文本颜色：白色 */
+}
+
+/* 菜单项图标左边距 */
+QMenu::icon {
+  padding-left: 10px; /* 图标左内边距设为10px（默认通常为0） */
+}
+
+/* 菜单项中已选中的图标样式 */
+QMenu::icon:checked{
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(230,230,230,127),stop:1 rgba(240,240,240,75)); /* 背景：从上到下的渐变浅灰 */
+  border:1px solid palette(highlight); /* 边框使用系统高亮色 */
+  border-radius:2px; /* 圆角：2px */
+}
+
+/* 菜单项分隔线样式 */
+QMenu::separator{
+  height:1px; /* 高度：1px */
+  background:palette(alternate-base); /* 背景色：系统交替基础色（如浅灰色） */
+  margin-left:2px; /* 左边距：2px */
+  margin-right:2px; /* 右边距：2px */
+}
+
+/* 菜单项指示器（如复选框、单选按钮）基础样式 */
+QMenu::indicator{
+  width:15px; /* 宽度：15px */
+  height:15px; /* 高度：15px */
+}
+
+/* 非排他性菜单项指示器（复选框）选中状态 */
+QMenu::indicator:non-exclusive:checked{
+  padding-left:2px; /* 左内边距：2px（调整指示器位置） */
+}
+
+/* 非排他性菜单项指示器（复选框）未选中状态 */
+QMenu::indicator:non-exclusive:unchecked{
+  padding-left:2px; /* 左内边距：2px（保持位置一致） */
+}
+
+/* 排他性菜单项指示器（单选按钮）选中状态 */
+QMenu::indicator:exclusive:checked{
+  padding-left:2px; /* 左内边距：2px（调整指示器位置） */
+}
+
+/* 排他性菜单项指示器（单选按钮）未选中状态 */
+QMenu::indicator:exclusive:unchecked{
+  padding-left:2px; /* 左内边距：2px（保持位置一致） */
+}
+
+/* 顶部工具栏样式 */
+QToolBar::top{
+  background-color:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 背景：垂直渐变浅灰（上浅下深） */
+  border-bottom:3px solid qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 底部边框：3px渐变浅灰 */
+}
+
+/* 底部工具栏样式 */
+QToolBar::bottom{
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 背景：垂直渐变浅灰（下浅上深） */
+  border-top:3px solid qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 顶部边框：3px渐变浅灰 */
+}
+
+/* 左侧工具栏样式 */
+QToolBar::left{
+  background-color:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 背景：水平渐变浅灰（左浅右深） */
+  border-right:3px solid qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 右侧边框：3px渐变浅灰 */
+}
+
+/* 右侧工具栏样式 */
+QToolBar::right{
+  background-color:qlineargradient(x1:1,y1:0,x2:0,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 背景：水平渐变浅灰（右浅左深） */
+  border-left:3px solid qlineargradient(x1:1,y1:0,x2:0,y2:0,stop:0 rgba(230,230,230,255),stop:1 rgba(245,245,245,255)); /* 左侧边框：3px渐变浅灰 */
+}
+
+/* 主窗口中的分隔器样式 */
+QMainWindow::separator{
+  width:6px; /* 水平分隔器宽度 */
+  height:5px; /* 垂直分隔器高度 */
+  padding:2px; /* 内边距：分隔器与周围元素的间距 */
+}
+
+/* 组合框基础样式 */
+QComboBox {
+  combobox-popup: 0; /* 禁用默认下拉弹出框样式（需自定义下拉列表） */
+}
+
+/* 组合框下拉列表视图样式 */
+QComboBox QAbstractItemView {
+  border: 1px solid palette(shadow); /* 下拉列表边框：1px系统阴影色 */
+}
+
+/* 组合框中选中项的样式 */
+QComboBox:item:selected {
+  border: none; /* 无选中边框 */
+  background:palette(highlight); /* 背景色：系统高亮色（如蓝色） */
+  color:rgba(255,255,255,255); /* 文字颜色：纯白色 */
+}
+
+/* 组合框指示器样式（如下拉箭头） */
+QComboBox::indicator{
+  background-color:transparent; /* 背景透明 */
+  selection-background-color:transparent; /* 选中时背景透明 */
+  color:transparent; /* 文字透明 */
+  selection-color:transparent; /* 选中时文字透明 */
+}
+
+/* 水平分割器手柄样式 */
+QSplitter::handle:horizontal{
+  background:palette(window); /* 背景色：系统窗口背景色（如浅灰色） */
+  width:10px; /* 手柄宽度 */
+}
+
+/* 垂直分割器手柄样式 */
+QSplitter::handle:vertical{
+  background:palette(window); /* 背景色：系统窗口背景色 */
+  height:10px; /* 手柄高度 */
+}
+
+/* 分隔器和分割器手柄的悬停状态 */
+QMainWindow::separator:hover,QSplitter::handle:hover{
+  background:palette(highlight); /* 悬停时背景色：系统高亮色 */
+}
+
+/* 停靠窗口标题栏样式 */
+QDockWidget::title{
+  padding:4px; /* 内边距：4px */
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(230,230,230,127),stop:1 rgba(245,245,245,75)); /* 背景：垂直渐变浅灰（下浅上深） */
+  border:1px solid rgba(200,200,200,75); /* 边框：1px半透明浅灰色 */
+  border-bottom:2px solid rgba(200,200,200,75); /* 底部边框：2px半透明浅灰色 */
+}
+
+/* 停靠窗口基础样式 */
+QDockWidget{
+  titlebar-close-icon:url(":/qss_icons/light/light_icons/window_close.png"); /* 关闭按钮图标路径 */
+  titlebar-normal-icon:url(":/qss_icons/light/light_icons/window_undock.png"); /* 浮动按钮图标路径 */
+}
+
+/* 停靠窗口关闭按钮与浮动按钮的位置控制 */
+QDockWidget::close-button,QDockWidget::float-button{
+  subcontrol-position:top right; /* 子控件位置：右上角 */
+  subcontrol-origin:margin; /* 子控件原点：从边距开始计算 */
+  position:absolute; /* 绝对定位 */
+  top:3px; /* 距离顶部3px */
+  bottom:0px; /* 距离底部0px */
+  width:20px; /* 按钮宽度 */
+  height:20px; /* 按钮高度 */
+}
+
+/* 关闭按钮的位置微调 */
+QDockWidget::close-button{
+  right:3px; /* 距离右侧3px */
+}
+
+/* 浮动按钮的位置微调 */
+QDockWidget::float-button{
+  right:25px; /* 距离右侧25px（与关闭按钮保持间距） */
+}
+
+/* 分组框基础样式 */
+QGroupBox{
+  background-color:rgba(245,245,245,50%); /* 背景：半透明极浅灰色 */
+  margin-top:27px; /* 顶部外边距：27px（为标题预留空间） */
+  border:1px solid rgba(200,200,200,127); /* 边框：1px半透明浅灰色 */
+  border-radius:4px; /* 圆角：4px */
+}
+
+/* 分组框标题样式 */
+QGroupBox::title{
+  subcontrol-origin:margin; /* 子控件原点：从边距开始计算 */
+  subcontrol-position:left top; /* 子控件位置：左上角 */
+  padding:4px 6px; /* 内边距：上下4px，左右6px */
+  margin-left:3px; /* 左侧外边距：3px */
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(230,230,230,127),stop:1 rgba(245,245,245,75)); /* 背景：垂直渐变浅灰（下浅上深） */
+  border:1px solid rgba(200,200,200,75); /* 边框：1px半透明浅灰色 */
+  border-bottom:2px solid rgb(180,180,180); /* 底部边框：2px中浅灰色 */
+  border-top-left-radius:4px; /* 左上角圆角：4px */
+  border-top-right-radius:4px; /* 右上角圆角：4px */
+}
+
+/* 标签页容器样式 */
+QTabWidget::pane{
+  background-color:palette(disabled); /* 背景：系统禁用状态颜色（浅灰色） */
+  border-top:1px solid rgba(220,220,220,50%); /* 上边框：半透明白色 */
+}
+
+/* 标签栏位置控制 */
+QTabWidget::tab-bar{
+  alignment: left; /* 标签栏左对齐 */
+  left:3px; /* 距离左侧3px */
+  top:1px; /* 距离顶部1px */
+}
+
+/* 标签栏基础样式 */
+QTabBar{
+  background-color:transparent; /* 背景透明 */
+  qproperty-drawBase:0; /* 禁用默认背景绘制 */
+  border-bottom:1px solid rgba(200,200,200,127); /* 底部边框：1px半透明浅灰色 */
+}
+
+/* 标签页样式 */
+QTabBar::tab{
+  padding:4px 6px; /* 内边距：标签文字与边框的间距 */
+  background-color:transparent; /* 背景透明 */
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(220,220,220,127),stop:1 rgba(200,200,200,75)); /* 背景：同停靠窗口标题的渐变 */
+  border:1px solid rgba(220,220,220,75); /* 边框：同停靠窗口标题 */
+  border-top-left-radius:4px; /* 左上角圆角 */
+  border-top-right-radius:4px; /* 右上角圆角 */
+}
+
+/* 标签页选中与悬停状态 */
+QTabBar::tab:selected,QTabBar::tab:hover{
+  background-color:transparent; /* 背景透明 */
+  background-color:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba(200,200,200,127),stop:1 rgba(200,200,200,50%)); /* 背景：反向渐变（上深下浅） */
+  border-bottom-color:rgba(200,200,200,75%); /* 下边框颜色：半透明白色 */
+}
+
+/* 标签页选中状态的底部高亮 */
+QTabBar::tab:selected{
+  border-bottom:2px solid palette(highlight); /* 下边框：2px系统高亮色（突出选中状态） */
+}
+
+/* 禁用状态下的标签页选中样式 */
+QTabBar::tab::selected:disabled{
+  border-bottom:2px solid rgb(127,127,127); /* 下边框：深灰色（禁用时的选中状态） */
+}
+
+/* 标签页关闭按钮基础样式 */
+QTabBar::close-button {
+  border:1px solid transparent; /* 透明边框 */
+  border-radius:2px; /* 圆角：2px */
+  image: url(":/qss_icons/light/light_icons/window_close.png"); /* 默认关闭图标 */
+}
+
+/* 关闭按钮悬停状态 */
+QTabBar::close-button:hover {
+  background-color:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba(176,176,176,255),stop:1 rgba(176,176,176,75)); /* 背景：浅灰色渐变 */
+  border:1px solid palette(base); /* 边框：系统基础色 */
+  image: url(":/qss_icons/light/light_icons/window_close_focus.png"); /* 悬停图标 */
+}
+
+/* 关闭按钮按下状态 */
+QTabBar::close-button:pressed {
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(220,220,220,127),stop:1 rgba(200,200,200,75)); /* 背景：同停靠窗口标题的渐变 */
+  border:1px solid palette(base); /* 边框：系统基础色 */
+  image: url(":/qss_icons/light/light_icons/window_close_pressed.png"); /* 按下图标 */
+}
+
+/* 复选框与单选按钮的指示器大小统一 */
+QCheckBox::indicator, QRadioButton::indicator {
+  width:18px; /* 指示器宽度：18px */
+  height:18px; /* 指示器高度：18px */
+}
+
+/* 单选按钮指示器尺寸 */
+QRadioButton::indicator{
+  width:18px; /* 宽度 */
+  height:18px; /* 高度 */
+}
+
+/* 树形视图与表格视图基础样式 */
+QTreeView, QTableView {
+  alternate-background-color:palette(window); /* 交替行背景色：系统窗口色（默认无交替，需配合setAlternatingRowColors(true)启用） */
+  background:palette(base); /* 背景色：系统基础色（通常为浅灰色） */
+}
+
+/* 表头样式 */
+QTreeView QHeaderView::section, QTableView QHeaderView::section {
+  background-color:qlineargradient(x1:0,y1:1,x2:0,y2:0,stop:0 rgba(220,220,220,127),stop:1 rgba(200,200,200,75)); /* 背景：垂直渐变浅灰色（下深上浅） */
+  border-style:none; /* 无边框 */
+  border-bottom:1px solid palette(dark); /* 下边框：系统深色（分隔表头与内容） */
+  padding-left:5px; /* 左侧内边距：5px */
+  padding-right:5px; /* 右侧内边距：5px */
+}
+
+/* 禁用状态下的选中项样式 */
+QTreeView::item:selected:disabled, QTableView::item:selected:disabled {
+  background:rgb(80,80,80); /* 背景：深灰色（禁用时的选中状态） */
+}
+
+/* 树视图分支基础样式 */
+QTreeView::branch{
+  background-color:palette(base); /* 背景色：系统基础色 */
+}
+
+/* 树视图分支闭合状态（无兄弟节点） */
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings{
+  border-image:none; /* 无边框图片 */
+}
+
+/* 树视图分支打开状态（无兄弟节点） */
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings{
+  border-image:none; /* 无边框图片 */
+}
+
+/* 树视图分支选中/悬停状态 */
+QTreeView:branch:selected, QTreeView:branch:hover {
+  background: url(":/qss_icons/dark/dark_icons/transparent.png"); /* 背景透明 */
+}
+
+/* 分支线样式（无兄弟节点且不相邻） */
+QTreeView:branch:has-siblings:!adjoins-item {
+  border-image: url(":/qss_icons/light/light_icons/branch_line.png") 0; /* 垂直线图标 */
+}
+
+/* 分支线样式（有兄弟节点且相邻） */
+QTreeView:branch:has-siblings:adjoins-item {
+  border-image: url(":/qss_icons/light/light_icons/branch_more.png") 0; /* 分叉线图标 */
+}
+
+/* 分支线样式（无子节点且相邻） */
+QTreeView:branch:!has-children:!has-siblings:adjoins-item {
+  border-image: url(":/qss_icons/light/light_icons/branch_end.png") 0; /* 末端线图标 */
+}
+
+/* 分支折叠状态（无兄弟节点/有兄弟节点） */
+QTreeView::branch:has-children:!has-siblings:closed, 
+QTreeView::branch:closed:has-children:has-siblings {
+  border-image: none; /* 无边框 */
+  image: url(":/qss_icons/light/light_icons/branch_closed.png"); /* 折叠箭头图标 */
+}
+
+/* 分支展开状态（无兄弟节点/有兄弟节点） */
+QTreeView::branch:open:has-children:!has-siblings, 
+QTreeView::branch:open:has-children:has-siblings {
+  border-image: none; /* 无边框 */
+  image: url(":/qss_icons/light/light_icons/branch_open.png"); /* 展开箭头图标 */
+}
+
+/* 分支折叠状态悬停 */
+QTreeView:branch:has-children:!has-siblings:closed:hover, 
+QTreeView:branch:closed:has-children:has-siblings:hover {
+  image: url(":/qss_icons/light/light_icons/branch_closed_focus.png"); /* 折叠箭头悬停图标 */
+}
+
+/* 分支展开状态悬停 */
+QTreeView:branch:open:has-children:!has-siblings:hover, 
+QTreeView:branch:open:has-children:has-siblings:hover {
+  image: url(":/qss_icons/light/light_icons/branch_open_focus.png"); /* 展开箭头悬停图标 */
+}
+
+/* 垂直滚动条基础样式 */
+QScrollBar:vertical {
+  background:palette(base); /* 背景色：系统基础色 */
+  border-top-right-radius:1px; /* 右上角圆角：1px */
+  border-bottom-right-radius:1px; /* 右下角圆角：1px */
+  width:8px; /* 滚动条宽度：8px */
+  margin:0px; /* 外边距：0px */
+}
+
+/* 垂直滚动条滑块 */
+QScrollBar::handle:vertical {
+  background-color:palette(alternate-base); /* 滑块背景色：系统交替基础色 */
+  border-radius:1px; /* 圆角：1px */
+  min-height:20px; /* 最小高度：20px */
+  margin:1px 2px 1px 2px; /* 上下左右边距：1px/2px */
+}
+
+/* 垂直滚动条滑块悬停状态 */
+QScrollBar::handle:vertical:hover {
+  background-color:palette(highlight); /* 滑块背景色：系统高亮色 */
+}
+
+/* 垂直滚动条的增加/减少按钮（隐藏） */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+  background:none; /* 背景透明 */
+  height:0px; /* 高度：0px（隐藏） */
+  subcontrol-position:right; /* 子控件位置：右侧 */
+  subcontrol-origin:margin; /* 子控件原点：边距 */
+}
+
+/* 垂直滚动条减少按钮 */
+QScrollBar::sub-line:vertical{
+  background:none; /* 背景透明 */
+  height:0px; /* 高度：0px */
+  subcontrol-position:left; /* 子控件位置：左侧 */
+  subcontrol-origin:margin; /* 子控件原点：边距 */
+}
+/* 水平滚动条基础样式 */
+QScrollBar:horizontal {
+  background:palette(base); /* 背景色：系统基础色 */
+  height:8px; /* 滚动条高度：8px */
+  margin:0px; /* 外边距：0px */
+}
+
+/* 水平滚动条滑块 */
+QScrollBar::handle:horizontal {
+  background-color:palette(alternate-base); /* 滑块背景色：系统交替基础色 */
+  border-radius:1px; /* 圆角：1px */
+  min-width:20px; /* 最小宽度：20px */
+  margin:2px 1px 2px 1px; /* 上下左右边距：2px/1px */
+}
+
+/* 水平滚动条滑块悬停状态 */
+QScrollBar::handle:horizontal:hover {
+  background-color:palette(highlight); /* 滑块背景色：系统高亮色 */
+}
+
+/* 水平滚动条的增加/减少按钮（隐藏） */
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+  background:none; /* 背景透明 */
+  width:0px; /* 宽度：0px（隐藏） */
+  subcontrol-position:bottom; /* 子控件位置：底部 */
+  subcontrol-origin:margin; /* 子控件原点：边距 */
+}
+
+/* 水平滚动条减少按钮 */
+QScrollBar::sub-line:horizontal{
+  background:none; /* 背景透明 */
+  width:0px; /* 宽度：0px */
+  subcontrol-position:top; /* 子控件位置：顶部 */
+  subcontrol-origin:margin; /* 子控件原点：边距 */
+}
+
+/* 水平滑块基础样式 */
+QSlider::handle:horizontal {
+  border-radius:4px; /* 圆角：4px */
+  border:1px solid rgba(220,220,220,255); /* 边框：白色（255透明度） */
+  background-color:palette(alternate-base); /* 背景色：系统交替基础色 */
+  min-height:20px; /* 最小高度：20px */
+  margin:0 -4px; /* 左右负边距：-4px（扩展滑块点击区域） */
+}
+
+/* 水平滑块悬停状态 */
+QSlider::handle:horizontal:hover {
+  background:palette(highlight); /* 背景色：系统高亮色 */
+}
+
+/* 滑块已选区域（右侧） */
+QSlider::add-page:horizontal {
+  background:palette(base); /* 背景色：系统基础色 */
+}
+
+/* 滑块未选区域（左侧） */
+QSlider::sub-page:horizontal {
+  background:palette(highlight); /* 背景色：系统高亮色 */
+}
+
+/* 禁用状态下的滑块未选区域 */
+QSlider::sub-page:horizontal:disabled {
+  background:rgb(80,80,80); /* 背景色：深灰色（禁用时的选中状态） */
+}

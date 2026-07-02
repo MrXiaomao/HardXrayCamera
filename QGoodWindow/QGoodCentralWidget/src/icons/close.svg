@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="13.333" height="13.333" viewBox="0 0 10 10" shape-rendering="crispEdges">
+  <g fill="none" stroke="#000" stroke-width="2" stroke-linecap="square">
+	<g stroke="#fff" stroke-width="1">
+		<polyline points="0 0 10 10"/>
+		<polyline points="10 0 0 10"/>
+	</g>
+  </g>
+</svg>
