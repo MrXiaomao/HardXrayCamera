@@ -303,6 +303,7 @@ void MainWindow::onMeasureTimerTimeout()
     printWaveformCollectionSummary();
     printSpectrumSequenceSummary();
     measureTimer->stop();
+    finalizeMeasurementPlots();
 
     ui->action_startMeasure->setEnabled(true);
     ui->action_stopMeasure->setEnabled(false);
@@ -382,6 +383,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
             measureTimer->stop();
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
+            finalizeMeasurementPlots();
             m_autoMeasureState = AutoMeasureState::Idle;
             m_autoMeasureDurationTimerStarted = false;
         } else if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
@@ -716,12 +718,6 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
     if (logicalChannel != currentChannel)
         return;
 
-    const int specCount = m_spectrumByChannel.at(currentChannel - 1).size();
-    ui->spb_specID->blockSignals(true);
-    ui->spb_specID->setValue(specCount - 1);
-    ui->spb_specID->blockSignals(false);
-    updateSpecIdSpinBoxRange();
-
     // 限流刷新，避免高频能谱拖慢 UI
     if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
         return;
@@ -757,12 +753,6 @@ void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, qu
     const int currentChannel = ui->spb_channel->value();
     if (logicalChannel != currentChannel)
         return;
-
-    const int waveCount = m_waveformByChannel.at(currentChannel - 1).size();
-    ui->spb_waveID->blockSignals(true);
-    ui->spb_waveID->setValue(waveCount - 1);
-    ui->spb_waveID->blockSignals(false);
-    updateWaveIdSpinBoxRange();
 }
 
 void MainWindow::onChannelSpinBoxChanged(int /*value*/)
@@ -960,6 +950,40 @@ void MainWindow::updateWaveIdSpinBoxRange()
     if (ui->spb_waveID->value() > maxWaveId)
         ui->spb_waveID->setValue(maxWaveId);
     ui->spb_waveID->blockSignals(false);
+}
+
+void MainWindow::syncSpectrumSpinBoxToLatest()
+{
+    const int channel = ui->spb_channel->value();
+    if (channel < 1 || channel > m_spectrumByChannel.size())
+        return;
+
+    const int maxSpecId = qMax(0, m_spectrumByChannel.at(channel - 1).size() - 1);
+    ui->spb_specID->blockSignals(true);
+    ui->spb_specID->setMaximum(maxSpecId);
+    ui->spb_specID->setValue(maxSpecId);
+    ui->spb_specID->blockSignals(false);
+}
+
+void MainWindow::syncWaveformSpinBoxToLatest()
+{
+    const int channel = ui->spb_channel->value();
+    if (channel < 1 || channel > m_waveformByChannel.size())
+        return;
+
+    const int maxWaveId = qMax(0, m_waveformByChannel.at(channel - 1).size() - 1);
+    ui->spb_waveID->blockSignals(true);
+    ui->spb_waveID->setMaximum(maxWaveId);
+    ui->spb_waveID->setValue(maxWaveId);
+    ui->spb_waveID->blockSignals(false);
+}
+
+void MainWindow::finalizeMeasurementPlots()
+{
+    syncSpectrumSpinBoxToLatest();
+    syncWaveformSpinBoxToLatest();
+    refreshSpectrumPlot();
+    refreshWaveformPlot();
 }
 
 void MainWindow::updateSpectrumRefreshIntervalRange()
@@ -1296,6 +1320,9 @@ void MainWindow::on_btn_generateProfile_clicked()
 
 void MainWindow::refreshSpectrumPlot()
 {
+    if (isMeasureSessionActive())
+        syncSpectrumSpinBoxToLatest();
+
     const int channel = ui->spb_channel->value();
     const int specId = ui->spb_specID->value();
     if (channel < 1 || channel > m_spectrumByChannel.size()) {
@@ -1343,6 +1370,9 @@ void MainWindow::refreshSpectrumPlot()
 
 void MainWindow::refreshWaveformPlot()
 {
+    if (isMeasureSessionActive())
+        syncWaveformSpinBoxToLatest();
+
     const int channel = ui->spb_channel->value();
     const int waveId = ui->spb_waveID->value();
     if (channel < 1 || channel > m_waveformByChannel.size()) {
@@ -1555,6 +1585,7 @@ void MainWindow::stopAutoMeasureSession()
         commandHelper->stopMeasure();
         printWaveformCollectionSummary();
         printSpectrumSequenceSummary();
+        finalizeMeasurementPlots();
     } else {
         // 炮号未到，硬件尚未开始测量，只取消等待，不发送停止指令。
         commandHelper->closeMeasurementFiles();
@@ -1698,7 +1729,8 @@ bool MainWindow::startMeasureInternal()
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
-            printSpectrumSequenceSummary();            
+            printSpectrumSequenceSummary();
+            finalizeMeasurementPlots();
 
             m_autoMeasureState = AutoMeasureState::Idle;
             ui->action_startMeasure->setEnabled(true);
@@ -2068,6 +2100,7 @@ void MainWindow::on_action_stopMeasure_triggered()
     printWaveformCollectionSummary();
     printSpectrumSequenceSummary();
     measureTimer->stop();
+    finalizeMeasurementPlots();
     qInfo() << "手动停止测量";
 }
 
