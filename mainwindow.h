@@ -171,6 +171,9 @@ private:
     void ensureSpectrumBinAddresses(int binCount);
     void updateSpecIdSpinBoxRange();
     void updateWaveIdSpinBoxRange();
+    void syncSpectrumSpinBoxToLatest();
+    void syncWaveformSpinBoxToLatest();
+    void finalizeMeasurementPlots();
     void updateSpectrumRefreshIntervalRange();
     void updateHxrDisplayBinControls();
     void updateProfileControls();

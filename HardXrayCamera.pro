@@ -91,7 +91,7 @@ DEFINES += GIT_BRANCH=\"\\\"$$GIT_BRANCH\\\"\"
 DEFINES += GIT_DATE=\"\\\"$$GIT_DATE\\\"\"
 DEFINES += GIT_HASH=\"\\\"$$GIT_HASH\\\"\"
 DEFINES += GIT_VERSION=\"\\\"$$GIT_VERSION\\\"\"
-DEFINES += APP_VERSION="\\\"V1.0.0\\\""
+DEFINES += APP_VERSION="\\\"V2.0.0\\\""
 
 message(GIT_BRANCH":  ""$$GIT_BRANCH")
 message(GIT_TIME":  ""$$GIT_TIME")
