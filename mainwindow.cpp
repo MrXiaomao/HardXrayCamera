@@ -260,6 +260,35 @@ MainWindow::MainWindow(QWidget *parent)
     // 开机自动最大化：一次性延迟调用，保留 lambda
     initStatusbar();
 
+    // 构造函数中添加
+    m_logFlushTimer = new QTimer(this);
+    m_logFlushTimer->start(10); // 每50ms刷新一次，每秒最多刷新20次
+    connect(m_logFlushTimer, &QTimer::timeout, this, [this](){
+        // 加锁取出所有缓存日志
+        QMutexLocker lock(&m_bufferMutex);
+        if (m_logBuffer.isEmpty()) return;
+
+        // 一次性批量插入所有缓存日志
+        QTextCursor cursor = ui->plainTextEdit_log->textCursor();
+        cursor.beginEditBlock(); // 批量编辑，关闭中途重绘，关键优化！
+        cursor.movePosition(QTextCursor::End);
+
+        for (const auto& item : m_logBuffer) {
+            QTextCharFormat format;
+            format.setForeground(item.color);
+            cursor.setCharFormat(format);
+            cursor.insertText(item.text + "\n");
+        }
+
+        cursor.endEditBlock(); // 完成后一次性刷新UI
+        ui->plainTextEdit_log->setTextCursor(cursor);
+        // 自动滚动只做一次
+        // ui->plainTextEdit_log->verticalScrollBar()->setValue(
+        //     ui->plainTextEdit_log->verticalScrollBar()->maximum()
+        //     );
+        m_logBuffer.clear();
+    });
+
     // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
 }
@@ -354,6 +383,8 @@ void MainWindow::onMeasureTimerTimeout()
     if (measureMode == 0)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
     else if (measureMode == 2){
+        emit ui->action_disconnectDet->trigger();
+        emit ui->action_disconnectMonitor->trigger();
         emit ui->action_relayNetClose->trigger();
         qInfo() << "无人值守测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
     }
@@ -376,19 +407,22 @@ void MainWindow::onRelayStatusChanged(bool on)
         if (m_enableAutoMated) {
             QTimer::singleShot(500, this, [this] {
                 // 延迟进入下一步，否则指令会发出去无响应
-                emit step1Finished();
+                emit relayConnected();
             });
         }
     }
     else{
+        // 关闭继电器自动重连
+        commandHelper->disconnectARM();
         setPowerSwitchEnabled(false);
         syncPowerSwitchFromRelay(false);
         ui->action_connectDet->setEnabled(false);
         ui->action_disconnectDet->setEnabled(false);
         ui->action_connectMonitor->setEnabled(false);
         ui->action_disconnectMonitor->setEnabled(false);
-        ui->action_startMeasure->setEnabled(false);
+        ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
         ui->action_stopMeasure->setEnabled(false);
+
         qInfo() << "继电器网络状态: 已断开";
     }
 }
@@ -416,7 +450,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         ui->action_disconnectDet->setEnabled(false);
         ui->action_connectMonitor->setEnabled(false);
         ui->action_disconnectMonitor->setEnabled(false);
-        ui->action_startMeasure->setEnabled(false);
+        ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
         ui->action_stopMeasure->setEnabled(false);
 
         qInfo() << "继电器控制的电源状态: 已关闭";
@@ -458,7 +492,7 @@ void MainWindow::onDetector1StatusChanged(bool on)
         detectOnline[0] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机主网口(控制/能谱)状态: 已断开";
@@ -479,7 +513,7 @@ void MainWindow::onDetector2StatusChanged(bool on)
         detectOnline[1] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已断开";
@@ -500,7 +534,7 @@ void MainWindow::onDetector3StatusChanged(bool on)
         detectOnline[2] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机副网口(波形接收)状态: 已断开";
@@ -521,7 +555,7 @@ void MainWindow::onDetector4StatusChanged(bool on)
         detectOnline[3] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(false);
+            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机副网口(波形接收)状态: 已断开";
@@ -806,29 +840,43 @@ void MainWindow::onChannelSpinBoxChanged(int /*value*/)
 }
 
 void MainWindow::slotAppendMsg(const QString &msg, QtMsgType msgType)
-{
-    QTextCharFormat format;
+{        
+    //QTextCharFormat format;
     const QString ts = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz>>");
     QString logLine;
 
     if (msgType == QtWarningMsg) {
-        format.setForeground(Qt::blue);
+        //format.setForeground(Qt::blue);
         logLine = QStringLiteral("%1 [WARN] %2").arg(ts).arg(msg);
+        appendColoredText(logLine, Qt::blue);
     } else if (msgType == QtCriticalMsg || msgType == QtFatalMsg) {
-        format.setForeground(Qt::red);
+        //format.setForeground(Qt::red);
         logLine = QStringLiteral("%1 [ERROR] %2").arg(ts).arg(msg);
+        appendColoredText(logLine, Qt::red);
     } else {
         // QtDebugMsg、QtInfoMsg、QtSystemMsg 等：不打印级别字样
         logLine = QStringLiteral("%1 %2").arg(ts).arg(msg);
+        appendColoredText(logLine, Qt::black);
     }
 
-    QTextCursor cursor = ui->plainTextEdit_log->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    cursor.insertText(logLine, format);
-    cursor.insertBlock();
-    ui->plainTextEdit_log->setTextCursor(cursor);
+    // QTextCursor cursor = ui->plainTextEdit_log->textCursor();
+    // cursor.movePosition(QTextCursor::End);
+    // cursor.insertText(logLine, format);
+    // cursor.insertBlock();
+    // ui->plainTextEdit_log->setTextCursor(cursor);
 }
 
+void MainWindow::appendColoredText(const QString &text, const QColor &color)
+{
+    if (QThread::currentThread() != this->thread()) {
+        QMetaObject::invokeMethod(this, "appendColoredText", Qt::QueuedConnection,
+                                  Q_ARG(QString, text), Q_ARG(QColor, color));
+        return;
+    }
+
+    QMutexLocker lock(&m_bufferMutex);
+    m_logBuffer.push_back({text, color});
+}
 
 int MainWindow::logicalChannelNumber(int detectorIndex, int channelNumber) const
 {
@@ -1072,11 +1120,28 @@ void MainWindow::updateProfileControls()
 
 void MainWindow::updateUnattendedControls()
 {
-    const bool unattendedMode = ui->comboBox_measureMode->currentIndex() == 2;
+    int index = ui->comboBox_measureMode->currentIndex();
+    const bool unattendedMode = index == 2;
     ui->label_9->setVisible(unattendedMode);
     ui->dateTimeEdit_startup->setVisible(unattendedMode);
     ui->label_10->setVisible(unattendedMode);
     ui->dateTimeEdit_shutdown->setVisible(unattendedMode);
+
+    if (index == 2){
+        // 无人值守
+        ui->action_startMeasure->setEnabled(true);
+        ui->checkBox_alarm->setEnabled(false);
+        ui->checkBox_alarm->setChecked(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
+    }
+    else{
+        ui->action_startMeasure->setEnabled(replayPowerOn ? !ui->action_connectDet->isEnabled() : false);
+        ui->checkBox_alarm->setEnabled(true);
+        ui->checkBox_alarm->setChecked(false);
+        ui->dateTimeEdit_startup->setEnabled(false);
+        ui->dateTimeEdit_shutdown->setEnabled(false);
+    }
 }
 
 QString MainWindow::energyCalibrationFilePath() const
@@ -1764,8 +1829,13 @@ bool MainWindow::startMeasureInternal()
             if (stopTimer->isActive())
                 stopTimer->stop();
 
-            if (measureTimer->isActive())
+            if (measureTimer->isActive()){
+                // 测量时长未到（原因：由于连接继电器到可以正常开始测量，耗时大约1分钟，如果开机时刻~关机时刻时间间隔太短，很可能关机时刻已经到了，但是测量还未结束）
+                emit ui->action_disconnectDet->trigger();
+                emit ui->action_disconnectMonitor->trigger();
+                emit ui->action_relayNetClose->trigger();
                 measureTimer->stop();
+            }
 
             // 停止工作定
             waveformPlotTimer->stop();
@@ -1913,7 +1983,7 @@ void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
 
     if (powerOn && m_enableAutoMated) {
         QTimer::singleShot(500, this, [this] {
-            emit step2Finished();
+            emit relayPowerOpened();
         });
     }
 }
@@ -1939,12 +2009,12 @@ void MainWindow::syncDetectorConnectButton()
     ui->action_connectDet->setEnabled(!allConnected && replayPowerOn);
     ui->action_disconnectDet->setEnabled(anyConnected);
 
-    ui->action_startMeasure->setEnabled(anyConnected);
+    ui->action_startMeasure->setEnabled(anyConnected || ui->comboBox_measureMode->currentIndex() == 2);
     ui->action_stopMeasure->setEnabled(anyConnected);
 
     if (allConnected && m_enableAutoMated) {
         QTimer::singleShot(500, this, [this] {
-            emit step3Finished();
+            emit detectorConnected();
         });
     }
 }
@@ -1961,8 +2031,13 @@ void MainWindow::syncArmMonitorButton()
     ui->action_connectMonitor->setEnabled(!allConnected);
     ui->action_disconnectMonitor->setEnabled(anyConnected);
 
+    if (!replayOnline) {
+        ui->action_connectMonitor->setEnabled(false);
+        ui->action_disconnectMonitor->setEnabled(false);
+    }
+
     if (allConnected && m_enableAutoMated)
-        emit step5Finished();
+        emit monitorConnected();
 }
 
 void MainWindow::loadMonitorAlarmSettings()
@@ -2072,9 +2147,18 @@ void MainWindow::showHardwareStartupWaitDialog()
 {
     QMessageBox box(this);
     box.setWindowTitle(QStringLiteral("提示"));
-    box.setText(QStringLiteral("硬件启动中，请稍等。"));
+    box.setText(QStringLiteral("硬件启动中，请稍等..."));
     box.setStandardButtons(QMessageBox::NoButton);
-    QTimer::singleShot(5000, &box, &QMessageBox::accept);
+
+    // 设置非模态对话框，避免界面堵塞
+    box.setWindowFlags(box.windowFlags() | Qt::WindowStaysOnTopHint | Qt::Tool);
+    box.setModal(true);
+
+    // 窗口延迟关闭
+    QTimer::singleShot(5000, &box, [&box](){
+        if(!box.isHidden()) box.accept();
+    });
+
     box.exec();
 }
 
@@ -2147,25 +2231,6 @@ void MainWindow::on_action_stopMeasure_triggered()
 }
 
 
-void MainWindow::on_comboBox_measureMode_currentIndexChanged(int index)
-{
-    if (index == 2){
-        // 无人值守
-        ui->action_startMeasure->setEnabled(true);
-        ui->checkBox_alarm->setEnabled(false);
-        ui->checkBox_alarm->setChecked(true);
-        ui->dateTimeEdit_startup->setEnabled(true);
-        ui->dateTimeEdit_shutdown->setEnabled(true);
-    }
-    else{
-        ui->action_startMeasure->setEnabled(replayPowerOn ? !ui->action_connectDet->isEnabled() : false);
-        ui->checkBox_alarm->setEnabled(true);
-        ui->checkBox_alarm->setChecked(false);
-        ui->dateTimeEdit_startup->setEnabled(false);
-        ui->dateTimeEdit_shutdown->setEnabled(false);
-    }
-}
-
 #include <QSignalTransition>
 void MainWindow::initStateMachine()
 {
@@ -2177,68 +2242,59 @@ void MainWindow::initStateMachine()
     stStep2 = new QState(machine);
     stStep3 = new QState(machine);
     stStep4 = new QState(machine);
-    stStep5 = new QState(machine);
     stFinish = new QState(machine);
     machine->setInitialState(stIdle);
 
     // 从空闲到Step1，启动后执行任务
     stIdle->addTransition(stIdle, &QState::entered, stStep1);
 
-    stStep1->addTransition(this, &MainWindow::step1Finished, stStep2);
+    stStep1->addTransition(this, &MainWindow::relayConnected, stStep2);
     connect(stStep1, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
         // 连接远程控制
-        if (ui->action_relayNetOpen->isEnabled()){
+        if (!replayOnline){
             emit ui->action_relayNetOpen->triggered(true);
         }
         else{
-            emit step1Finished();
+            emit relayConnected();
         }
     });
 
     // 后面两个步骤以此类推
-    stStep2->addTransition(this, &MainWindow::step2Finished, stStep3);
+    stStep2->addTransition(this, &MainWindow::relayPowerOpened, stStep3);
     connect(stStep2, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
         // 开启电源
-        if (ui->action_powerOn->isEnabled()){
+        if (!replayPowerOn){
             emit ui->action_powerOn->triggered(true);
         }
         else{
-            emit step2Finished();
+            emit relayPowerOpened();
         }
 
     });
 
-    stStep3->addTransition(this, &MainWindow::step3Finished, stStep4);
+    stStep3->addTransition(this, &MainWindow::detectorConnected, stStep4);
     connect(stStep3, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
         // 连接采集系统
-        if (ui->action_connectDet->isEnabled()){
+        const bool allConnected = detectOnline[0] && detectOnline[1] && detectOnline[2] && detectOnline[3];
+        if (!allConnected){
             emit ui->action_connectDet->triggered(true);
         }
         else{
-            emit step3Finished();
+            emit detectorConnected();
         }
     });
 
-    stStep4->addTransition(this, &MainWindow::step4Finished, stStep5);
+    stStep4->addTransition(this, &MainWindow::monitorConnected, stFinish);
     connect(stStep4, &QState::entered, this, [this](){
-        if (!m_enableAutoMated)
-            return;
-
-        // 进入测量准备阶段，实际测量在 stFinish 中启动
-        emit step4Finished();
-    });
-
-    stStep5->addTransition(this, &MainWindow::step5Finished, stFinish);
-    connect(stStep5, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
@@ -2247,7 +2303,7 @@ void MainWindow::initStateMachine()
             emit ui->action_connectMonitor->triggered(true);
         }
         else{
-            emit step5Finished();
+            emit monitorConnected();
         }
     });
 
@@ -2321,4 +2377,3 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     event->accept();
     qApp->quit();
 }
-

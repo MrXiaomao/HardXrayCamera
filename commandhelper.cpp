@@ -306,6 +306,8 @@ void CommandHelper::connectARM()
 
 void CommandHelper::disconnectARM()
 {
+    client_arm1->setAutoReconnect(false);
+    client_arm2->setAutoReconnect(false);
     client_arm1->disconnectFromHost();
     client_arm2->disconnectFromHost();
 
@@ -482,26 +484,18 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
     qInfo()<<"水平相机波形数据文件名:"<<QFileInfo(mfileNameFpga1Wave).fileName();
     qInfo()<<"垂直相机波形数据文件名:"<<QFileInfo(mfileNameFpga2Wave).fileName();
 
-    /*if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "Failed to open 水平相机主网口 file:" << mfileNameFpga1Main;
-    } else {
-        qInfo() << "水平相机主网口 data will be saved to:" << mfileNameFpga1Main;
+    if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qWarning() << "水平相机能谱数据创建失败，文件名：" << mfileNameFpga1Main;
     }
     if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "Failed to open 垂直相机主网口 file:" << mfileNameFpga2Main;
-    } else {
-        qInfo() << "垂直相机主网口 data will be saved to:" << mfileNameFpga2Main;
+        qWarning() << "垂直相机能谱数据创建失败，文件名：" << mfileNameFpga2Main;
     }
     if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "Failed to open 水平相机副网口 file:" << mfileNameFpga1Wave;
-    } else {
-        qInfo() << "水平相机副网口 data will be saved to:" << mfileNameFpga1Wave;
+        qWarning() << "水平相机波形数据创建失败，文件名：" << mfileNameFpga1Wave;
     }
     if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "Failed to open 垂直相机副网口 file:" << mfileNameFpga2Wave;
-    } else {
-        qInfo() << "垂直相机副网口 data will be saved to:" << mfileNameFpga2Wave;
-    }*/
+        qWarning() << "垂直相机波形数据创建失败，文件名：" << mfileNameFpga2Wave;
+    }
 }
 
 void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
@@ -676,8 +670,6 @@ void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
             if (m_fpga1MainFile.isOpen()) {
                 m_fpga1MainFile.write(binaryData);
                 m_fpga1MainFile.flush();
-            } else {
-                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
             }
         }
         // 处理水平相机主网口能谱数据，根据当前传输模式选择解析器
@@ -709,8 +701,6 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
         if (m_fpga2MainFile.isOpen()) {
             m_fpga2MainFile.write(binaryData);
             m_fpga2MainFile.flush();
-        } else {
-            qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
         }
     }
 
@@ -742,8 +732,6 @@ void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
         if (m_fpga1WaveFile.isOpen()) {
             m_fpga1WaveFile.write(binaryData);
             m_fpga1WaveFile.flush();
-        } else {
-            qWarning() << "水平相机副网口 file is not open:" << mfileNameFpga1Wave;
         }
     }
 
@@ -771,8 +759,6 @@ void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
         if (m_fpga2WaveFile.isOpen()) {
             m_fpga2WaveFile.write(binaryData);
             m_fpga2WaveFile.flush();
-        } else {
-            qWarning() << "垂直相机副网口 file is not open:" << mfileNameFpga2Wave;
         }
     }
 
@@ -839,11 +825,6 @@ bool CommandHelper::parseSpectrum512Packet(int detectorIndex, const QByteArray& 
             fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
             fpgaMainFile[detectorIndex-1]->write("\n");
             fpgaMainFile[detectorIndex-1]->flush();
-        } else {
-            if (1==detectorIndex)
-                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
-            else
-                qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
         }
     }
 
@@ -914,11 +895,6 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
             fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
             fpgaMainFile[detectorIndex-1]->write("\n");
             fpgaMainFile[detectorIndex-1]->flush();
-        } else {
-            if (1==detectorIndex)
-                qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Main;
-            else
-                qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Main;
         }
     }
 
@@ -978,11 +954,6 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
                 fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
                 fpgaWaveFile[detectorIndex-1]->write("\n");
                 fpgaWaveFile[detectorIndex-1]->flush();
-            } else {
-                if (1==detectorIndex)
-                    qWarning() << "水平相机主网口 file is not open:" << mfileNameFpga1Wave;
-                else
-                    qWarning() << "垂直相机主网口 file is not open:" << mfileNameFpga2Wave;
             }
         }
 

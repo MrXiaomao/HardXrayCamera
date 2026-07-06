@@ -111,8 +111,6 @@ private slots:
 
     void on_btn_generateProfile_clicked();
 
-    void on_comboBox_measureMode_currentIndexChanged(int index);
-
     void on_action_connectMonitor_triggered();
 
     void on_action_disconnectMonitor_triggered();
@@ -261,15 +259,24 @@ public:
     // 无人值守
     bool m_enableAutoMated;
     QStateMachine *machine;
-    QState *stIdle, *stStep1, *stStep2, *stStep3, *stStep4, *stStep5, *stFinish;
+    QState *stIdle, *stStep1, *stStep2, *stStep3, *stStep4, *stFinish;
     void initStateMachine();
 
 Q_SIGNALS:
     // 无人值守共分五步：
-    void step1Finished();// 1、连接远程控制
-    void step2Finished();// 2、开启电源
-    void step3Finished();// 3、连接采集系统
-    void step4Finished();// 4、进入测量准备
-    void step5Finished();// 5、连接实时监测系统
+    void relayConnected();// 1、连接远程控制
+    void relayPowerOpened();// 2、开启电源
+    void detectorConnected();// 3、连接采集系统
+    void monitorConnected();// 5、连接实时监测系统
+
+private:
+    struct LogItem {
+        QString text;
+        QColor color;
+    };
+    QVector<LogItem> m_logBuffer; // 日志缓存队列
+    QTimer* m_logFlushTimer;      // 定时刷新定时器
+    QMutex m_bufferMutex;         // 多线程防护（如果日志来自后台线程）
+    void appendColoredText(const QString &text, const QColor &color);
 };
 #endif // MAINWINDOW_H
