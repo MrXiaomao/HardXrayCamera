@@ -258,6 +258,9 @@ MainWindow::MainWindow(QWidget *parent)
     initStateMachine();
 
     // 开机自动最大化：一次性延迟调用，保留 lambda
+    initStatusbar();
+
+    // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
 }
 
@@ -266,6 +269,43 @@ MainWindow::~MainWindow()
     saveMonitorAlarmSettings();
     saveMeasureSettings();
     delete ui;
+}
+
+void MainWindow::initStatusbar()
+{
+    // 设置任务栏信息 - 系统时间
+    QLabel *label_systemtime = new QLabel(ui->statusbar);
+    label_systemtime->setObjectName("label_systemtime");
+    label_systemtime->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    ui->statusbar->setContentsMargins(5, 0, 5, 0);
+    ui->statusbar->addWidget(nullptr, 1);
+    ui->statusbar->addPermanentWidget(label_systemtime);
+
+    QTimer* systemClockTimer = new QTimer(this);
+    systemClockTimer->setObjectName("systemClockTimer");
+    connect(systemClockTimer, &QTimer::timeout, this, &MainWindow::onSystemTimer);
+    systemClockTimer->start(900);
+}
+
+// 系统刷新定时器，暂定于每秒钟刷新1次，刷新内容包括：测量时间、能谱图像、计数率曲线等
+void MainWindow::onSystemTimer()
+{
+    // 获取当前时间
+    QDateTime currentDateTime = QDateTime::currentDateTime();
+
+    // 获取星期几的数字（1代表星期日，7代表星期日）
+    int dayOfWeekNumber = currentDateTime.date().dayOfWeek();
+
+    // 星期几的中文名称列表
+    QStringList dayNames = {
+        tr("星期日"), QObject::tr("星期一"), QObject::tr("星期二"), QObject::tr("星期三"), QObject::tr("星期四"), QObject::tr("星期五"), QObject::tr("星期六"), QObject::tr("星期日")
+    };
+
+    // 根据数字获取中文名称
+    QString dayOfWeekString = dayNames.at(dayOfWeekNumber);
+    this->findChild<QLabel*>("label_systemtime")->setText(QString(QObject::tr("系统时间：")) + currentDateTime.toString("yyyy/MM/dd hh:mm:ss ") + dayOfWeekString);
+
 }
 
 int MainWindow::measureDurationMs() const
@@ -312,8 +352,10 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 0)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
-    else if (measureMode == 2)
+    else if (measureMode == 2){
+        emit ui->action_relayNetClose->trigger();
         qInfo() << "无人值守测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+    }
 }
 
 void MainWindow::onRelayStatusChanged(bool on)

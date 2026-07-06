@@ -40,6 +40,8 @@ public:
 private slots:
     void slotAppendMsg(const QString &msg, QtMsgType msgType);
 
+    void onSystemTimer();
+
     void on_pushButton_clearSysLog_clicked();
 
     void on_pushButton_clearNetLog_clicked();
@@ -158,6 +160,7 @@ private:
     static constexpr int kWaveformMaxDisplayNs =
         static_cast<int>(kWaveformSampleCount * kWaveformSampleIntervalNs);
 
+    void initStatusbar();
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
     void clearWaveformData();

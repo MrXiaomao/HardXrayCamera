@@ -944,7 +944,7 @@
                </time>
               </property>
               <property name="displayFormat">
-               <string>yyyy/M/d H:mm:ss</string>
+               <string>yyyy/MM/dd HH:mm:ss</string>
               </property>
              </widget>
             </item>
@@ -984,7 +984,7 @@
                </time>
               </property>
               <property name="displayFormat">
-               <string>yyyy/M/d H:mm:ss</string>
+               <string>yyyy/MM/dd HH:mm:ss</string>
               </property>
              </widget>
             </item>
