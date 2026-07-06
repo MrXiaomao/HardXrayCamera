@@ -476,7 +476,13 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
     m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
     m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
 
-    if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+    qInfo()<<"数据保存路径:"<<mSavePath;
+    qInfo()<<"水平相机能谱数据文件名:"<<QFileInfo(mfileNameFpga1Main).fileName();;
+    qInfo()<<"垂直相机能谱数据文件名:"<<QFileInfo(mfileNameFpga2Main).fileName();
+    qInfo()<<"水平相机波形数据文件名:"<<QFileInfo(mfileNameFpga1Wave).fileName();
+    qInfo()<<"垂直相机波形数据文件名:"<<QFileInfo(mfileNameFpga2Wave).fileName();
+
+    /*if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
         qWarning() << "Failed to open 水平相机主网口 file:" << mfileNameFpga1Main;
     } else {
         qInfo() << "水平相机主网口 data will be saved to:" << mfileNameFpga1Main;
@@ -495,7 +501,7 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
         qWarning() << "Failed to open 垂直相机副网口 file:" << mfileNameFpga2Wave;
     } else {
         qInfo() << "垂直相机副网口 data will be saved to:" << mfileNameFpga2Wave;
-    }
+    }*/
 }
 
 void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
@@ -796,7 +802,7 @@ void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, co
         if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             // 包尾不对，继续寻找下一个包头
             buffer.remove(0, SpectrumHeader.size());
-            //qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
+            qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
             continue;
         }
 
@@ -866,7 +872,7 @@ void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, con
         const QByteArray packet = buffer.left(Spectrum16PacketSize);
         if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             buffer.remove(0, SpectrumHeader.size());
-            //qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+            qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
             continue;
         }
 
