@@ -98,6 +98,9 @@ public:
     // index 1=FPGA1主网口, 2=FPGA2主网口
     bool isDetectorConnected(int index) const;
 
+    // 设置触发信号时间宽度
+    void sendTriggerSignalTimeWidth(quint8 detectorIndex = 0x11/*高位-板卡2，低位-板卡1*/, quint16 timeWidth = 96/*默认值*/);
+
 private:
     // 初始化常用指令
     void initCommand(); 
@@ -166,6 +169,8 @@ signals:
 
     void sigOTAUpgradeData(quint8, const QByteArray& data); // 上报OTA升级数据
 
+    void sigMeasureStarted();
+
 public slots:
     // 继电器数据处理
     void handleRelayData(const QByteArray &binaryData);
@@ -219,6 +224,8 @@ private:
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
+
+    std::atomic_bool mHardTriggered[2] = {false, false};
 
     bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;

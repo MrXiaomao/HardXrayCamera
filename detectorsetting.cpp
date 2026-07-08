@@ -154,7 +154,6 @@ void DetectorSetting::loadSettings()
     ui->spb_udpPort->setValue(runSettings->getValueByPath("Network/udpBroadcastPort", 6000).toInt());
 
     // 硬件参数读取
-    ui->spb_specRefashTime->setValue(settings->getValueByPath("FPGA/spec_refash_time").toInt());
     ui->spb_threshold->setValue(settings->getValueByPath("FPGA/threshold").toInt());
     ui->spb_deadTime->setValue(settings->getValueByPath("FPGA/deadTime").toInt());
     ui->spb_waveThreshold1->setValue(settings->getValueByPath("FPGA/wave/threshold1", DefaultThreshold).toInt());
@@ -213,7 +212,6 @@ void DetectorSetting::on_btn_ok_accepted()
     settings->setValueByPath("network/port_relay", port_relay);
 
     //硬件参数读取
-    settings->setValueByPath("FPGA/spec_refash_time", ui->spb_specRefashTime->value());
     settings->setValueByPath("FPGA/threshold", ui->spb_threshold->text());
     settings->setValueByPath("FPGA/deadTime", ui->spb_deadTime->text());
 

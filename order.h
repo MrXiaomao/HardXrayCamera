@@ -27,6 +27,7 @@ public:
     static QByteArray setSpectrumRefreshTime(quint32 ms);
     static QByteArray setSpectrumTriggerThreshold(quint16 threshold);
     static QByteArray setSpectrumDeadTime(quint16 deadTime16ns);
+    static QByteArray setTriggerSignalTimeWidth(quint16 timeWidth16ns = 16);
     static QByteArray setTimeSpectrumRange(quint8 index, quint16 start, quint16 end);
     // 单通道 17 个道址边界 -> 9 条 0xFB 指令（序号 channelIndex*9 .. +8）
     static QVector<QByteArray> setTimeSpectrumRangeChannel(quint8 channelIndex,
@@ -48,6 +49,7 @@ public:
     QByteArray SpectrumRefreshTime;
     QByteArray SpectrumTriggerThreshold;
     QByteArray SpectrumDeadTime;
+    QByteArray TriggerSignalTimeWidth;
 
     QByteArray WaveformStop;
     QByteArray WaveformSoftwareTrigger;

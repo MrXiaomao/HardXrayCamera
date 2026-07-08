@@ -69,6 +69,8 @@ private slots:
     void onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
                                 const QVector<quint16> &samples);
 
+    void onMeasureStarted();
+
     // 能谱/波形显示控件联动
     void onChannelSpinBoxChanged(int value);
 
@@ -121,6 +123,12 @@ private slots:
 
     void on_action_analyze_triggered();
 
+    void on_action_signalWidth_triggered();
+
+    void on_radioButton_spec_clicked();
+
+    void on_radioButton_cps_clicked();
+
 private:
     struct EnergyCalibration {
         double k = 1.0;
@@ -142,6 +150,12 @@ private:
         int detectorIndex = 0;
         quint32 timeUnits = 0; // 时间单位，ms
         QVector<quint16> samples;
+    };
+
+    struct SpectrumCountsEntry {
+        int detectorIndex = 0;
+        quint32 timeMs = 0; // 时间单位，ms
+        quint32 count;
     };
 
     static constexpr int kChannelsPerDetector = 16;
@@ -189,6 +203,7 @@ private:
     void refreshProfilePlot();
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
+    void refreshSpectrumCountsPlot();
     void resetWaveformCounters();
     void resetSpectrumSequenceTracking();
     void printWaveformCollectionSummary() const;
@@ -225,6 +240,7 @@ private:
     QVector<QVector<quint32>> m_spectrumSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
     QVector<quint32> m_lastSpectrumSequenceByChannel;
+    QVector<QVector<SpectrumCountsEntry>> m_spectrumCountsByChannel;//记录计数率
     QVector<bool> m_hasSpectrumSequenceByChannel;
     // 按逻辑通道(1~32)存储波形历史
     QVector<QVector<WaveformEntry>> m_waveformByChannel;

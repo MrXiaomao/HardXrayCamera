@@ -14,6 +14,7 @@ CONFIG += c++17
 SOURCES += \
     commandhelper.cpp \
     otaupgradewindow.cpp \
+    signalwidthsetting.cpp \
     udpshotreceiver.cpp \
     detectorsetting.cpp \
     fixeddataplotwidget.cpp \
@@ -31,6 +32,7 @@ SOURCES += \
 HEADERS += \
     commandhelper.h \
     otaupgradewindow.h \
+    signalwidthsetting.h \
     udpshotreceiver.h \
     detectorsetting.h \
     fixeddataplotwidget.h \
@@ -48,7 +50,8 @@ FORMS += \
     detectorsetting.ui \
     mainwindow.ui \
     offlinewindow.ui \
-    otaupgradewindow.ui
+    otaupgradewindow.ui \
+    signalwidthsetting.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

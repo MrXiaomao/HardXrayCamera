@@ -50,7 +50,7 @@ const QByteArray SpectrumHeader = QByteArray::fromHex("aa bb");
 const QByteArray SpectrumTail = QByteArray::fromHex("cc dd");
 
 // Waveform packet constants
-constexpr int WaveformPacketSize = 1176;
+constexpr int WaveformPacketSize = 1168;
 const QByteArray WaveformHeader = QByteArray::fromHex("aa bb");
 const QByteArray WaveformTail = QByteArray::fromHex("cc dd");
 
@@ -154,6 +154,8 @@ CommandHelper::CommandHelper(QObject *parent)
         if(connected){
             // qInfo() << "FPGA主板1主网口连接成功";
             emit sigDetector1Status(true);
+
+            sendTriggerSignalTimeWidth(0x01);
         } else {
             // qInfo() << "FPGA主板1主网口断开连接";
             emit sigDetector1Status(false);
@@ -164,6 +166,8 @@ CommandHelper::CommandHelper(QObject *parent)
         if(connected){
             // qInfo() << "FPGA主板2主网口连接成功";
             emit sigDetector2Status(true);
+
+            sendTriggerSignalTimeWidth(0x10);
         } else {
             // qInfo() << "FPGA主板2主网口断开连接";
             emit sigDetector2Status(false);
@@ -588,6 +592,22 @@ void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QStr
     }
 }
 
+void CommandHelper::sendTriggerSignalTimeWidth(quint8 detectorIndex, quint16 timeWidth)
+{
+    const quint16 timeWidth16ns = (quint32)timeWidth * 16 / 16;
+    if (detectorIndex & 0x01){
+        sendCommand(client_fpga1_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
+                "触发信号宽度",
+                QString("%1 ns").arg(timeWidth16ns));
+    }
+
+    if (detectorIndex & 0x10){
+        sendCommand(client_fpga2_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
+                "触发信号宽度",
+                QString("%1 ns").arg(timeWidth16ns));
+    }
+}
+
 void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
                                 const QString& name, const QString& parameter)
 {
@@ -906,6 +926,27 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
 {
     buffer.append(data);
 
+    // if (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger){
+    //     if (!mHardTriggered[detectorIndex-1].load())
+    //     {
+    //         const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+
+    //         // 波形数据来临之前先判断硬触发信号
+    //         if (buffer.contains(hardTriggerCommand)){
+    //             mHardTriggered[detectorIndex-1].store(true);
+    //             buffer.remove(0, hardTriggerCommand.size());
+
+    //             if (mHardTriggered[0] && mHardTriggered[1]){
+    //                 emit sigMeasureStarted();
+    //             }
+    //         }
+    //         else {
+    //             buffer.clear();
+    //             return;
+    //         }
+    //     }
+    // }
+
     while (buffer.size() >= WaveformHeader.size()) {
         const int headerIndex = buffer.indexOf(WaveformHeader);
         if (headerIndex < 0) {
@@ -938,12 +979,12 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
         const int channelNumber = channelNumberFromMask(channelMask);
 
         QVector<quint16> samples;
-        samples.reserve(584);
+        samples.reserve(580);
 
         QStringList strCounts;
         strCounts << QString::number(timeUnits-10) << QString::number(channelNumber);
         const char* sampleData = p + WaveformHeader.size() + 4;
-        for (int i = 0; i < 584; ++i) {
+        for (int i = 0; i < 580; ++i) {
             samples.append(readUInt16BE(sampleData + i * 2));
             strCounts << QString::number(readUInt16BE(sampleData + i * 2));
         }

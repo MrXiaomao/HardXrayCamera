@@ -85,13 +85,59 @@
             </widget>
            </item>
            <item>
-            <widget class="FixedDataPlotWidget" name="plotSpec" native="true">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
+            <widget class="QStackedWidget" name="stackedWidget">
+             <widget class="QWidget" name="page_spectrum">
+              <layout class="QGridLayout" name="gridLayout">
+               <property name="leftMargin">
+                <number>0</number>
+               </property>
+               <property name="topMargin">
+                <number>0</number>
+               </property>
+               <property name="rightMargin">
+                <number>0</number>
+               </property>
+               <property name="bottomMargin">
+                <number>0</number>
+               </property>
+               <item row="0" column="0">
+                <widget class="FixedDataPlotWidget" name="plotSpec" native="true">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="page_cps">
+              <layout class="QGridLayout" name="gridLayout_3">
+               <property name="leftMargin">
+                <number>0</number>
+               </property>
+               <property name="topMargin">
+                <number>0</number>
+               </property>
+               <property name="rightMargin">
+                <number>0</number>
+               </property>
+               <property name="bottomMargin">
+                <number>0</number>
+               </property>
+               <item row="0" column="0">
+                <widget class="FixedDataPlotWidget" name="plotCps" native="true">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
             </widget>
            </item>
            <item>
@@ -141,29 +187,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QSpinBox" name="spb_channel">
-                  <property name="sizePolicy">
-                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                    <horstretch>0</horstretch>
-                    <verstretch>0</verstretch>
-                   </sizepolicy>
-                  </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>40</width>
-                    <height>0</height>
-                   </size>
-                  </property>
-                  <property name="minimum">
-                   <number>1</number>
-                  </property>
-                  <property name="maximum">
-                   <number>32</number>
-                  </property>
-                  <property name="value">
-                   <number>11</number>
-                  </property>
-                 </widget>
+                 <widget class="QComboBox" name="cbb_channel"/>
                 </item>
                 <item>
                  <widget class="QLabel" name="label_12">
@@ -322,6 +346,23 @@
                    </size>
                   </property>
                  </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radioButton_spec">
+                  <property name="text">
+                   <string>显示能谱</string>
+                  </property>
+                  <property name="checked">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radioButton_cps">
+                  <property name="text">
+                   <string>显示计数率</string>
+                  </property>
+                 </widget>
                 </item>
                </layout>
               </item>
@@ -753,7 +794,7 @@
                <number>10</number>
               </property>
               <property name="maximum">
-               <number>100000</number>
+               <number>65536</number>
               </property>
               <property name="value">
                <number>3000</number>
@@ -1139,7 +1180,7 @@
      <x>0</x>
      <y>0</y>
      <width>1272</width>
-     <height>25</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">
@@ -1153,6 +1194,7 @@
      <string>配置</string>
     </property>
     <addaction name="action_hardwareSetting"/>
+    <addaction name="action_signalWidth"/>
    </widget>
    <widget class="QMenu" name="menu_3">
     <property name="title">
@@ -1189,8 +1231,6 @@
    <addaction name="separator"/>
    <addaction name="action_relayNetOpen"/>
    <addaction name="action_relayNetClose"/>
-   <addaction name="action_powerOn"/>
-   <addaction name="action_powerOff"/>
    <addaction name="separator"/>
    <addaction name="action_connectDet"/>
    <addaction name="action_disconnectDet"/>
@@ -1202,11 +1242,6 @@
    <addaction name="separator"/>
    <addaction name="action_exit"/>
   </widget>
-  <action name="action_setting">
-   <property name="text">
-    <string>网络配置</string>
-   </property>
-  </action>
   <action name="action_hardwareSetting">
    <property name="icon">
     <iconset resource="resource.qrc">
@@ -1371,6 +1406,15 @@
     <enum>QAction::NoRole</enum>
    </property>
   </action>
+  <action name="action_signalWidth">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/setting.png</normaloff>:/resource/setting.png</iconset>
+   </property>
+   <property name="text">
+    <string>设置信号宽度</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -1399,7 +1443,6 @@
   <tabstop>dateTimeEdit_shutdown</tabstop>
   <tabstop>btn_startMeasure</tabstop>
   <tabstop>btn_stopMeasure</tabstop>
-  <tabstop>spb_channel</tabstop>
   <tabstop>spinBox_4</tabstop>
   <tabstop>spb_specID</tabstop>
   <tabstop>spb_hxrDisplayBins</tabstop>

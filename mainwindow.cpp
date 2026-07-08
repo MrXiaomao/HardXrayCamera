@@ -72,6 +72,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotSpec->setYAxisLabel("计数");
     ui->plotSpec->setXRange(1,512);
 
+    ui->plotCps->setTitle("计数率");
+    ui->plotCps->setXAxisLabel("时间(ms)");
+    ui->plotCps->setYAxisLabel("计数");
+
     ui->plotProfile->setTitle("剖面分布");
     ui->plotProfile->setXAxisLabel("编号");
     ui->plotProfile->setYAxisLabel("计数");
@@ -159,12 +163,15 @@ MainWindow::MainWindow(QWidget *parent)
         &MainWindow::onSpectrumDataReceived, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigWaveformData, this,
         &MainWindow::onWaveformDataReceived, Qt::QueuedConnection);
+    connect(commandHelper, &CommandHelper::sigMeasureStarted, this,
+            &MainWindow::onMeasureStarted, Qt::QueuedConnection);
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
     m_spectrumSequenceNumbersByChannel.resize(kSpectrumChannelCount);
     m_missingSpectrumNumbersByChannel.resize(kSpectrumChannelCount);
     m_lastSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
     m_hasSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
+    m_spectrumCountsByChannel.resize(kSpectrumChannelCount);
     m_waveformByChannel.resize(kSpectrumChannelCount);
     m_waveformSequenceNumbersByChannel.resize(kSpectrumChannelCount);
     m_missingWaveformNumbersByChannel.resize(kSpectrumChannelCount);
@@ -176,7 +183,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(waveformPlotTimer, &QTimer::timeout, this, &MainWindow::refreshWaveformPlot);
     // waveformPlotTimer 仅在波形测量模式下启动
 
-    connect(ui->spb_channel, QOverload<int>::of(&QSpinBox::valueChanged),
+    for (int i=1; i <=32; ++i)
+        ui->cbb_channel->addItem(QString::number(i));
+    ui->cbb_channel->setCurrentIndex(10);
+    connect(ui->cbb_channel, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onChannelSpinBoxChanged);
     connect(ui->spb_specID, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
@@ -476,6 +486,9 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         detectOnline[2] = false;
         detectOnline[3] = false;
         syncDetectorConnectButton();
+
+        // 自动打开继电器电源开关
+        emit ui->action_powerOn->trigger();
     }
 }
 
@@ -790,7 +803,7 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
         m_lastSpectrumSequenceByChannel[channelIndex] = spectrumSequence;
     }
 
-    const int currentChannel = ui->spb_channel->value();
+    const int currentChannel = ui->cbb_channel->currentIndex() + 1;
     if (logicalChannel != currentChannel)
         return;
 
@@ -826,7 +839,7 @@ void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, qu
         m_lastWaveformSequenceByChannel[channelIndex] = waveformSequence;
     }
 
-    const int currentChannel = ui->spb_channel->value();
+    const int currentChannel = ui->cbb_channel->currentIndex() + 1;
     if (logicalChannel != currentChannel)
         return;
 }
@@ -951,6 +964,8 @@ void MainWindow::clearSpectrumData()
 {
     for (auto &channelSpectra : m_spectrumByChannel)
         channelSpectra.clear();
+    for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
+        channelSpectrumCounts.clear();
 
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setValue(0);
@@ -958,6 +973,9 @@ void MainWindow::clearSpectrumData()
     updateSpecIdSpinBoxRange();
     ui->plotSpec->clearData();
     ui->plotSpec->refreshPlot();
+    clearProfileData();
+    ui->plotCps->clearData();
+    ui->plotCps->refreshPlot();
     clearProfileData();
 }
 
@@ -986,6 +1004,14 @@ void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint3
     entry.timeMs = timeMs;
     entry.counts = counts;
     m_spectrumByChannel[storageChannel - 1].append(entry);
+
+    SpectrumCountsEntry countsEntry;
+    countsEntry.detectorIndex = detectorIndex;
+    countsEntry.timeMs = timeMs;
+    countsEntry.count = 0;
+    for (const auto& count: counts)
+        countsEntry.count += count;
+    m_spectrumCountsByChannel[storageChannel - 1].append(countsEntry);
 }
 
 void MainWindow::appendWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -1014,7 +1040,7 @@ void MainWindow::ensureSpectrumBinAddresses(int binCount)
 
 void MainWindow::updateSpecIdSpinBoxRange()
 {
-    const int channel = ui->spb_channel->value();
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     const int specCount = (channel >= 1 && channel <= m_spectrumByChannel.size())
                               ? m_spectrumByChannel.at(channel - 1).size()
                               : 0;
@@ -1029,7 +1055,7 @@ void MainWindow::updateSpecIdSpinBoxRange()
 
 void MainWindow::updateWaveIdSpinBoxRange()
 {
-    const int channel = ui->spb_channel->value();
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     const int waveCount = (channel >= 1 && channel <= m_waveformByChannel.size())
                               ? m_waveformByChannel.at(channel - 1).size()
                               : 0;
@@ -1044,7 +1070,7 @@ void MainWindow::updateWaveIdSpinBoxRange()
 
 void MainWindow::syncSpectrumSpinBoxToLatest()
 {
-    const int channel = ui->spb_channel->value();
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     if (channel < 1 || channel > m_spectrumByChannel.size())
         return;
 
@@ -1057,7 +1083,7 @@ void MainWindow::syncSpectrumSpinBoxToLatest()
 
 void MainWindow::syncWaveformSpinBoxToLatest()
 {
-    const int channel = ui->spb_channel->value();
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     if (channel < 1 || channel > m_waveformByChannel.size())
         return;
 
@@ -1427,10 +1453,15 @@ void MainWindow::on_btn_generateProfile_clicked()
 
 void MainWindow::refreshSpectrumPlot()
 {
-    if (isMeasureSessionActive())
-        syncSpectrumSpinBoxToLatest();
+    if (ui->radioButton_cps->isChecked()){
+        refreshSpectrumCountsPlot();
+        return;
+    }
 
-    const int channel = ui->spb_channel->value();
+    if (isMeasureSessionActive())
+        syncSpectrumSpinBoxToLatest();    
+
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     const int specId = ui->spb_specID->value();
     if (channel < 1 || channel > m_spectrumByChannel.size()) {
         ui->plotSpec->clearData();
@@ -1480,7 +1511,7 @@ void MainWindow::refreshWaveformPlot()
     if (isMeasureSessionActive())
         syncWaveformSpinBoxToLatest();
 
-    const int channel = ui->spb_channel->value();
+    const int channel = ui->cbb_channel->currentIndex() + 1;
     const int waveId = ui->spb_waveID->value();
     if (channel < 1 || channel > m_waveformByChannel.size()) {
         ui->plotWave->clearData();
@@ -1516,6 +1547,33 @@ void MainWindow::refreshWaveformPlot()
                                .arg(waveId)
                                .arg(entry.timeUnits));
     ui->plotWave->refreshPlot(false, true);
+}
+
+void MainWindow::refreshSpectrumCountsPlot()
+{
+    const int channel = ui->cbb_channel->currentIndex() + 1;
+    if (channel < 1 || channel > m_spectrumByChannel.size()) {
+        ui->plotCps->clearData();
+        ui->plotCps->refreshPlot();
+        return;
+    }
+
+    const QVector<SpectrumCountsEntry> &entry = m_spectrumCountsByChannel.at(channel - 1);
+    if (entry.size() <= 0)
+        return;
+
+    ui->plotCps->setTitle(QString("计数率 %1 CH%2")
+                               .arg(entry[0].detectorIndex==1  ? QStringLiteral("水平") : QStringLiteral("垂直"))
+                               .arg(channel)
+                           );
+
+    QVector<double> xs(entry.size()), ys(entry.size());
+    for (int i = 0; i < entry.size(); ++i) {
+        xs[i] = entry[i].timeMs;
+        ys[i] = entry[i].count;
+    }
+    ui->plotCps->setData(xs, ys);
+    ui->plotCps->refreshPlot(true, true);
 }
 
 void MainWindow::appendUdpLog(const QString &line)
@@ -1750,7 +1808,7 @@ bool MainWindow::startMeasureInternal()
     commandHelper->setShotNumber(shotNumber);
 
     // 自动测量
-    if (measureMode == 1) {
+    if (trigMode == Order::TriggerMode::HardwareTrigger) {
         m_autoMeasureDurationTimerStarted = false;
         if (!commandHelper->configureMeasure(detPara))
             return false;
@@ -2360,7 +2418,7 @@ void MainWindow::on_action_about_triggered()
 
 void MainWindow::on_action_analyze_triggered()
 {
-
+    // 数据分析
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -2376,4 +2434,30 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     this->hide();
     event->accept();
     qApp->quit();
+}
+
+#include "signalwidthsetting.h"
+void MainWindow::on_action_signalWidth_triggered()
+{
+    SignalWidthSetting dlg;
+    dlg.exec();
+}
+
+
+void MainWindow::on_radioButton_spec_clicked()
+{
+    ui->stackedWidget->setCurrentWidget(ui->page_spectrum);
+    refreshSpectrumPlot();
+}
+
+
+void MainWindow::on_radioButton_cps_clicked()
+{
+    ui->stackedWidget->setCurrentWidget(ui->page_cps);
+    refreshSpectrumPlot();
+}
+
+void MainWindow::onMeasureStarted()
+{
+    // 自动测量开始
 }

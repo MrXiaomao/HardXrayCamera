@@ -31,6 +31,7 @@ Order::Order()
     , SpectrumRefreshTime(setSpectrumRefreshTime(1000))
     , SpectrumTriggerThreshold(setSpectrumTriggerThreshold(100))
     , SpectrumDeadTime(setSpectrumDeadTime(50))
+    , TriggerSignalTimeWidth(setTriggerSignalTimeWidth(16))
     , WaveformStop(controlWaveform(Stop))
     , WaveformSoftwareTrigger(controlWaveform(SoftwareTrigger))
     , WaveformHardwareTrigger(controlWaveform(HardwareTrigger))
@@ -60,6 +61,11 @@ QByteArray Order::setSpectrumTriggerThreshold(quint16 threshold)
 QByteArray Order::setSpectrumDeadTime(quint16 deadTime16ns)
 {
     return makeCommand(0xFA, 0x14, 0, deadTime16ns);
+}
+
+QByteArray Order::setTriggerSignalTimeWidth(quint16 timeWidth16ns)
+{
+    return makeCommand(0xFF, 0xB0, 0, timeWidth16ns);
 }
 
 QByteArray Order::setTimeSpectrumRange(quint8 index, quint16 start, quint16 end)
