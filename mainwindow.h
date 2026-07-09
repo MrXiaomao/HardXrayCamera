@@ -23,16 +23,86 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+// 自定义X轴格式化器：将数值转换为CH1-CH18的标签
+#ifdef QT_DATAVISUALIZATION_LIB
+#include <QtDataVisualization>
+#include <QSurface>
+using namespace QtDataVisualization;
+
+#include <QtDataVisualization/Q3DInputHandler>
+#include <QtDataVisualization/Q3DSurface>
+#include <QMouseEvent>
+class QValue3DAxisFormatterX: public QtDataVisualization::QValue3DAxisFormatter
+{
+   Q_OBJECT
+public:
+   explicit QValue3DAxisFormatterX(QObject *parent = nullptr) : QValue3DAxisFormatter(parent) {}
+
+   virtual QString stringForValue(qreal value, const QString &/*format*/) const override
+   {
+       if (value >= 1 && value <= 16)
+           return QString("CH %1").arg(QString::number(value / 1.0, 'f', 0));
+       else
+           return QString();
+   }
+};
+
+class CustomSurface : public QtDataVisualization::Q3DSurface {
+   Q_OBJECT
+public:
+   explicit CustomSurface(const QSurfaceFormat *format = nullptr, QWindow *parent = nullptr) : QtDataVisualization::Q3DSurface(format, parent) {}
+
+protected:
+   void mousePressEvent(QMouseEvent *event) override {
+       // 交换左右键的按下状态
+       if (event->button() == Qt::LeftButton) {
+           // 模拟右键按下（触发旋转）
+           QMouseEvent fakeRightPress(event->type(), event->pos(),
+                                      Qt::RightButton, Qt::RightButton, event->modifiers());
+           Q3DSurface::mousePressEvent(&fakeRightPress);
+       } else if (event->button() == Qt::RightButton) {
+           // 模拟左键按下（默认是选择/平移，此处改为旋转）
+           QMouseEvent fakeLeftPress(event->type(), event->pos(),
+                                     Qt::LeftButton, Qt::LeftButton, event->modifiers());
+           Q3DSurface::mousePressEvent(&fakeLeftPress);
+       } else {
+           Q3DSurface::mousePressEvent(event);
+       }
+   }
+
+   void mouseMoveEvent(QMouseEvent *event) override {
+       // 移动时保持交换后的按键逻辑
+       if (event->buttons() & Qt::LeftButton) {
+           QMouseEvent fakeRightMove(event->type(), event->pos(),
+                                     Qt::RightButton, Qt::RightButton, event->modifiers());
+           Q3DSurface::mouseMoveEvent(&fakeRightMove);
+       } else if (event->buttons() & Qt::RightButton) {
+           QMouseEvent fakeLeftMove(event->type(), event->pos(),
+                                    Qt::LeftButton, Qt::LeftButton, event->modifiers());
+           Q3DSurface::mouseMoveEvent(&fakeLeftMove);
+       } else {
+           Q3DSurface::mouseMoveEvent(event);
+       }
+   }
+};
+#endif //QT_DATAVISUALIZATION
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
+    struct ChannelProfileEntry {
+        quint32 timeMs = 0; // 时间单位，ms
+        quint32 energy;// 能量
+    };
+
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 signals:
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
+    void showProfileChart(const QVector<QVector<ChannelProfileEntry>>& data);
 
 public:
     virtual void closeEvent(QCloseEvent *event) override;
@@ -90,6 +160,8 @@ private slots:
     void startMeasureDurationTimer();
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
+
+    void onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>& data);
 
     void on_action_hardwareSetting_triggered();
 
@@ -225,6 +297,8 @@ private:
     void handleArmSensorData(int armIndex, const QVector<double> &temperature,
                              const QVector<double> &voltage, const QVector<double> &current);
 
+    QtDataVisualization::QSurfaceDataProxy* init3DSurface(QWidget* wigetContainer, const QString& title);//3D剖面图
+
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
     UdpShotReceiver *m_udpShotReceiver = nullptr;
@@ -270,6 +344,10 @@ private:
     enum class AutoMeasureState { Idle, WaitingShot, Measuring };
     AutoMeasureState m_autoMeasureState = AutoMeasureState::Idle;
     bool m_autoMeasureDurationTimerStarted = false;
+
+    // 3D剖面图
+    QtDataVisualization::QSurfaceDataProxy *m_horDataProxy = nullptr;
+    QtDataVisualization::QSurfaceDataProxy *m_verDataProxy = nullptr;
 
 public:
     // 无人值守

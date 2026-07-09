@@ -154,8 +154,6 @@ CommandHelper::CommandHelper(QObject *parent)
         if(connected){
             // qInfo() << "FPGA主板1主网口连接成功";
             emit sigDetector1Status(true);
-
-            sendTriggerSignalTimeWidth(0x01);
         } else {
             // qInfo() << "FPGA主板1主网口断开连接";
             emit sigDetector1Status(false);
@@ -166,8 +164,6 @@ CommandHelper::CommandHelper(QObject *parent)
         if(connected){
             // qInfo() << "FPGA主板2主网口连接成功";
             emit sigDetector2Status(true);
-
-            sendTriggerSignalTimeWidth(0x10);
         } else {
             // qInfo() << "FPGA主板2主网口断开连接";
             emit sigDetector2Status(false);
@@ -597,13 +593,13 @@ void CommandHelper::sendTriggerSignalTimeWidth(quint8 detectorIndex, quint16 tim
     const quint16 timeWidth16ns = (quint32)timeWidth * 16 / 16;
     if (detectorIndex & 0x01){
         sendCommand(client_fpga1_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
-                "触发信号宽度",
+                "板卡#1触发信号宽度",
                 QString("%1 ns").arg(timeWidth16ns));
     }
 
     if (detectorIndex & 0x10){
         sendCommand(client_fpga2_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
-                "触发信号宽度",
+                "板卡#2触发信号宽度",
                 QString("%1 ns").arg(timeWidth16ns));
     }
 }
@@ -926,26 +922,27 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
 {
     buffer.append(data);
 
-    // if (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger){
-    //     if (!mHardTriggered[detectorIndex-1].load())
-    //     {
-    //         const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+    if (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger){
+        if (!mHardTriggered[detectorIndex-1].load())
+        {
+            const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
 
-    //         // 波形数据来临之前先判断硬触发信号
-    //         if (buffer.contains(hardTriggerCommand)){
-    //             mHardTriggered[detectorIndex-1].store(true);
-    //             buffer.remove(0, hardTriggerCommand.size());
+            // 波形数据来临之前先判断硬触发信号
+            if (buffer.contains(hardTriggerCommand)){
+                buffer.remove(0, hardTriggerCommand.size());
 
-    //             if (mHardTriggered[0] && mHardTriggered[1]){
-    //                 emit sigMeasureStarted();
-    //             }
-    //         }
-    //         else {
-    //             buffer.clear();
-    //             return;
-    //         }
-    //     }
-    // }
+                if (!mHardTriggered[0] && !mHardTriggered[1]){
+                    emit sigMeasureStarted();
+                }
+
+                mHardTriggered[detectorIndex-1].store(true);
+            }
+            else {
+                buffer.clear();
+                return;
+            }
+        }
+    }
 
     while (buffer.size() >= WaveformHeader.size()) {
         const int headerIndex = buffer.indexOf(WaveformHeader);

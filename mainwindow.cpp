@@ -61,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plainTextEdit_log->document()->setMaximumBlockCount(2000);
     
     connect(this, SIGNAL(sigAppendMsg(const QString &, QtMsgType)), this, SLOT(slotAppendMsg(const QString &, QtMsgType)));
+    connect(this, SIGNAL(showProfileChart(const QVector<QVector<ChannelProfileEntry>>&)), this, SLOT(onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>&)));
     qRegisterMetaType<QtMsgType>("QtMsgType");
     
     ui->plotWave->setTitle("波形");
@@ -252,7 +253,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_startMeasure->setEnabled(false);
     ui->action_stopMeasure->setEnabled(false);
 
-    // ui->action_connectMonitor->setCheckable(true);
+    ui->action_connectMonitor->setCheckable(true);
     // ui->action_connectMonitor->setChecked(false);
     // ui->action_connectMonitor->setText(QStringLiteral("连接实时监测系统"));
     ui->action_connectMonitor->setEnabled(false);
@@ -269,6 +270,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 开机自动最大化：一次性延迟调用，保留 lambda
     initStatusbar();
+
+    m_horDataProxy = init3DSurface(ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
+    m_verDataProxy = init3DSurface(ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
 
     // 构造函数中添加
     m_logFlushTimer = new QTimer(this);
@@ -773,13 +777,13 @@ void MainWindow::onArm2SensorData(const QVector<double>&/*温度*/ temperature, 
 void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
                                         const QVector<quint32> &counts)
 {
-    if (m_autoMeasureState == AutoMeasureState::Measuring
-        && ui->comboBox_measureMode->currentIndex() == 1
-        && !m_autoMeasureDurationTimerStarted) {
-        m_autoMeasureDurationTimerStarted = true;
-        startMeasureDurationTimer();
-        qInfo() << "收到首个能谱数据，开始测量倒计时:" << measureDurationMs() << "ms";
-    }
+    // if (m_autoMeasureState == AutoMeasureState::Measuring
+    //     && ui->comboBox_measureMode->currentIndex() == 1
+    //     && !m_autoMeasureDurationTimerStarted) {
+    //     m_autoMeasureDurationTimerStarted = true;
+    //     startMeasureDurationTimer();
+    //     qInfo() << "收到首个能谱数据，开始测量倒计时:" << measureDurationMs() << "ms"; // 改为接收到硬件触发信号才开始计时onMeasureStarted
+    // }
 
     const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
     if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
@@ -2459,5 +2463,201 @@ void MainWindow::on_radioButton_cps_clicked()
 
 void MainWindow::onMeasureStarted()
 {
-    // 自动测量开始
+    // 自动测量开始计时
+    if (m_autoMeasureState == AutoMeasureState::Measuring
+        && ui->comboBox_measureMode->currentIndex() == 1
+        && !m_autoMeasureDurationTimerStarted) {
+        m_autoMeasureDurationTimerStarted = true;
+        startMeasureDurationTimer();
+        qInfo() << "收到硬件触发指令，开始测量倒计时:" << measureDurationMs() << "ms";
+    }
+}
+
+#include <QRandomGenerator>
+QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(QWidget* wigetContainer, const QString& title)
+{
+    const int channelCount = 16;
+    const int timePoints = 101;
+    const float timeMin = 0.0f, timeMax = 10000.0f;
+    const float valMin = 0.0f, valMax = 65536.0f;
+
+    // 1. 创建3D曲面视图
+    CustomSurface *surface = new CustomSurface();
+    surface->setShadowQuality(QtDataVisualization::QAbstract3DGraph::ShadowQualityNone);
+    surface->setSelectionMode(QtDataVisualization::QAbstract3DGraph::SelectionNone);
+    surface->setHorizontalAspectRatio(1.0f);// 把X/Z平面的纵深比例
+    surface->setAspectRatio(1.5f);//全局Y轴高度 / X-Z平面纵深的整体比例
+
+    // 嵌入到传入的容器控件
+    QWidget *container = QWidget::createWindowContainer(surface);
+    //container->setMinimumSize(500, 500);
+    container->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    container->setContentsMargins(0,0,0,0);
+
+    // 创建全局标题Label
+    auto *globalTitle = new QLabel(title, container);
+    globalTitle->setAlignment(Qt::AlignCenter);
+    globalTitle->setStyleSheet(R"(
+        QLabel {
+            color: black;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: white;
+            padding: 4px 12px;
+        }
+    )");
+
+    QVBoxLayout* vLayout = new QVBoxLayout(wigetContainer);
+    vLayout->setContentsMargins(0,0,0,0);
+    vLayout->setSpacing(0);
+    vLayout->addWidget(globalTitle);
+    vLayout->addWidget(container);
+    wigetContainer->setLayout(vLayout);
+
+    // 全局主题配置
+    surface->activeTheme()->setGridEnabled(true);
+    surface->activeTheme()->setLabelBorderEnabled(false);
+    surface->activeTheme()->setLightStrength(1.0);
+    surface->activeTheme()->setAmbientLightStrength(1.0);
+    surface->activeTheme()->setHighlightLightStrength(1.0);
+    surface->activeTheme()->setGridLineColor(QColor(60,60,60));
+
+    // 2. 配置坐标轴 完全保留原有语义
+    QtDataVisualization::QValue3DAxis *xAxis = new QtDataVisualization::QValue3DAxis();
+    xAxis->setTitle("时间 (ms)");
+    xAxis->setTitleVisible(true);
+    xAxis->setRange(timeMin, timeMax);
+
+    QtDataVisualization::QValue3DAxis *yAxis = new QtDataVisualization::QValue3DAxis();
+    yAxis->setTitle("计数率");
+    yAxis->setTitleVisible(true);
+    yAxis->setRange(valMin, valMax);
+
+    QtDataVisualization::QValue3DAxis *zAxis = new QtDataVisualization::QValue3DAxis();
+    zAxis->setTitle("通道号");
+    zAxis->setTitleVisible(true);
+    zAxis->setRange(0, (channelCount+1)*1.0);
+    zAxis->setLabelFormat("CH%.0f");
+    zAxis->setSegmentCount(channelCount);
+    zAxis->setFormatter(new QValue3DAxisFormatterX());
+
+    surface->setAxisX(xAxis);
+    surface->setAxisY(yAxis);
+    surface->setAxisZ(zAxis);
+
+    // 3. 生成标准连续剖面网格数据（核心方案3）
+    QtDataVisualization::QSurfaceDataProxy *profileProxy = new QtDataVisualization::QSurfaceDataProxy();
+    QtDataVisualization::QSurface3DSeries *profileSeries = new QtDataVisualization::QSurface3DSeries(profileProxy);
+    profileSeries->setDrawMode(QtDataVisualization::QSurface3DSeries::DrawSurfaceAndWireframe);
+    profileSeries->setMeshSmooth(true);
+    profileSeries->setFlatShadingEnabled(false);
+
+    // 复用你原有自定义蓝-绿-黄-橙-红全段渐变
+    QLinearGradient gradient;
+    gradient.setColorAt(0.0, Qt::darkBlue);
+    gradient.setColorAt(0.1, QColor(4, 49, 255));
+    gradient.setColorAt(0.2, QColor(1, 100, 253));
+    gradient.setColorAt(0.3, QColor(4, 155, 252));
+    gradient.setColorAt(0.4, QColor(4, 203, 255));
+    gradient.setColorAt(0.5, QColor(3, 255, 2));
+    gradient.setColorAt(0.6, QColor(254, 255, 2));
+    gradient.setColorAt(0.7, QColor(254, 151, 4));
+    gradient.setColorAt(0.8, QColor(255, 100, 2));
+    gradient.setColorAt(0.9, QColor(255, 70, 2));
+    gradient.setColorAt(1.0, QColor(255, 0, 0));
+
+    profileSeries->setBaseGradient(gradient);
+    profileSeries->setColorStyle(QtDataVisualization::Q3DTheme::ColorStyleRangeGradient);
+
+    // 生成101行 × 16列的标准二维剖面网格
+    QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
+    fullProfileData->reserve(timePoints);
+
+    for (int chIdx = 0; chIdx < channelCount; ++chIdx)
+    {
+        float fixedZ = chIdx * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
+        QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
+        for (int tIdx = 0; tIdx < timePoints; ++tIdx)
+        {
+            float currentX = timeMin + tIdx * (timeMax - timeMin) / (timePoints - 1);
+            float randomY = QRandomGenerator::global()->bounded((quint32)valMin, (quint32)valMax);
+            (*timeRow)[tIdx] = QVector3D(currentX, randomY, fixedZ);
+        }
+
+        fullProfileData->append(timeRow);
+    }
+
+    profileSeries->dataProxy()->resetArray(fullProfileData);
+    surface->addSeries(profileSeries);
+
+    // 4. 优化视角 适合剖面观测
+    surface->scene()->activeCamera()->setCameraPosition(
+        -60.0f,   // 方位角 调整为更易观察通道分布
+        30.0f,    // 低仰角 突出剖面高度起伏
+        90.0f    // 视距缩放范围 完整显示全部16通道范围
+        );
+
+    surface->show();
+
+    QTimer* timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, [=]{
+
+        const int channelCount = 16;
+        const int timePoints = 101;
+        const float timeMin = 0.0f, timeMax = 10000.0f;
+        const float valMin = 0.0f, valMax = 65536.0f;
+
+        QVector<QVector<ChannelProfileEntry>> data;
+        data.reserve(channelCount);
+
+        for (int chIdx = 0; chIdx < channelCount; ++chIdx)
+        {
+            QVector<ChannelProfileEntry> entrys;
+            entrys.reserve(timePoints);
+            for (int tIdx = 0; tIdx < timePoints; ++tIdx)
+            {
+                float currentX = timeMin + tIdx * (timeMax - timeMin) / (timePoints - 1);
+                float randomY = QRandomGenerator::global()->bounded((quint32)valMin, (quint32)valMax);
+
+                entrys[tIdx].timeMs = currentX;
+                entrys[tIdx].energy = randomY;
+            }
+
+            data[chIdx] = entrys;
+        }
+
+        emit showProfileChart(data);
+    });
+    timer->start(5000);
+
+    return profileProxy;
+}
+
+void MainWindow::onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>& data)
+{
+    const int channelCount = 16;
+    const int timePoints = data[0].size();
+    const float timeMin = 0.0f, timeMax = 10000.0f;
+    const float valMin = 0.0f, valMax = 65536.0f;
+
+    QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
+    fullProfileData->reserve(timePoints);
+
+    for (int chIdx = 0; chIdx < channelCount; ++chIdx)
+    {
+        auto &entrys = data[chIdx];//QVector<ChannelProfileEntry>
+        float fixedZ = chIdx * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
+        QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
+        for (int tIdx = 0; tIdx < entrys.size(); ++tIdx)
+        {
+            float currentX = entrys[tIdx].timeMs;
+            float randomY = entrys[tIdx].energy;
+            (*timeRow)[tIdx] = QVector3D(currentX, randomY, fixedZ);
+        }
+
+        fullProfileData->append(timeRow);
+    }
+    m_horDataProxy->resetArray(fullProfileData);
+
+    //emit showProfileChart(data);
 }

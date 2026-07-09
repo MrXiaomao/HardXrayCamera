@@ -99,7 +99,7 @@ public:
     bool isDetectorConnected(int index) const;
 
     // 设置触发信号时间宽度
-    void sendTriggerSignalTimeWidth(quint8 detectorIndex = 0x11/*高位-板卡2，低位-板卡1*/, quint16 timeWidth = 96/*默认值*/);
+    void sendTriggerSignalTimeWidth(quint8 detectorIndex = 0x11/*高位-板卡2，低位-板卡1*/, quint16 timeWidth = 2000/*默认值*/);
 
 private:
     // 初始化常用指令

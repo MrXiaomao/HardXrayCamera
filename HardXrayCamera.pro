@@ -119,3 +119,6 @@ RC_ICONS = $$PWD/resource/LOGO.ico
 # 第三方库
 include($$PWD/log4qt/Include/log4qt.pri)
 include($$PWD/QGoodWindow/QGoodWindowHelper/QGoodWindowHelper.pri)
+
+# 3D剖面图
+QT += datavisualization 3dextras
