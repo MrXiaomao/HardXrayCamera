@@ -412,34 +412,36 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
                     .arg(measurement.spectrumDeadTime).arg(deadTime16ns));
 
     if (measurement.transferMode == Order::TransferMode::Spectrum16) {
-        JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
-        ScopedFileLock lock(settings);
-        const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
-
-        QVector<QVector<quint16>> channelBoundaries;
-        QString csvError;        
-        if (!DetectorSetting::load16SpecEnWindowCsv(csvPath, channelBoundaries, &csvError)) {
+        QString csvError;
+        if (!DetectorSetting::reloadEnergyBoundaries(&csvError)
+            || DetectorSetting::energyBoundaries().isEmpty()) {
+            if (csvError.isEmpty())
+                csvError = tr("未配置16道能谱能窗CSV文件路径");
             qWarning() << "16道能谱能窗CSV加载失败:" << csvError;
             emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
             return false;
         }
 
-        // 将道址转换为能量
-        QVector<QVector<quint16>> channelEnery;
+        const QVector<QVector<quint16>>& energyBoundaries = DetectorSetting::energyBoundaries();
+
+        // 将能量转换为道址
+        QVector<QVector<quint16>> channelBoundaries;
         int chIdx = 0;
-        for (const auto& boundar : channelBoundaries){
-            QVector<quint16> enery;
+        for (const auto& boundar : energyBoundaries){
+            QVector<quint16> channelBoundary;
             for (const auto& a : boundar){
-                enery.push_back(a * m_channelEnergyCalib[chIdx].k_calib + m_channelEnergyCalib[chIdx].b_calib);
+                int channelAddr = static_cast<int>((a - m_channelEnergyCalib[chIdx].b_calib) / m_channelEnergyCalib[chIdx].k_calib);
+                if (channelAddr < 0) channelAddr = 0;
+                channelBoundary.push_back(channelAddr);
             }
 
-            channelEnery.push_back(enery);
+            channelBoundaries.push_back(channelBoundary);
             chIdx++;
         }
         send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
-                                       channelEnery/*channelBoundaries*/, 0);
+                                       channelBoundaries, 0);
         send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
-                                       channelEnery/*channelBoundaries*/, 16);
+                                       channelBoundaries, 16);
     }
 
     return true;
@@ -576,15 +578,15 @@ CommandHelper::~CommandHelper()
 }
 
 void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QString& fpgaLabel,
-                                                 const QVector<QVector<quint16>>& channelBoundaries,
+                                                 const QVector<QVector<quint16>>& energyBoundaries,
                                                  int csvChannelOffset)
 {
     for (int channel = 0; channel < 16; ++channel) {
         const int csvIndex = csvChannelOffset + channel;
-        if (csvIndex < 0 || csvIndex >= channelBoundaries.size())
+        if (csvIndex < 0 || csvIndex >= energyBoundaries.size())
             continue;
 
-        const QVector<quint16>& boundaries = channelBoundaries.at(csvIndex);
+        const QVector<quint16>& boundaries = energyBoundaries.at(csvIndex);
         const QVector<QByteArray> commands =
             Order::setTimeSpectrumRangeChannel(static_cast<quint8>(channel), boundaries);
         for (int cmd = 0; cmd < commands.size(); ++cmd) {

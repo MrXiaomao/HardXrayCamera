@@ -215,6 +215,7 @@ MainWindow::MainWindow(QWidget *parent)
         ui->page_3DSurface->layout()->addWidget(splitterH1);
     }
     commandHelper = CommandHelper::instance();
+    DetectorSetting::reloadEnergyBoundaries();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
     connect(commandHelper, &CommandHelper::sigRelayStatus, this, &MainWindow::onRelayStatusChanged);
     connect(commandHelper, &CommandHelper::sigRelayConnectError, this, [=](QAbstractSocket::SocketError) {
@@ -1597,18 +1598,28 @@ void MainWindow::refreshSpectrumPlot()
 
     ensureSpectrumBinAddresses(displayBinCount);
 
-    //X轴采用能量重新进行刻度
+    //X轴采用能量重新进行刻度,
+    // 对于512道，X轴应该采用能量刻度文件对道址进行换算
+    // 对于16道，X轴应该采用HXR能量道文件输入能量点，采用右边界
     QVector<quint32> spectrumEneryAddresses;
-    for (const auto& addr : m_spectrumBinAddresses){
-        spectrumEneryAddresses.push_back(addr*commandHelper->m_channelEnergyCalib[channel-1].k_calib + commandHelper->m_channelEnergyCalib[channel-1].b_calib);
-    }
-
     if (hxrMode) {
+        const QVector<QVector<quint16>>& energyBoundaries = DetectorSetting::energyBoundaries();
+
+        // 取出 energyBoundaries 中对应通道 specId 的右边界作为能量地址
+        if (specId < energyBoundaries.size()) {
+            const QVector<quint16> &boundaries = energyBoundaries.at(specId);
+            for (const auto& addr : boundaries){
+                spectrumEneryAddresses.push_back(addr);
+            }
+        }
         ui->plotSpec->setXRange(1, displayBinCount);
-        ui->plotSpec->setData(spectrumEneryAddresses/*m_spectrumBinAddresses*/,
+        ui->plotSpec->setData(spectrumEneryAddresses.mid(0, displayBinCount),
                               entry.counts.mid(0, displayBinCount));
     } else {
-        ui->plotSpec->setData(spectrumEneryAddresses/*m_spectrumBinAddresses*/, entry.counts);
+        for (const auto& addr : m_spectrumBinAddresses){
+            spectrumEneryAddresses.push_back(addr*commandHelper->m_channelEnergyCalib[channel-1].k_calib + commandHelper->m_channelEnergyCalib[channel-1].b_calib);
+        }
+        ui->plotSpec->setData(spectrumEneryAddresses, entry.counts);
     }
     ui->plotSpec->refreshPlot();
 }

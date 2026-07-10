@@ -26,14 +26,20 @@ public:
     static bool validate16SpecEnWindowCsv(const QString& filePath, QString* errorMessage = nullptr);
     // 解析 CSV 为 32 通道×17 个道址边界；须先通过 validate16SpecEnWindowCsv
     static bool load16SpecEnWindowCsv(const QString& filePath,
-                                      QVector<QVector<quint16>>& channelBoundaries,
+                                      QVector<QVector<quint16>>& energyBoundaries,
                                       QString* errorMessage = nullptr);
+    // 从配置路径重新加载 16 道能量边界到静态缓存
+    static bool reloadEnergyBoundaries(QString* errorMessage = nullptr);
+    static bool reloadEnergyBoundaries(const QString& filePath, QString* errorMessage = nullptr);
+    static const QVector<QVector<quint16>>& energyBoundaries();
 
 private slots:
     void on_btn_ok_accepted();
     void onSelectCsvFile();
 
 private:
+    static QVector<QVector<quint16>> s_energyBoundaries;
+
     QString m_csvFilePath;
     Ui::DetectorSetting *ui;
 };

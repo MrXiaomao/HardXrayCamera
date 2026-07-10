@@ -31,8 +31,10 @@ constexpr int kCsvTotalLineCount = 33;
 constexpr int kCsvColumnCount = 18;
 constexpr int kCsvValueColFirst = 2;   // 1-based，参与校验的首列
 constexpr int kCsvValueColLast = 18;   // 1-based，参与校验的末列
-constexpr int kCsvValueMin = 0;
-constexpr int kCsvValueMax = 65535;
+constexpr int kCsvChannelCol = 1;      // 1-based，通道号列
+constexpr int kCsvChannelMin = 1;
+constexpr int kCsvChannelMax = 32;
+constexpr double kCsvValueMax = 1000.0; // 第 2～18 列须为正数（整数或浮点数）
 
 QStringList parseCsvFields(const QString& line)
 {
@@ -89,6 +91,8 @@ protected:
     }
 };
 }
+
+QVector<QVector<quint16>> DetectorSetting::s_energyBoundaries;
 
 DetectorSetting::DetectorSetting(QWidget *parent)
     : QDialog(parent)
@@ -159,6 +163,8 @@ void DetectorSetting::loadSettings()
         m_csvFilePath.clear();
         ui->lineEdit_csvPath->clear();
     }
+
+    reloadEnergyBoundaries(m_csvFilePath);
 }
 
 //保存界面参数
@@ -212,6 +218,8 @@ void DetectorSetting::on_btn_ok_accepted()
         runSettings->setValueByPath("Network/udpBroadcastPort", ui->spb_udpPort->value());
         runSettings->save();
     }
+
+    reloadEnergyBoundaries(m_csvFilePath);
 }
 
 void DetectorSetting::setUdpPortEditable(bool editable)
@@ -225,9 +233,9 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
      * 16 道能谱能窗 CSV 格式规则：
      * 1. 文件必须有 33 行（第 1 行标题 + 第 2～33 行数据，整体为 33 行×18 列表格）；
      * 2. 第 1 行为标题行，不检查其内容；
-     * 3. 第 2～33 行每行必须有 18 列；
-     * 4. 每行第 2～18 列（共 17 个数值）须为 [0, 65535] 内的整数；
-     * 5. 每行第 2～18 列须严格递增（后一列 > 前一列，不允许相等）。
+     * 3. 第 2～33 行每行必须恰好 18 列；
+     * 4. 第 1 列为通道号，须为 1～32 依次递增、不重复；
+     * 5. 每行第 2～18 列须为合法正数（整数或浮点数，非文本），且在 (0, 65535] 内严格递增。
      */
     const QStringList lines = readCsvLines(filePath, errorMessage);
     if (lines.isEmpty() && errorMessage && !errorMessage->isEmpty())
@@ -246,9 +254,9 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
         const int lineNumber = lineIndex + 1;
         const QStringList fields = parseCsvFields(lines.at(lineIndex));
 
-        if (fields.size() < kCsvColumnCount) {
+        if (fields.size() != kCsvColumnCount) {
             if (errorMessage) {
-                *errorMessage = tr("第 %1 行列数不足，需要 %2 列（当前 %3 列）")
+                *errorMessage = tr("第 %1 行列数必须为 %2 列（当前 %3 列）")
                                     .arg(lineNumber)
                                     .arg(kCsvColumnCount)
                                     .arg(fields.size());
@@ -256,32 +264,67 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
             return false;
         }
 
-        int previousValue = -1;
+        const QString& channelText = fields.at(kCsvChannelCol - 1);
+        bool channelOk = false;
+        const int channel = channelText.toInt(&channelOk);
+        if (!channelOk || channelText.isEmpty() || channelText.contains(QLatin1Char('.'))) {
+            if (errorMessage) {
+                *errorMessage = tr("第 %1 行第 %2 列通道号不是合法整数：%3")
+                                    .arg(lineNumber)
+                                    .arg(kCsvChannelCol)
+                                    .arg(channelText);
+            }
+            return false;
+        }
+        if (channel < kCsvChannelMin || channel > kCsvChannelMax) {
+            if (errorMessage) {
+                *errorMessage = tr("第 %1 行第 %2 列通道号超出范围 [%3, %4]：%5")
+                                    .arg(lineNumber)
+                                    .arg(kCsvChannelCol)
+                                    .arg(kCsvChannelMin)
+                                    .arg(kCsvChannelMax)
+                                    .arg(channel);
+            }
+            return false;
+        }
+        const int expectedChannel = lineIndex;
+        if (channel != expectedChannel) {
+            if (errorMessage) {
+                *errorMessage = tr("第 %1 行第 %2 列通道号须为 %3（当前 %4），通道号须从 1 到 32 依次递增且不重复")
+                                    .arg(lineNumber)
+                                    .arg(kCsvChannelCol)
+                                    .arg(expectedChannel)
+                                    .arg(channel);
+            }
+            return false;
+        }
+
+        double previousValue = 0.0;
+        bool hasPreviousValue = false;
         for (int col = kCsvValueColFirst; col <= kCsvValueColLast; ++col) {
             const QString& text = fields.at(col - 1);
             bool ok = false;
-            const int value = text.toInt(&ok);
-            if (!ok || text.contains(QLatin1Char('.'))) {
+            const double value = text.toDouble(&ok);
+            if (!ok || text.isEmpty() || !qIsFinite(value)) {
                 if (errorMessage) {
-                    *errorMessage = tr("第 %1 行第 %2 列不是合法整数：%3")
+                    *errorMessage = tr("第 %1 行第 %2 列不是合法数字：%3")
                                         .arg(lineNumber)
                                         .arg(col)
                                         .arg(text);
                 }
                 return false;
             }
-            if (value < kCsvValueMin || value > kCsvValueMax) {
+            if (value <= 0.0 || value > kCsvValueMax) {
                 if (errorMessage) {
-                    *errorMessage = tr("第 %1 行第 %2 列数值超出范围 [%3, %4]：%5")
+                    *errorMessage = tr("第 %1 行第 %2 列须为正数且在范围 (0, %3] 内：%4")
                                         .arg(lineNumber)
                                         .arg(col)
-                                        .arg(kCsvValueMin)
-                                        .arg(kCsvValueMax)
+                                        .arg(kCsvValueMax, 0, 'g', -1)
                                         .arg(value);
                 }
                 return false;
             }
-            if (previousValue >= 0 && value <= previousValue) {
+            if (hasPreviousValue && value <= previousValue) {
                 if (errorMessage) {
                     *errorMessage = tr("第 %1 行第 %2～%3 列须严格递增，第 %4 列 (%5) 不大于前一列 (%6)")
                                         .arg(lineNumber)
@@ -294,6 +337,7 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
                 return false;
             }
             previousValue = value;
+            hasPreviousValue = true;
         }
     }
 
@@ -301,10 +345,10 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
 }
 
 bool DetectorSetting::load16SpecEnWindowCsv(const QString& filePath,
-                                            QVector<QVector<quint16>>& channelBoundaries,
+                                            QVector<QVector<quint16>>& energyBoundaries,
                                             QString* errorMessage)
 {
-    channelBoundaries.clear();
+    energyBoundaries.clear();
     if (!validate16SpecEnWindowCsv(filePath, errorMessage))
         return false;
 
@@ -318,24 +362,52 @@ bool DetectorSetting::load16SpecEnWindowCsv(const QString& filePath,
         return false;
     }
 
-    channelBoundaries.reserve(kCsvTotalLineCount - 1);
+    energyBoundaries.reserve(kCsvTotalLineCount - 1);
     for (int lineIndex = 1; lineIndex < kCsvTotalLineCount; ++lineIndex) {
         const QStringList fields = parseCsvFields(lines.at(lineIndex));
         QVector<quint16> boundaries;
         boundaries.reserve(kCsvValueColLast - kCsvValueColFirst + 1);
         for (int col = kCsvValueColFirst; col <= kCsvValueColLast; ++col)
-            boundaries.append(static_cast<quint16>(fields.at(col - 1).toInt()));
-        channelBoundaries.append(boundaries);
+            boundaries.append(static_cast<quint16>(qRound(fields.at(col - 1).toDouble())));
+        energyBoundaries.append(boundaries);
     }
 
-    if (channelBoundaries.size() != 32) {
+    if (energyBoundaries.size() != 32) {
         if (errorMessage)
-            *errorMessage = tr("CSV 数据通道数必须为 32（当前 %1）").arg(channelBoundaries.size());
-        channelBoundaries.clear();
+            *errorMessage = tr("CSV 数据通道数必须为 32（当前 %1）").arg(energyBoundaries.size());
+        energyBoundaries.clear();
         return false;
     }
 
     return true;
+}
+
+const QVector<QVector<quint16>>& DetectorSetting::energyBoundaries()
+{
+    return s_energyBoundaries;
+}
+
+bool DetectorSetting::reloadEnergyBoundaries(QString* errorMessage)
+{
+    JsonSettings* settings = GlobalSettings::instance()->mUserSettings;
+    ScopedFileLock lock(settings);
+    const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
+    return reloadEnergyBoundaries(csvPath, errorMessage);
+}
+
+bool DetectorSetting::reloadEnergyBoundaries(const QString& filePath, QString* errorMessage)
+{
+    s_energyBoundaries.clear();
+    if (filePath.isEmpty())
+        return true;
+
+    if (!QFile::exists(filePath)) {
+        if (errorMessage)
+            *errorMessage = tr("CSV 文件不存在：%1").arg(filePath);
+        return false;
+    }
+
+    return load16SpecEnWindowCsv(filePath, s_energyBoundaries, errorMessage);
 }
 
 void DetectorSetting::onSelectCsvFile()
