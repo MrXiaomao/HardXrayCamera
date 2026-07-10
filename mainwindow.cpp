@@ -271,9 +271,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     for (int i=0; i <32; ++i){
         if (i<16)
-            ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%14));
+            ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1));
         else
-            ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16));
+            ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16 + 1));
     }
     ui->cbb_channel->setCurrentIndex(10);
     connect(ui->cbb_channel, QOverload<int>::of(&QComboBox::currentIndexChanged),
