@@ -314,9 +314,9 @@ bool DetectorSetting::validate16SpecEnWindowCsv(const QString& filePath, QString
                 }
                 return false;
             }
-            if (value <= 0.0 || value > kCsvValueMax) {
+            if (value < 0.0 || value > kCsvValueMax) {
                 if (errorMessage) {
-                    *errorMessage = tr("第 %1 行第 %2 列须为正数且在范围 (0, %3] 内：%4")
+                    *errorMessage = tr("第 %1 行第 %2 列须为正数且在范围[0, %3] 内：%4")
                                         .arg(lineNumber)
                                         .arg(col)
                                         .arg(kCsvValueMax, 0, 'g', -1)

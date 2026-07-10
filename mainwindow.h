@@ -161,6 +161,7 @@ private slots:
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
 
+    //void onSelectSpectrumRange(const QCPRange& range);
     void onShowProfileChart(const int& detectorIndex, const QVector<QVector<ChannelProfileEntry>>& data);
 
     void on_action_hardwareSetting_triggered();
@@ -235,6 +236,7 @@ private:
     static constexpr int kDetector2ChannelOffset = 16; // 探测器2的逻辑通道号相对于物理通道的偏移
 
     static constexpr int kSpectrum512BinCount = 512;
+    static constexpr int kSpectrum16BinCount = 17;
     static constexpr int kProfileChannelCount = 32;
     static constexpr int kVerticalCameraChannels = 16;
     static constexpr double kProfileZMin = -8.0;
@@ -265,14 +267,12 @@ private:
     int hxrDisplayBinCount() const;
     bool loadEnergyCalibration(QVector<EnergyCalibration> &calibration, QString *errorMessage) const;
     QString energyCalibrationFilePath() const;
-    void energyToBinRange(double energyLeft, double energyRight, const EnergyCalibration &cal,
+    void energyToBinRange512(double energyLeft, double energyRight, const EnergyCalibration &cal,
                           int &binStart, int &binEnd) const;
+    void energyToBinRange16(double energyLeft, double energyRight, const EnergyCalibration &cal,
+                             int &binStart, int &binEnd) const;
     quint64 sumCountsInBinRange(const QVector<quint32> &counts, int binStart, int binEnd) const;
-    double profilePointPosition(int pointIndex) const;
     void generateProfileSnapshots();
-    void updateProfileIdSpinBoxRange();
-    void clearProfileData();
-    void refreshProfilePlot();
     void refreshSpectrumPlot();
     void refreshWaveformPlot();
     void refreshSpectrumCountsPlot();
@@ -297,7 +297,7 @@ private:
     void handleArmSensorData(int armIndex, const QVector<double> &temperature,
                              const QVector<double> &voltage, const QVector<double> &current);
 
-    QtDataVisualization::QSurfaceDataProxy* init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title);//3D剖面图
+    CustomSurface* init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title);//3D剖面图
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络
@@ -324,7 +324,6 @@ private:
     QVector<bool> m_hasWaveformSequenceByChannel;
     QTimer* waveformPlotTimer = nullptr;
     QVector<EnergyCalibration> m_energyCalibration;
-    QVector<ProfileSnapshot> m_profileSnapshots;
 
     // 继电器电源开关状态
     bool replayPowerOn = false;
@@ -346,8 +345,8 @@ private:
     bool m_autoMeasureDurationTimerStarted = false;
 
     // 3D剖面图
-    QtDataVisualization::QSurfaceDataProxy *m_horDataProxy = nullptr;
-    QtDataVisualization::QSurfaceDataProxy *m_verDataProxy = nullptr;
+    CustomSurface *m_hor3DSurface = nullptr;
+    CustomSurface *m_ver3DSurface = nullptr;
 
 public:
     // 无人值守

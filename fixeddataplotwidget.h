@@ -3,9 +3,6 @@
 
 #include <QWidget>
 #include "qcustomplothelper.h"
-/*class QCustomPlot;
-class QCPTextElement;
-class QCPGraph;*/
 
 // 用于绘制固定长度的数据类型，比如波形、能谱
 class FixedDataPlotWidget : public QWidget
@@ -32,6 +29,7 @@ public:
     void refreshPlot(bool rescaleX = true, bool rescaleY = true);
 
 signals:
+    void selectRangeChanged(const QCPRange& range);
 
 private:
     QCustomPlot *m_plot;

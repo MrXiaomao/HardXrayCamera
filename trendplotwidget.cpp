@@ -6,7 +6,6 @@
  * @Description: 请填写简介
  */
 #include "trendplotwidget.h"
-#include "qcustomplot.h"
 #include <QDateTime>
 #include <QSizePolicy>
 #include <QVBoxLayout>
@@ -16,6 +15,8 @@ TrendPlotWidget::TrendPlotWidget(QWidget *parent)
 {
     m_plot = new QCustomPlot(this);
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    QCustomPlotHelper* customPlotHelper = new QCustomPlotHelper(m_plot, this);
+    (void)customPlotHelper;
 
     // Use a layout so QCustomPlot always fills this widget on resize.
     auto *layout = new QVBoxLayout(this);

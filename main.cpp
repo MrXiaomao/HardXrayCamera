@@ -41,8 +41,8 @@ void AppMessageHandler(QtMsgType type, const QMessageLogContext& context, const 
 
     // 加锁
     QMutexLocker locker(&mutexMsg);
-    // if (type == QtWarningMsg)
-    //     return;
+    if (type == QtWarningMsg && context.file == nullptr && context.function == nullptr)
+        return;// 主要用于过滤系统的警告信息
 
     if (mw && type != QtDebugMsg)
         emit mw->sigAppendMsg(msg, type);
@@ -102,8 +102,8 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
-    //全局代码都采用该编码方式。
-    QTextCodec::setCodecForLocale(QTextCodec::codecForMib(106));/* Utf8 */
+    // 日志初始化前统一 locale 为 UTF-8，避免追加写入已有日志文件时使用系统 GBK 编码
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     QApplication::setStyle(QStyleFactory::create("fusion"));//WindowsVista fusion windows
 
     // 启用新的日子记录类

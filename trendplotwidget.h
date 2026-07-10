@@ -9,9 +9,7 @@
 #define TRENDPLOTWIDGET_H
 
 #include <QWidget>
-class QCustomPlot;
-class QCPTextElement;
-class QCPGraph;
+#include "qcustomplothelper.h"
 
 // 用于绘制不断刷新的曲线类型，比如电压/电流/温度监测曲线
 class TrendPlotWidget : public QWidget

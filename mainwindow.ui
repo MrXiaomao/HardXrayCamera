@@ -73,7 +73,7 @@
             <height>0</height>
            </size>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_4">
+          <layout class="QVBoxLayout" name="verticalLayout_4" stretch="1,1,3,0">
            <property name="spacing">
             <number>1</number>
            </property>
@@ -175,24 +175,10 @@
                 <number>0</number>
                </property>
                <item>
-                <widget class="QWidget" name="widget_hor" native="true">
-                 <property name="sizeIncrement">
-                  <size>
-                   <width>1</width>
-                   <height>1</height>
-                  </size>
-                 </property>
-                </widget>
+                <widget class="QWidget" name="widget_hor" native="true"/>
                </item>
                <item>
-                <widget class="QWidget" name="widget_ver" native="true">
-                 <property name="sizeIncrement">
-                  <size>
-                   <width>1</width>
-                   <height>1</height>
-                  </size>
-                 </property>
-                </widget>
+                <widget class="QWidget" name="widget_ver" native="true"/>
                </item>
               </layout>
              </widget>
@@ -511,26 +497,6 @@
                   <property name="icon">
                    <iconset resource="resource.qrc">
                     <normaloff>:/resource/surface.png</normaloff>:/resource/surface.png</iconset>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label_profileID">
-                  <property name="text">
-                   <string>剖面编号</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QSpinBox" name="spb_profileID">
-                  <property name="minimumSize">
-                   <size>
-                    <width>60</width>
-                    <height>0</height>
-                   </size>
-                  </property>
-                  <property name="minimum">
-                   <number>0</number>
                   </property>
                  </widget>
                 </item>
@@ -2313,7 +2279,6 @@
   <tabstop>dsbx_energyLeft</tabstop>
   <tabstop>dsbx_energyRight</tabstop>
   <tabstop>btn_generateProfile</tabstop>
-  <tabstop>spb_profileID</tabstop>
   <tabstop>tabWidget</tabstop>
   <tabstop>plainTextEdit_log</tabstop>
   <tabstop>pushButton_clearSysLog</tabstop>

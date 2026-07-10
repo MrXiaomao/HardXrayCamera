@@ -23,6 +23,13 @@ FixedDataPlotWidget::FixedDataPlotWidget(QWidget *parent)
 
     m_plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
     QCustomPlotHelper* customPlotHelper = new QCustomPlotHelper(m_plot, this);
+    connect(customPlotHelper, &QCustomPlotHelper::selectRangeChanged, this, [=](const QCPAxisRect */*axisRect*/, const QCPRange& range){
+        const QString objName = this->objectName();
+        if ( objName == QStringLiteral("plotSpec")){
+            emit selectRangeChanged(range);
+        }
+    });
+
     (void)customPlotHelper;
 
     //创建一条曲线

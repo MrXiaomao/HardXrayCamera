@@ -438,12 +438,68 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
             channelBoundaries.push_back(channelBoundary);
             chIdx++;
         }
+
+        // 将道址保存为csv文件
+        //saveChannelBoundaries(channelBoundaries);
+
         send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
-                                       channelBoundaries, 0);
+                                       channelBoundaries/*energyBoundaries*//*channelBoundaries*/, 0);
         send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
-                                       channelBoundaries, 16);
+                                       channelBoundaries/*energyBoundaries*//*channelBoundaries*/, 16);
     }
 
+    return true;
+}
+
+bool CommandHelper::saveChannelBoundaries(const QVector<QVector<quint16>>& channelBoundaries)
+{
+    const QString savePath("./HXR能量道参数.csv");
+    // 自动创建保存目录，避免路径不存在导出失败
+    QDir dir = QFileInfo(savePath).absoluteDir();
+    if(!dir.exists() && !dir.mkpath(".")) {
+        qWarning() << "导出路径无法创建:" << savePath;
+        return false;
+    }
+
+    QFile file(savePath);
+    if(!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "打开CSV文件失败:" << file.errorString();
+        return false;
+    }
+
+    QTextStream out(&file);
+    out.setCodec("UTF-8"); // 兼容中文路径和表头
+    out.setGenerateByteOrderMark(true); // 让Excel打开不会乱码
+
+    // 可选：先写入表头 （按通道号命名）
+    out << "channel,";
+    for(int ch = 0; ch < channelBoundaries.size(); ch++) {
+        out << QString("Energy%1").arg(ch+1);
+        if(ch != channelBoundaries.size()-1) out << ",";
+    }
+    out << "\n";
+
+    // 逐行导出所有边界点
+    int maxRowCount = 0;
+    // 先找到最长的列长度，避免短行数据错位
+    for(const auto& chData : channelBoundaries) {
+        maxRowCount = qMax(maxRowCount, chData.size());
+    }
+
+    for(int row = 0; row < maxRowCount; row++) {
+        out << row+1 << ",";
+        for(int ch = 0; ch < channelBoundaries.size(); ch++) {
+            // 当前通道该行有数据就写入，没有就留空
+            if(row < channelBoundaries[ch].size()) {
+                out << channelBoundaries[ch][row];
+            }
+            if(ch != channelBoundaries.size()-1) out << ",";
+        }
+        out << "\n";
+    }
+
+    file.close();
+    qDebug() << "通道边界CSV导出成功，路径:" << savePath;
     return true;
 }
 
@@ -594,7 +650,7 @@ void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QStr
             const int firstIndex = cmd * 2;
             const int secondIndex = qMin(firstIndex + 1, 16);            
             sendCommand(client, commands.at(cmd), QStringLiteral("分时能谱能窗"),
-                        QStringLiteral("%1 逻辑CH%2 序号0x%3 能量%4-%5-%6")
+                        QStringLiteral("%1 逻辑CH%2 序号0x%3 能量%4,%5")
                             .arg(fpgaLabel)
                             .arg(channel + 1)
                             .arg(commandIndex, 2, 16, QChar('0'))
@@ -981,7 +1037,7 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
             const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
             const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
             const int channelNumber = channelNumberFromMask(channelMask);
-            qDebug() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
         }
 
@@ -1243,12 +1299,13 @@ void CommandHelper::loadEnergyCalibration()
         energyCalib item;
         // 转浮点数容错处理
         bool okK = false, okB = false;
+        int channel = cols[0].toInt(&okK);
         item.k_calib = cols[1].toFloat(&okK);
         item.b_calib = cols[2].toFloat(&okB);
 
         if (okK && okB)
         {
-            m_channelEnergyCalib.append(item);
+            m_channelEnergyCalib[channel-1] =item;
         }
         else
         {

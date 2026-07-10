@@ -107,6 +107,7 @@ public:
     };
     QVector<energyCalib> m_channelEnergyCalib;
     void loadEnergyCalibration();// 加载能量刻度
+    bool saveChannelBoundaries(const QVector<QVector<quint16>>& channelBoundaries);
 
 private:
     // 初始化常用指令

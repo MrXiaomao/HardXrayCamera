@@ -76,7 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotWave->setYAxisLabel("幅值");
 
     ui->plotSpec->setTitle("分时能谱");
-    ui->plotSpec->setXAxisLabel("道址");
+    ui->plotSpec->setXAxisLabel("能量(keV)");
     ui->plotSpec->setYAxisLabel("计数");
     ui->plotSpec->setXRange(1,512);
 
@@ -195,17 +195,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 分隔栏
     {
-        //ui->widget_2->setLayout(new QVBoxLayout(ui->widget__plot));
-
         QSplitter *splitterV1 = new QSplitter(Qt::Vertical,this);
         splitterV1->setHandleWidth(1);
         splitterV1->addWidget(ui->plotWave);
         splitterV1->addWidget(ui->stackedWidget_spectrum);
         splitterV1->addWidget(ui->stackedWidget_3D);
-        splitterV1->addWidget(ui->groupBox_pictureSetting);
         splitterV1->setSizes(QList<int>() << 1 << 1 << 3);
-        splitterV1->setCollapsible(3,false);
         ui->widget_2->layout()->addWidget(splitterV1);
+        ui->widget_2->layout()->addWidget(ui->groupBox_pictureSetting);
 
         QSplitter *splitterH1 = new QSplitter(Qt::Horizontal,this);
         splitterH1->setHandleWidth(1);
@@ -214,6 +211,11 @@ MainWindow::MainWindow(QWidget *parent)
         splitterH1->setSizes(QList<int>() << 1 << 1);
         ui->page_3DSurface->layout()->addWidget(splitterH1);
     }
+
+    connect(ui->plotSpec, &FixedDataPlotWidget::selectRangeChanged, this, [=](const QCPRange& range){
+        ui->dsbx_energyLeft->setValue(range.lower);
+        ui->dsbx_energyRight->setValue(range.upper);
+    });//&MainWindow::onSelectSpectrumRange);
     commandHelper = CommandHelper::instance();
     DetectorSetting::reloadEnergyBoundaries();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
@@ -265,8 +267,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(waveformPlotTimer, &QTimer::timeout, this, &MainWindow::refreshWaveformPlot);
     // waveformPlotTimer 仅在波形测量模式下启动
 
-    for (int i=1; i <=32; ++i)
-        ui->cbb_channel->addItem(QString::number(i));
+    for (int i=0; i <32; ++i){
+        if (i<16)
+            ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%14));
+        else
+            ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16));
+    }
     ui->cbb_channel->setCurrentIndex(10);
     connect(ui->cbb_channel, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onChannelSpinBoxChanged);
@@ -295,8 +301,6 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateUnattendedControls);
     connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
-    connect(ui->spb_profileID, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &MainWindow::refreshProfilePlot);
     loadMeasureSettings();
 
     m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
@@ -352,8 +356,8 @@ MainWindow::MainWindow(QWidget *parent)
     // 开机自动最大化：一次性延迟调用，保留 lambda
     initStatusbar();
 
-    m_horDataProxy = init3DSurface(1, ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
-    m_verDataProxy = init3DSurface(2, ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
+    m_hor3DSurface = init3DSurface(1, ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
+    m_ver3DSurface = init3DSurface(2, ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
 
     // 构造函数中添加
     m_logFlushTimer = new QTimer(this);
@@ -576,7 +580,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         syncDetectorConnectButton();
 
         // 自动打开继电器电源开关
-        emit ui->action_powerOn->trigger();
+        //emit ui->action_powerOn->trigger();
     }
 }
 
@@ -1072,10 +1076,8 @@ void MainWindow::clearSpectrumData()
     updateSpecIdSpinBoxRange();
     ui->plotSpec->clearData();
     ui->plotSpec->refreshPlot();
-    clearProfileData();
     ui->plotCps->clearData();
     ui->plotCps->refreshPlot();
-    clearProfileData();
 }
 
 void MainWindow::clearWaveformData()
@@ -1241,8 +1243,6 @@ void MainWindow::updateProfileControls()
     ui->label_energyRight->setVisible(spectrum512Mode);
     ui->dsbx_energyRight->setVisible(spectrum512Mode);
     ui->btn_generateProfile->setVisible(spectrum512Mode);
-    ui->label_profileID->setVisible(spectrum512Mode);
-    ui->spb_profileID->setVisible(spectrum512Mode);
 }
 
 void MainWindow::updateUnattendedControls()
@@ -1367,7 +1367,7 @@ bool MainWindow::loadEnergyCalibration(QVector<EnergyCalibration> &calibration,
     return true;
 }
 
-void MainWindow::energyToBinRange(double energyLeft, double energyRight,
+void MainWindow::energyToBinRange512(double energyLeft, double energyRight,
                                   const EnergyCalibration &cal,
                                   int &binStart, int &binEnd) const
 {
@@ -1381,6 +1381,24 @@ void MainWindow::energyToBinRange(double energyLeft, double energyRight,
 
     binStart = qBound(1, static_cast<int>(std::floor(chLow)), kSpectrum512BinCount);
     binEnd = qBound(1, static_cast<int>(std::ceil(chHigh)), kSpectrum512BinCount);
+    if (binStart > binEnd)
+        std::swap(binStart, binEnd);
+}
+
+void MainWindow::energyToBinRange16(double energyLeft, double energyRight,
+                                     const EnergyCalibration &cal,
+                                     int &binStart, int &binEnd) const
+{
+    const double eMin = qMin(energyLeft, energyRight);
+    const double eMax = qMax(energyLeft, energyRight);
+
+    double chLow = (eMin - cal.b) / cal.k;
+    double chHigh = (eMax - cal.b) / cal.k;
+    if (chLow > chHigh)
+        std::swap(chLow, chHigh);
+
+    binStart = qBound(1, static_cast<int>(std::floor(chLow)), kSpectrum16BinCount);
+    binEnd = qBound(1, static_cast<int>(std::ceil(chHigh)), kSpectrum16BinCount);
     if (binStart > binEnd)
         std::swap(binStart, binEnd);
 }
@@ -1402,23 +1420,8 @@ quint64 MainWindow::sumCountsInBinRange(const QVector<quint32> &counts,
     return total;
 }
 
-double MainWindow::profilePointPosition(int pointIndex) const
-{
-    if (pointIndex < 0 || pointIndex >= kVerticalCameraChannels)
-        return 0.0;
-
-    return kProfileZMin
-           + pointIndex * (kProfileZMax - kProfileZMin)
-                 / (kVerticalCameraChannels - 1);
-}
-
 void MainWindow::generateProfileSnapshots()
 {
-    if (ui->cmb_transferMode->currentIndex() != 0) {
-        QMessageBox::information(this, tr("提示"), tr("剖面分布仅适用于512道能谱模式"));
-        return;
-    }
-
     const double energyLeft = ui->dsbx_energyLeft->value();
     const double energyRight = ui->dsbx_energyRight->value();
     if (energyLeft > energyRight) {
@@ -1437,114 +1440,134 @@ void MainWindow::generateProfileSnapshots()
         profileCount = qMax(profileCount, channelSpectra.size());
     }
     if (profileCount <= 0) {
-        QMessageBox::information(this, tr("提示"), tr("当前没有512道能谱数据，无法生成剖面分布"));
+        QMessageBox::information(this, tr("提示"), tr("当前没有能谱数据，无法生成剖面分布"));
         return;
     }
 
-    QVector<int> binStarts(kProfileChannelCount);
-    QVector<int> binEnds(kProfileChannelCount);
-    for (int ch = 0; ch < kProfileChannelCount; ++ch) {
-        energyToBinRange(energyLeft, energyRight, m_energyCalibration.at(ch),
-                         binStarts[ch], binEnds[ch]);
-    }
+    //X轴采用能量重新进行刻度,
+    // 对于512道，X轴应该采用能量刻度文件对道址进行换算
+    // 对于16道，X轴应该采用HXR能量道文件输入能量点，采用右边界
+    // QVector<quint32> spectrumEneryAddresses;
+    // if (hxrMode) {
+    //     const QVector<QVector<quint16>>& energyBoundaries = DetectorSetting::energyBoundaries();
 
-    m_profileSnapshots.clear();
-    m_profileSnapshots.reserve(profileCount);
+    //     // 取出 energyBoundaries 中对应通道 specId 的右边界作为能量地址
+    //     if (specId < energyBoundaries.size()) {
+    //         const QVector<quint16> &boundaries = energyBoundaries.at(specId);
+    //         for (const auto& addr : boundaries){
+    //             spectrumEneryAddresses.push_back(addr);
+    //         }
+    //     }
+    //     ui->plotSpec->setXRange(1, displayBinCount);
+    //     ui->plotSpec->setData(spectrumEneryAddresses.mid(0, displayBinCount),
+    //                           entry.counts.mid(0, displayBinCount));
+    // } else {
+    //     for (const auto& addr : m_spectrumBinAddresses){
+    //         spectrumEneryAddresses.push_back(addr*commandHelper->m_channelEnergyCalib[channel-1].k_calib + commandHelper->m_channelEnergyCalib[channel-1].b_calib);
+    //     }
+    //     ui->plotSpec->setData(spectrumEneryAddresses, entry.counts);
+    // }
+    /////////////////////////////////////////////////////////////////////////////////////////
+    QVector<QVector<ChannelProfileEntry>> dataHor;
+    QVector<QVector<ChannelProfileEntry>> dataVer;
+    dataHor.resize(16);
+    dataVer.resize(16);
 
-    for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
-        ProfileSnapshot snapshot;
-        snapshot.counts.resize(kProfileChannelCount);
-        snapshot.timeMs = 0;
-
+    const bool spectrum512Mode = ui->cmb_transferMode->currentIndex() == 0;
+    if (spectrum512Mode){
         for (int ch = 0; ch < kProfileChannelCount; ++ch) {
-            const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
-            if (profileIndex >= spectra.size()) {
-                snapshot.counts[ch] = 0;
-                continue;
+            QVector<int> binStarts(kProfileChannelCount);
+            QVector<int> binEnds(kProfileChannelCount);
+            for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+                energyToBinRange512(energyLeft, energyRight, m_energyCalibration.at(ch),
+                                    binStarts[ch], binEnds[ch]);
             }
 
-            const SpectrumEntry &entry = spectra.at(profileIndex);
-            if (snapshot.timeMs == 0)
-                snapshot.timeMs = entry.timeMs;
-            snapshot.counts[ch] = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+            QVector<ChannelProfileEntry> entrys;
+            entrys.resize(profileCount);
+            for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
+                const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+                if (profileIndex >= spectra.size()) {
+                    if (ch<16)
+                        dataHor[ch%16] = entrys;
+                    else
+                        dataVer[ch%16] = entrys;
+                    continue;
+                }
+
+                const SpectrumEntry &entry = spectra.at(profileIndex);
+                entrys[profileIndex].timeMs = entry.timeMs;;
+                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+            }
+
+            if (ch<16)
+                dataHor[ch%16] = entrys;
+            else
+                dataVer[ch%16] = entrys;
         }
-
-        m_profileSnapshots.append(snapshot);
     }
+    else{
+        for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+            QVector<int> binStarts(kProfileChannelCount);
+            QVector<int> binEnds(kProfileChannelCount);
+            for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+                energyToBinRange16(energyLeft, energyRight, m_energyCalibration.at(ch),
+                                    binStarts[ch], binEnds[ch]);
+            }
 
-    ui->spb_profileID->blockSignals(true);
-    ui->spb_profileID->setValue(profileCount - 1);
-    ui->spb_profileID->blockSignals(false);
-    updateProfileIdSpinBoxRange();
-    refreshProfilePlot();
+            QVector<ChannelProfileEntry> entrys;
+            entrys.resize(profileCount);
+            for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
+                const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+                if (profileIndex >= spectra.size()) {
+                    if (ch<16)
+                        dataHor[ch%16] = entrys;
+                    else
+                        dataVer[ch%16] = entrys;
+                    continue;
+                }
 
-    qInfo() << QString("剖面分布已生成 %1 帧，能量区间 [%2, %3] keV")
-                   .arg(profileCount)
-                   .arg(energyLeft, 0, 'f', 1)
-                   .arg(energyRight, 0, 'f', 1);
-}
+                const SpectrumEntry &entry = spectra.at(profileIndex);
+                entrys[profileIndex].timeMs = entry.timeMs;;
+                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+            }
 
-void MainWindow::updateProfileIdSpinBoxRange()
-{
-    const int maxProfileId = qMax(0, m_profileSnapshots.size() - 1);
-
-    ui->spb_profileID->blockSignals(true);
-    ui->spb_profileID->setMaximum(maxProfileId);
-    if (ui->spb_profileID->value() > maxProfileId)
-        ui->spb_profileID->setValue(maxProfileId);
-    ui->spb_profileID->blockSignals(false);
-}
-
-void MainWindow::clearProfileData()
-{
-    m_profileSnapshots.clear();
-    ui->spb_profileID->blockSignals(true);
-    ui->spb_profileID->setValue(0);
-    ui->spb_profileID->blockSignals(false);
-    updateProfileIdSpinBoxRange();
-    ui->plotProfile->clearAllGraphData();
-    ui->plotProfile->refreshPlot(false, true);
-}
-
-void MainWindow::refreshProfilePlot()
-{
-    if (m_profileSnapshots.isEmpty()) {
-        ui->plotProfile->clearAllGraphData();
-        ui->plotProfile->setTitle(QStringLiteral("剖面分布 (无数据)"));
-        ui->plotProfile->refreshPlot(false, true);
-        return;
+            if (ch<16)
+                dataHor[ch%16] = entrys;
+            else
+                dataVer[ch%16] = entrys;
+        }
     }
+    emit showProfileChart(1, dataHor);
+    emit showProfileChart(2, dataVer);
 
-    const int profileId = ui->spb_profileID->value();
-    if (profileId < 0 || profileId >= m_profileSnapshots.size()) {
-        ui->plotProfile->clearAllGraphData();
-        ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 (无数据)").arg(profileId));
-        ui->plotProfile->refreshPlot(false, true);
-        return;
-    }
 
-    const ProfileSnapshot &snapshot = m_profileSnapshots.at(profileId);
-    QVector<double> verticalX(kVerticalCameraChannels);
-    QVector<double> verticalY(kVerticalCameraChannels);
-    QVector<double> horizontalX(kVerticalCameraChannels);
-    QVector<double> horizontalY(kVerticalCameraChannels);
+    /////////////////////////////////////////////////////////////////////////////////////////
+    // QVector<int> binStarts(kProfileChannelCount);
+    // QVector<int> binEnds(kProfileChannelCount);
+    // for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+    //     energyToBinRange512(energyLeft, energyRight, m_energyCalibration.at(ch),
+    //                      binStarts[ch], binEnds[ch]);
+    // }
 
-    for (int i = 0; i < kVerticalCameraChannels; ++i) {
-        const double x = profilePointPosition(i);
-        verticalX[i] = x;
-        verticalY[i] = static_cast<double>(snapshot.counts.at(i));
+    // for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
+    //     ProfileSnapshot snapshot;
+    //     snapshot.counts.resize(kProfileChannelCount);
+    //     snapshot.timeMs = 0;
 
-        horizontalX[i] = x;
-        horizontalY[i] = static_cast<double>(snapshot.counts.at(i + kVerticalCameraChannels));
-    }
+    //     for (int ch = 0; ch < kProfileChannelCount; ++ch) {
+    //         const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+    //         if (profileIndex >= spectra.size()) {
+    //             snapshot.counts[ch] = 0;
+    //             continue;
+    //         }
 
-    ui->plotProfile->setGraphData(0, verticalX, verticalY);
-    ui->plotProfile->setGraphData(1, horizontalX, horizontalY);
-    ui->plotProfile->setTitle(QStringLiteral("剖面分布 #%1 t=%2ms")
-                                  .arg(profileId)
-                                  .arg(snapshot.timeMs));
-    ui->plotProfile->setXRange(kProfileZMin, kProfileZMax);
-    ui->plotProfile->refreshPlot(false, true);
+    //         const SpectrumEntry &entry = spectra.at(profileIndex);
+    //         if (snapshot.timeMs == 0)
+    //             snapshot.timeMs = entry.timeMs;
+    //         snapshot.counts[ch] = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+    //     }
+    // }
 }
 
 void MainWindow::on_btn_generateProfile_clicked()
@@ -1606,14 +1629,14 @@ void MainWindow::refreshSpectrumPlot()
         const QVector<QVector<quint16>>& energyBoundaries = DetectorSetting::energyBoundaries();
 
         // 取出 energyBoundaries 中对应通道 specId 的右边界作为能量地址
-        if (specId < energyBoundaries.size()) {
-            const QVector<quint16> &boundaries = energyBoundaries.at(specId);
+        if (channel < energyBoundaries.size()) {
+            const QVector<quint16> &boundaries = energyBoundaries.at(channel);
             for (const auto& addr : boundaries){
                 spectrumEneryAddresses.push_back(addr);
             }
         }
         ui->plotSpec->setXRange(1, displayBinCount);
-        ui->plotSpec->setData(spectrumEneryAddresses.mid(0, displayBinCount),
+        ui->plotSpec->setData(spectrumEneryAddresses.mid(1, displayBinCount),
                               entry.counts.mid(0, displayBinCount));
     } else {
         for (const auto& addr : m_spectrumBinAddresses){
@@ -2598,6 +2621,8 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         return;
     }
 
+    // 关闭继电器，否则下次启动第一次容易连接不上
+    commandHelper->PowerOffRelay();
     this->hide();
     event->accept();
     qApp->quit();
@@ -2637,7 +2662,7 @@ void MainWindow::onMeasureStarted()
 }
 
 #include <QRandomGenerator>
-QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title)
+CustomSurface* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title)
 {
     const int channelCount = 16;
     const int timePoints = 101;
@@ -2673,8 +2698,8 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& det
     QVBoxLayout* vLayout = new QVBoxLayout(wigetContainer);
     vLayout->setContentsMargins(0,0,0,0);
     vLayout->setSpacing(0);
-    vLayout->addWidget(globalTitle);
     vLayout->addWidget(container);
+    vLayout->addWidget(globalTitle);
     wigetContainer->setLayout(vLayout);
 
     // 全局主题配置
@@ -2736,19 +2761,19 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& det
     QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
     fullProfileData->reserve(timePoints);
 
-    for (int chIdx = 0; chIdx < channelCount; ++chIdx)
-    {
-        float fixedZ = chIdx * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
-        QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
-        for (int tIdx = 0; tIdx < timePoints; ++tIdx)
-        {
-            float currentX = timeMin + tIdx * (timeMax - timeMin) / (timePoints - 1);
-            float randomY = QRandomGenerator::global()->bounded((quint32)valMin, (quint32)valMax);
-            (*timeRow)[tIdx] = QVector3D(currentX, randomY, fixedZ);
-        }
+    // for (int chIdx = 0; chIdx < channelCount; ++chIdx)
+    // {
+    //     float fixedZ = chIdx * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
+    //     QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
+    //     for (int tIdx = 0; tIdx < timePoints; ++tIdx)
+    //     {
+    //         float currentX = timeMin + tIdx * (timeMax - timeMin) / (timePoints - 1);
+    //         float randomY = QRandomGenerator::global()->bounded((quint32)valMin, (quint32)valMax);
+    //         (*timeRow)[tIdx] = QVector3D(currentX, randomY, fixedZ);
+    //     }
 
-        fullProfileData->append(timeRow);
-    }
+    //     fullProfileData->append(timeRow);
+    // }
 
     profileSeries->dataProxy()->resetArray(fullProfileData);
     surface->addSeries(profileSeries);
@@ -2757,7 +2782,7 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& det
     surface->scene()->activeCamera()->setCameraPosition(
         -60.0f,   // 方位角 调整为更易观察通道分布
         30.0f,    // 低仰角 突出剖面高度起伏
-        90.0f    // 视距缩放范围 完整显示全部16通道范围
+        125.0f    // 视距缩放范围 完整显示全部16通道范围
         );
 
     surface->show();
@@ -2791,15 +2816,23 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& det
 
         emit showProfileChart(detectorIndex, data);
     });
-    timer->start(5000);
+    //timer->start(5000);
 
-    return profileProxy;
+    return surface;
 }
+
+// void MainWindow::onSelectSpectrumRange(const QCPRange& range)
+// {
+//     ui->dsbx_energyLeft->setValue(range.minRange);
+//     ui->dsbx_energyRight->setValue(range.maxRange);
+// }
 
 void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVector<ChannelProfileEntry>>& data)
 {
     const int channelCount = 16;
     const int timePoints = data[0].size();
+    float timeMin = 0.0f, timeMax = 10000.0f;
+    float valMin = 0.0f, valMax = 0.0f;
 
     QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
     fullProfileData->reserve(timePoints);
@@ -2811,16 +2844,21 @@ void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVec
         QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
         for (int tIdx = 0; tIdx < entrys.size(); ++tIdx)
         {
-            float currentX = entrys[tIdx].timeMs;
-            float randomY = entrys[tIdx].energy;
-            (*timeRow)[tIdx] = QVector3D(currentX, randomY, fixedZ);
+            float timeMs = entrys[tIdx].timeMs;
+            float energy = entrys[tIdx].energy;
+            timeMax = qMax(timeMax, timeMs);
+            valMax = qMax(valMax, energy);
+            (*timeRow)[tIdx] = QVector3D(timeMs, energy, fixedZ);
         }
 
         fullProfileData->append(timeRow);
     }
 
+    CustomSurface *surface = m_ver3DSurface;
     if (1== detectorIndex)
-        m_horDataProxy->resetArray(fullProfileData);
-    else
-        m_verDataProxy->resetArray(fullProfileData);
+        surface = m_hor3DSurface;
+
+    surface->axisX()->setRange(timeMin, timeMax);
+    surface->axisY()->setRange(valMin, valMax*1.2);
+    surface->seriesList().first()->dataProxy()->resetArray(fullProfileData);
 }
