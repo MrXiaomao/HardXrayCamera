@@ -457,19 +457,14 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
-        printWaveformCollectionSummary();
-        printSpectrumSequenceSummary();
-        finalizeMeasurementPlots();
 
         ui->action_startMeasure->setEnabled(true);
         ui->action_stopMeasure->setEnabled(false);
-        ui->comboBox_measureMode->setEnabled(true);
-        ui->dateTimeEdit_startup->setEnabled(true);
-        ui->dateTimeEdit_shutdown->setEnabled(true);
         qInfo().nospace() << "炮号["<< m_currentShotNumber << "]自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
 
         // 自动进入下一次自动测量阶段，直到手动点击停止按钮为止
         startMeasureInternal();
+        updateMeasureParamsGroupEnabled();
         return;
     }
 
@@ -484,6 +479,7 @@ void MainWindow::onMeasureTimerTimeout()
     ui->comboBox_measureMode->setEnabled(true);
     ui->dateTimeEdit_startup->setEnabled(true);
     ui->dateTimeEdit_shutdown->setEnabled(true);
+    updateMeasureParamsGroupEnabled();
 
     if (measureMode == 0)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
@@ -564,7 +560,10 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
             measureTimer->stop();
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
+            printWaveformCollectionSummary();
+            printSpectrumSequenceSummary();
             finalizeMeasurementPlots();
+            resetMeasurementPlotData();
             m_autoMeasureState = AutoMeasureState::Idle;
             m_autoMeasureDurationTimerStarted = false;
         } else if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
@@ -574,6 +573,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
             m_autoMeasureState = AutoMeasureState::Idle;
             m_autoMeasureDurationTimerStarted = false;
         }
+        updateMeasureParamsGroupEnabled();
         
         // 断电后清除各设备在线标记
         detectOnline[0] = false;
@@ -1096,6 +1096,31 @@ void MainWindow::clearWaveformData()
     ui->plotWave->refreshPlot();
 }
 
+#ifdef QT_DATAVISUALIZATION_LIB
+void MainWindow::clear3DSurface(CustomSurface *surface)
+{
+    if (!surface || surface->seriesList().isEmpty())
+        return;
+
+    surface->seriesList().first()->dataProxy()->resetArray(
+        new QtDataVisualization::QSurfaceDataArray());
+    surface->axisX()->setRange(0.0f, 10000.0f);
+    surface->axisY()->setRange(0.0f, 65536.0f);
+}
+#endif
+
+void MainWindow::resetMeasurementPlotData()
+{
+    clearSpectrumData();
+    clearWaveformData();
+    resetWaveformCounters();
+    resetSpectrumSequenceTracking();
+#ifdef QT_DATAVISUALIZATION_LIB
+    clear3DSurface(m_hor3DSurface);
+    clear3DSurface(m_ver3DSurface);
+#endif
+}
+
 void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                                     const QVector<quint32> &counts)
 {
@@ -1272,6 +1297,11 @@ void MainWindow::updateUnattendedControls()
         ui->dateTimeEdit_startup->setEnabled(false);
         ui->dateTimeEdit_shutdown->setEnabled(false);
     }
+}
+
+void MainWindow::updateMeasureParamsGroupEnabled()
+{
+    ui->groupBox_3->setEnabled(!isMeasureSessionActive());
 }
 
 QString MainWindow::energyCalibrationFilePath() const
@@ -1839,10 +1869,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     commandHelper->setShotNumber(shotNumber);
     m_autoMeasureDurationTimerStarted = false;
 
-    clearWaveformData();
-    clearSpectrumData();
-    resetWaveformCounters();
-    resetSpectrumSequenceTracking();
+    resetMeasurementPlotData();
     spectrumPlotThrottle.invalidate();
 
     commandHelper->beginRecording(mdetPara);
@@ -1858,6 +1885,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
 
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->action_stopMeasure->setEnabled(true);
+    updateMeasureParamsGroupEnabled();
     qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
             << measureDurationMs() << "ms";
 }
@@ -1895,6 +1923,7 @@ void MainWindow::stopAutoMeasureSession()
         printWaveformCollectionSummary();
         printSpectrumSequenceSummary();
         finalizeMeasurementPlots();
+        resetMeasurementPlotData();
     } else {
         // 炮号未到，硬件尚未开始测量，只取消等待，不发送停止指令。
         commandHelper->closeMeasurementFiles();
@@ -1918,10 +1947,7 @@ bool MainWindow::startMeasureInternal()
     if (measureMode == 1 && m_autoMeasureState != AutoMeasureState::Idle)
         return true;
 
-    clearWaveformData();
-    clearSpectrumData();
-    resetWaveformCounters();
-    resetSpectrumSequenceTracking();
+    resetMeasurementPlotData();
     spectrumPlotThrottle.invalidate();
 
     DetParameter detPara = {};
@@ -1969,6 +1995,7 @@ bool MainWindow::startMeasureInternal()
         ui->comboBox_measureMode->setEnabled(false);
         ui->dateTimeEdit_startup->setEnabled(false);
         ui->dateTimeEdit_shutdown->setEnabled(false);
+        updateMeasureParamsGroupEnabled();
         qInfo() << "自动测量已就绪，等待炮号...";
         return true;
     }
@@ -2052,6 +2079,7 @@ bool MainWindow::startMeasureInternal()
             ui->comboBox_measureMode->setEnabled(true);
             ui->dateTimeEdit_startup->setEnabled(true);
             ui->dateTimeEdit_shutdown->setEnabled(true);
+            updateMeasureParamsGroupEnabled();
 
             qInfo() << "无人值守时间到，系统将自动退出";
             QTimer::singleShot(3000, this, [=]{
@@ -2061,6 +2089,7 @@ bool MainWindow::startMeasureInternal()
 
         startTimer->start(msecToA);
         stopTimer->start(msecToB);
+        updateMeasureParamsGroupEnabled();
         qInfo() << "程序已进入无人值守模式，超出用户自定义的监测参数范围，软件将自动切断前端硬件供电。";
     }
     else
@@ -2081,6 +2110,7 @@ bool MainWindow::startMeasureInternal()
         ui->comboBox_measureMode->setEnabled(false);
         ui->dateTimeEdit_startup->setEnabled(false);
         ui->dateTimeEdit_shutdown->setEnabled(false);
+        updateMeasureParamsGroupEnabled();
         qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << measureDurationMs() << "ms";
     }
 
@@ -2444,6 +2474,7 @@ void MainWindow::on_action_stopMeasure_triggered()
         ui->dateTimeEdit_shutdown->setEnabled(true);
         ui->action_startMeasure->setEnabled(true);
         ui->action_stopMeasure->setEnabled(false);
+        updateMeasureParamsGroupEnabled();
         qInfo() << "自动测量已取消，未收到炮号";
         return;
     }
@@ -2455,6 +2486,7 @@ void MainWindow::on_action_stopMeasure_triggered()
         ui->dateTimeEdit_shutdown->setEnabled(true);
         ui->action_startMeasure->setEnabled(true);
         ui->action_stopMeasure->setEnabled(false);
+        updateMeasureParamsGroupEnabled();
         qInfo() << "自动测量已手动停止，已发送硬件停止指令";
         return;
     }
@@ -2483,6 +2515,7 @@ void MainWindow::on_action_stopMeasure_triggered()
     printSpectrumSequenceSummary();
     measureTimer->stop();
     finalizeMeasurementPlots();
+    updateMeasureParamsGroupEnabled();
     qInfo() << "手动停止测量";
 }
 

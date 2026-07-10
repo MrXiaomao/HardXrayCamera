@@ -250,6 +250,10 @@ private:
     int logicalChannelNumber(int detectorIndex, int channelNumber) const;
     void clearSpectrumData();
     void clearWaveformData();
+    void resetMeasurementPlotData();
+#ifdef QT_DATAVISUALIZATION_LIB
+    void clear3DSurface(CustomSurface *surface);
+#endif
     void appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                             const QVector<quint32> &counts);
     void appendWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -264,6 +268,7 @@ private:
     void updateHxrDisplayBinControls();
     void updateProfileControls();
     void updateUnattendedControls();
+    void updateMeasureParamsGroupEnabled();
     int hxrDisplayBinCount() const;
     bool loadEnergyCalibration(QVector<EnergyCalibration> &calibration, QString *errorMessage) const;
     QString energyCalibrationFilePath() const;
