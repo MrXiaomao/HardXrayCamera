@@ -124,7 +124,8 @@ CommandHelper::CommandHelper(QObject *parent)
 {
     loadIPConfig();
     initCommand();
-    
+    loadEnergyCalibration();
+
     client_fpga1_main = new TcpClient(this); // FPGA主板1主网口(控制/能谱)
     client_fpga2_main = new TcpClient(this); // FPGA主板2主网口(控制/能谱)
     client_fpga1_wave = new TcpClient(this); // 副网口，仅接收波形（FPGA主板1）
@@ -416,16 +417,29 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
         const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
 
         QVector<QVector<quint16>> channelBoundaries;
-        QString csvError;
+        QString csvError;        
         if (!DetectorSetting::load16SpecEnWindowCsv(csvPath, channelBoundaries, &csvError)) {
             qWarning() << "16道能谱能窗CSV加载失败:" << csvError;
             emit sigAppendMsg(tr("16道能谱能窗CSV无效，已取消测量：%1").arg(csvError), QtWarningMsg);
             return false;
         }
+
+        // 将道址转换为能量
+        QVector<QVector<quint16>> channelEnery;
+        int chIdx = 0;
+        for (const auto& boundar : channelBoundaries){
+            QVector<quint16> enery;
+            for (const auto& a : boundar){
+                enery.push_back(a * m_channelEnergyCalib[chIdx].k_calib + m_channelEnergyCalib[chIdx].b_calib);
+            }
+
+            channelEnery.push_back(enery);
+            chIdx++;
+        }
         send16SpecEnergyWindowCommands(client_fpga1_main, QString::fromUtf8(kFpga1MainPort),
-                                       channelBoundaries, 0);
+                                       channelEnery/*channelBoundaries*/, 0);
         send16SpecEnergyWindowCommands(client_fpga2_main, QString::fromUtf8(kFpga2MainPort),
-                                       channelBoundaries, 16);
+                                       channelEnery/*channelBoundaries*/, 16);
     }
 
     return true;
@@ -576,9 +590,9 @@ void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QStr
         for (int cmd = 0; cmd < commands.size(); ++cmd) {
             const quint8 commandIndex = static_cast<quint8>(channel * 9 + cmd);
             const int firstIndex = cmd * 2;
-            const int secondIndex = qMin(firstIndex + 1, 16);
+            const int secondIndex = qMin(firstIndex + 1, 16);            
             sendCommand(client, commands.at(cmd), QStringLiteral("分时能谱能窗"),
-                        QStringLiteral("%1 逻辑CH%2 序号0x%3 道址%4-%5")
+                        QStringLiteral("%1 逻辑CH%2 序号0x%3 能量%4-%5-%6")
                             .arg(fpgaLabel)
                             .arg(channel + 1)
                             .arg(commandIndex, 2, 16, QChar('0'))
@@ -1180,4 +1194,66 @@ bool CommandHelper::sendOTAUpgradeData(quint8 index, const QByteArray& data)
 
     client->send(data);
     return true;
+}
+
+void CommandHelper::loadEnergyCalibration()
+{
+    // 加载能量刻度
+    // 1. 初始化资源与路径定义
+    m_channelEnergyCalib.reserve(32);
+    for (int i=0; i<32; ++i)
+    {
+        m_channelEnergyCalib.append(energyCalib{1, 0});
+    }
+
+    QString csvPath = "./能量刻度.csv";
+    QFile file(csvPath);
+
+    // 2. 文件合法性校验
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        qWarning() << "打开能量刻度CSV失败:" << file.errorString();
+        return;
+    }
+
+    QTextStream in(&file);
+    in.setCodec("UTF-8");
+    in.setAutoDetectUnicode(true);
+
+    // 3. 跳过表头行（匹配第一行"channel,k,b"）
+    if (!in.atEnd()) in.readLine();
+
+    // 4. 逐行解析映射到结构体
+    while (!in.atEnd())
+    {
+        QString line = in.readLine().trimmed();
+        // 跳过空行/注释行
+        if (line.isEmpty() || line.startsWith('#')) continue;
+
+        QStringList cols = line.split(',', Qt::SkipEmptyParts);
+        // 严格校验每行必须有3列（通道号+K+B）
+        if (cols.size() < 3)
+        {
+            qWarning() << "跳过非法行:" << line;
+            continue;
+        }
+
+        energyCalib item;
+        // 转浮点数容错处理
+        bool okK = false, okB = false;
+        item.k_calib = cols[1].toFloat(&okK);
+        item.b_calib = cols[2].toFloat(&okB);
+
+        if (okK && okB)
+        {
+            m_channelEnergyCalib.append(item);
+        }
+        else
+        {
+            qWarning() << "行数据格式错误:" << line;
+        }
+    }
+
+    file.close();
+    qDebug() << "成功加载" << m_channelEnergyCalib.size() << "路通道能量刻度";
 }

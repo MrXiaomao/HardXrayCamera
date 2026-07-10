@@ -101,6 +101,13 @@ public:
     // 设置触发信号时间宽度
     void sendTriggerSignalTimeWidth(quint8 detectorIndex = 0x11/*高位-板卡2，低位-板卡1*/, quint16 timeWidth = 2000/*默认值*/);
 
+    struct energyCalib {
+        float k_calib;//能量刻度系数-k
+        float b_calib;//能量刻度系数-b
+    };
+    QVector<energyCalib> m_channelEnergyCalib;
+    void loadEnergyCalibration();// 加载能量刻度
+
 private:
     // 初始化常用指令
     void initCommand(); 
@@ -238,7 +245,7 @@ private:
 
     mutable QMutex m_measurementMutex;
 
-    void closeMeasurementFilesLocked();
+    void closeMeasurementFilesLocked();    
 };
 
 #endif // COMMANDHELPER_H

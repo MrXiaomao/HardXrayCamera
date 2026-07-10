@@ -102,7 +102,7 @@ public:
 
 signals:
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
-    void showProfileChart(const QVector<QVector<ChannelProfileEntry>>& data);
+    void showProfileChart(const int& detectorIndex, const QVector<QVector<ChannelProfileEntry>>& data);
 
 public:
     virtual void closeEvent(QCloseEvent *event) override;
@@ -161,7 +161,7 @@ private slots:
     void saveShotNumberFile(const QString &shotNumber) const;
     void appendUdpLog(const QString &line);
 
-    void onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>& data);
+    void onShowProfileChart(const int& detectorIndex, const QVector<QVector<ChannelProfileEntry>>& data);
 
     void on_action_hardwareSetting_triggered();
 
@@ -297,7 +297,7 @@ private:
     void handleArmSensorData(int armIndex, const QVector<double> &temperature,
                              const QVector<double> &voltage, const QVector<double> &current);
 
-    QtDataVisualization::QSurfaceDataProxy* init3DSurface(QWidget* wigetContainer, const QString& title);//3D剖面图
+    QtDataVisualization::QSurfaceDataProxy* init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title);//3D剖面图
 
     Ui::MainWindow *ui;
     CommandHelper *commandHelper = nullptr;//探测器网络

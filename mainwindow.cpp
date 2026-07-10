@@ -22,6 +22,7 @@
 #include <QDateTime>
 #include <cmath>
 #include <algorithm>
+#include <QGraphicsProxyWidget>
 
 #include "detectorsetting.h"
 #include "commandhelper.h"
@@ -38,12 +39,18 @@ MainWindow::MainWindow(QWidget *parent)
     connect(measureTimer, &QTimer::timeout, this, &MainWindow::onMeasureTimerTimeout);
     ui->setupUi(this);
     loadMonitorAlarmSettings();
-    connect(ui->doubleSpinBox_temp, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this](double) { saveMonitorAlarmSettings(); });
-    connect(ui->doubleSpinBox_voltage, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this](double) { saveMonitorAlarmSettings(); });
-    connect(ui->doubleSpinBox_current, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this](double) { saveMonitorAlarmSettings(); });
+    QList<QDoubleSpinBox*> spinBoxs;
+    spinBoxs << ui->doubleSpinBox_dev1_temp_1 << ui->doubleSpinBox_dev1_temp_2 << ui->doubleSpinBox_dev1_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev1_voltage;
+    spinBoxs << ui->doubleSpinBox_dev1_current;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_1 << ui->doubleSpinBox_dev2_temp_2 << ui->doubleSpinBox_dev2_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_4 << ui->doubleSpinBox_dev2_temp_5 << ui->doubleSpinBox_dev2_temp_6;
+    spinBoxs << ui->doubleSpinBox_dev2_voltage_1 << ui->doubleSpinBox_dev2_voltage_2 << ui->doubleSpinBox_dev2_voltage_3 << ui->doubleSpinBox_dev2_voltage_4;
+    spinBoxs << ui->doubleSpinBox_dev2_current_1 << ui->doubleSpinBox_dev2_current_2 << ui->doubleSpinBox_dev2_current_3 << ui->doubleSpinBox_dev2_current_4;
+    for (auto const& spinBox : spinBoxs){
+        connect(spinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+                this, [this](double) { saveMonitorAlarmSettings(); });
+    }
 
     QAction *action = ui->le_savePath->addAction(QIcon(":/resource/open.png"), QLineEdit::TrailingPosition);
     QToolButton* button = qobject_cast<QToolButton*>(action->associatedWidgets().last());
@@ -61,7 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plainTextEdit_log->document()->setMaximumBlockCount(2000);
     
     connect(this, SIGNAL(sigAppendMsg(const QString &, QtMsgType)), this, SLOT(slotAppendMsg(const QString &, QtMsgType)));
-    connect(this, SIGNAL(showProfileChart(const QVector<QVector<ChannelProfileEntry>>&)), this, SLOT(onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>&)));
+    connect(this, SIGNAL(showProfileChart(const int&,const QVector<QVector<ChannelProfileEntry>>&)), this, SLOT(onShowProfileChart(const int&, const QVector<QVector<ChannelProfileEntry>> &)));
     qRegisterMetaType<QtMsgType>("QtMsgType");
     
     ui->plotWave->setTitle("波形");
@@ -133,6 +140,79 @@ MainWindow::MainWindow(QWidget *parent)
         ui->plotTemp_2->setYAxisLabel("温度 (℃)");
         ui->plotTemp_2->setTimeWindow(180);
         ui->plotTemp_2->setupNumericLegend();
+    }
+    // 实时监测左侧栏
+    {
+        QPushButton* thresholdSettingButton = nullptr;
+        thresholdSettingButton = new QPushButton();
+        thresholdSettingButton->setText(tr("异常阈值设置"));
+        thresholdSettingButton->setFixedSize(150,29);
+        thresholdSettingButton->setCheckable(true);
+        thresholdSettingButton->setChecked(true);
+
+        QHBoxLayout* sideHboxLayout = new QHBoxLayout();
+        sideHboxLayout->setObjectName("sideHboxLayout");
+        sideHboxLayout->setContentsMargins(0,0,0,0);
+        sideHboxLayout->setSpacing(2);
+
+        QWidget* sideProxyWidget = new QWidget();
+        sideProxyWidget->setObjectName("sideProxyWidget");
+        sideProxyWidget->setLayout(sideHboxLayout);
+        sideHboxLayout->addWidget(thresholdSettingButton);
+
+        QGraphicsScene *scene = new QGraphicsScene(this);
+        QGraphicsProxyWidget *w = scene->addWidget(sideProxyWidget);
+        w->setPos(0,0);
+        w->setRotation(-90);
+        ui->graphicsView->setScene(scene);
+        ui->graphicsView->setFrameStyle(0);
+        ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        ui->graphicsView->setFixedSize(30, 150);
+        ui->leftSidewidget->setFixedWidth(30);
+
+        connect(thresholdSettingButton,&QPushButton::clicked,this,[=](){
+            if(ui->leftStackedWidget->isHidden()) {
+                ui->leftStackedWidget->show();
+
+                thresholdSettingButton->setChecked(true);
+            } else {
+                if(ui->leftStackedWidget->currentWidget() == ui->detectorStatusWidget) {
+                    ui->leftStackedWidget->hide();
+                    thresholdSettingButton->setChecked(false);
+                } else {
+                    ui->leftStackedWidget->setCurrentWidget(ui->detectorStatusWidget);
+                    thresholdSettingButton->setChecked(true);
+                }
+            }
+        });
+
+        connect(ui->toolButton_closeDetectorStatusWidget,&QPushButton::clicked,this,[=](){
+            ui->leftStackedWidget->hide();
+            thresholdSettingButton->setChecked(false);
+        });
+    }
+
+    // 分隔栏
+    {
+        //ui->widget_2->setLayout(new QVBoxLayout(ui->widget__plot));
+
+        QSplitter *splitterV1 = new QSplitter(Qt::Vertical,this);
+        splitterV1->setHandleWidth(1);
+        splitterV1->addWidget(ui->plotWave);
+        splitterV1->addWidget(ui->stackedWidget_spectrum);
+        splitterV1->addWidget(ui->stackedWidget_3D);
+        splitterV1->addWidget(ui->groupBox_pictureSetting);
+        splitterV1->setSizes(QList<int>() << 1 << 1 << 3);
+        splitterV1->setCollapsible(3,false);
+        ui->widget_2->layout()->addWidget(splitterV1);
+
+        QSplitter *splitterH1 = new QSplitter(Qt::Horizontal,this);
+        splitterH1->setHandleWidth(1);
+        splitterH1->addWidget(ui->widget_hor);
+        splitterH1->addWidget(ui->widget_ver);
+        splitterH1->setSizes(QList<int>() << 1 << 1);
+        ui->page_3DSurface->layout()->addWidget(splitterH1);
     }
     commandHelper = CommandHelper::instance();
     connect(commandHelper, &CommandHelper::sigAppendMsg, this, &MainWindow::slotAppendMsg);
@@ -253,7 +333,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_startMeasure->setEnabled(false);
     ui->action_stopMeasure->setEnabled(false);
 
-    ui->action_connectMonitor->setCheckable(true);
+    // ui->action_connectMonitor->setCheckable(true);
     // ui->action_connectMonitor->setChecked(false);
     // ui->action_connectMonitor->setText(QStringLiteral("连接实时监测系统"));
     ui->action_connectMonitor->setEnabled(false);
@@ -271,8 +351,8 @@ MainWindow::MainWindow(QWidget *parent)
     // 开机自动最大化：一次性延迟调用，保留 lambda
     initStatusbar();
 
-    m_horDataProxy = init3DSurface(ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
-    m_verDataProxy = init3DSurface(ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
+    m_horDataProxy = init3DSurface(1, ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
+    m_verDataProxy = init3DSurface(2, ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
 
     // 构造函数中添加
     m_logFlushTimer = new QTimer(this);
@@ -372,12 +452,15 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
-        ui->action_startMeasure->setEnabled(true);
-        ui->action_stopMeasure->setEnabled(false);
-        ui->comboBox_measureMode->setEnabled(true);
-        ui->dateTimeEdit_startup->setEnabled(true);
-        ui->dateTimeEdit_shutdown->setEnabled(true);
-        qInfo() << "自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+        // ui->action_startMeasure->setEnabled(true);
+        // ui->action_stopMeasure->setEnabled(false);
+        // ui->comboBox_measureMode->setEnabled(true);
+        // ui->dateTimeEdit_startup->setEnabled(true);
+        // ui->dateTimeEdit_shutdown->setEnabled(true);
+        qInfo().nospace() << "炮号["<< m_currentShotNumber << "]自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+
+        // 自动进入下一次自动测量阶段，直到手动点击停止按钮为止
+        startMeasureInternal();
         return;
     }
 
@@ -691,33 +774,44 @@ void MainWindow::checkArmMonitorAlarm(int armIndex, const QVector<double> &tempe
     if (!ui->checkBox_alarm->isChecked())
         return ;
 
-    const double tempLimit = ui->doubleSpinBox_temp->value();
-    const double voltageLimit = ui->doubleSpinBox_voltage->value();
-    const double currentLimit = ui->doubleSpinBox_current->value();
+    QVector<double> tempLimit;
+    QVector<double>  voltageLimit;
+    QVector<double>  currentLimit;
+    if (armIndex == 1){
+        tempLimit << ui->doubleSpinBox_dev1_temp_1->value() << ui->doubleSpinBox_dev1_temp_2->value() << ui->doubleSpinBox_dev1_temp_3->value();
+        voltageLimit << ui->doubleSpinBox_dev1_voltage->value();
+        currentLimit << ui->doubleSpinBox_dev1_current->value();
+    }
+    else{
+        tempLimit << ui->doubleSpinBox_dev2_temp_1->value() << ui->doubleSpinBox_dev2_temp_2->value() << ui->doubleSpinBox_dev2_temp_3->value();
+        tempLimit << ui->doubleSpinBox_dev2_temp_4->value() << ui->doubleSpinBox_dev2_temp_5->value() << ui->doubleSpinBox_dev2_temp_6->value();
+        voltageLimit << ui->doubleSpinBox_dev2_voltage_1->value() << ui->doubleSpinBox_dev2_voltage_2->value() << ui->doubleSpinBox_dev2_voltage_3->value() << ui->doubleSpinBox_dev2_voltage_4->value();
+        currentLimit << ui->doubleSpinBox_dev2_current_1->value() << ui->doubleSpinBox_dev2_current_2->value() << ui->doubleSpinBox_dev2_current_3->value() << ui->doubleSpinBox_dev2_current_4->value();
+    }
 
     QStringList alarmDetails;
     for (int i = 0; i < temperature.size(); ++i) {
-        if (temperature[i] > tempLimit) {
+        if (temperature[i] > tempLimit[i]) {
             alarmDetails << tr("温度CH%1=%2°C>阈值%3°C")
                                 .arg(i + 1)
                                 .arg(temperature[i], 0, 'f', 1)
-                                .arg(tempLimit, 0, 'f', 1);
+                                .arg(tempLimit[i], 0, 'f', 1);
         }
     }
     for (int i = 0; i < voltage.size(); ++i) {
-        if (voltage[i] > voltageLimit) {
+        if (voltage[i] > voltageLimit[i]) {
             alarmDetails << tr("电压CH%1=%2V>阈值%3V")
                                 .arg(i + 1)
                                 .arg(voltage[i], 0, 'f', 3)
-                                .arg(voltageLimit, 0, 'f', 3);
+                                .arg(voltageLimit[i], 0, 'f', 3);
         }
     }
     for (int i = 0; i < current.size(); ++i) {
-        if (current[i] > currentLimit) {
+        if (current[i] > currentLimit[i]) {
             alarmDetails << tr("电流CH%1=%2A>阈值%3A")
                                 .arg(i + 1)
                                 .arg(current[i], 0, 'f', 3)
-                                .arg(currentLimit, 0, 'f', 3);
+                                .arg(currentLimit[i], 0, 'f', 3);
         }
     }
 
@@ -1038,8 +1132,9 @@ void MainWindow::ensureSpectrumBinAddresses(int binCount)
         return;
 
     m_spectrumBinAddresses.resize(binCount);
-    for (int i = 0; i < binCount; ++i)
-        m_spectrumBinAddresses[i] = i + 1;
+    for (int i = 0; i < binCount; ++i){
+        m_spectrumBinAddresses[i] = i + 1;                       
+    }
 }
 
 void MainWindow::updateSpecIdSpinBoxRange()
@@ -1138,6 +1233,7 @@ int MainWindow::hxrDisplayBinCount() const
 
 void MainWindow::updateProfileControls()
 {
+    return;
     const bool spectrum512Mode = ui->cmb_transferMode->currentIndex() == 0;
     ui->label_energyLeft->setVisible(spectrum512Mode);
     ui->dsbx_energyLeft->setVisible(spectrum512Mode);
@@ -1500,12 +1596,19 @@ void MainWindow::refreshSpectrumPlot()
     }
 
     ensureSpectrumBinAddresses(displayBinCount);
+
+    //X轴采用能量重新进行刻度
+    QVector<quint32> spectrumEneryAddresses;
+    for (const auto& addr : m_spectrumBinAddresses){
+        spectrumEneryAddresses.push_back(addr*commandHelper->m_channelEnergyCalib[channel-1].k_calib + commandHelper->m_channelEnergyCalib[channel-1].b_calib);
+    }
+
     if (hxrMode) {
         ui->plotSpec->setXRange(1, displayBinCount);
-        ui->plotSpec->setData(m_spectrumBinAddresses,
+        ui->plotSpec->setData(spectrumEneryAddresses/*m_spectrumBinAddresses*/,
                               entry.counts.mid(0, displayBinCount));
     } else {
-        ui->plotSpec->setData(m_spectrumBinAddresses, entry.counts);
+        ui->plotSpec->setData(spectrumEneryAddresses/*m_spectrumBinAddresses*/, entry.counts);
     }
     ui->plotSpec->refreshPlot();
 }
@@ -2104,36 +2207,85 @@ void MainWindow::syncArmMonitorButton()
 
 void MainWindow::loadMonitorAlarmSettings()
 {
+    QList<QDoubleSpinBox*> spinBoxs;
+    spinBoxs << ui->doubleSpinBox_dev1_temp_1 << ui->doubleSpinBox_dev1_temp_2 << ui->doubleSpinBox_dev1_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev1_voltage;
+    spinBoxs << ui->doubleSpinBox_dev1_current;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_1 << ui->doubleSpinBox_dev2_temp_2 << ui->doubleSpinBox_dev2_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_4 << ui->doubleSpinBox_dev2_temp_5 << ui->doubleSpinBox_dev2_temp_6;
+    spinBoxs << ui->doubleSpinBox_dev2_voltage_1 << ui->doubleSpinBox_dev2_voltage_2 << ui->doubleSpinBox_dev2_voltage_3 << ui->doubleSpinBox_dev2_voltage_4;
+    spinBoxs << ui->doubleSpinBox_dev2_current_1 << ui->doubleSpinBox_dev2_current_2 << ui->doubleSpinBox_dev2_current_3 << ui->doubleSpinBox_dev2_current_4;
+
+    QList<QString> sectionNames;
+    sectionNames << "dev1_tempAlarmThreshold1" << "dev1_tempAlarmThreshold2" << "dev1_tempAlarmThreshold3";
+    sectionNames << "dev1_voltageAlarmThreshold";
+    sectionNames << "dev1_currentAlarmThreshold";
+    sectionNames << "dev2_tempAlarmThreshold1" << "dev2_tempAlarmThreshold2" << "dev2_tempAlarmThreshold3";
+    sectionNames << "dev2_tempAlarmThreshold4" << "dev2_tempAlarmThreshold5" << "dev2_tempAlarmThreshold6";
+    sectionNames << "dev2_voltageAlarmThreshold1" << "dev2_voltageAlarmThreshold2" << "dev2_voltageAlarmThreshold3" << "dev2_voltageAlarmThreshold4";
+    sectionNames << "dev2_currentAlarmThreshold1" << "dev2_currentAlarmThreshold2" << "dev2_currentAlarmThreshold3" << "dev2_currentAlarmThreshold4";
+
+    QVector<double> defaultValues;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 5.0;
+    defaultValues << 1.25;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 5.0 << 5.0 << 5.0 << 5.0;
+    defaultValues << 1.25 << 1.25 << 1.25 << 1.25;
+
     JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
     ScopedFileLock lock(settings);
 
-    ui->doubleSpinBox_temp->blockSignals(true);
-    ui->doubleSpinBox_voltage->blockSignals(true);
-    ui->doubleSpinBox_current->blockSignals(true);
-
-    ui->doubleSpinBox_temp->setValue(
-        settings->getValueByPath(QStringLiteral("Monitor/tempAlarmThreshold"), 65.0).toDouble());
-    ui->doubleSpinBox_voltage->setValue(
-        settings->getValueByPath(QStringLiteral("Monitor/voltageAlarmThreshold"), 5.02).toDouble());
-    ui->doubleSpinBox_current->setValue(
-        settings->getValueByPath(QStringLiteral("Monitor/currentAlarmThreshold"), 1.25).toDouble());
-
-    ui->doubleSpinBox_temp->blockSignals(false);
-    ui->doubleSpinBox_voltage->blockSignals(false);
-    ui->doubleSpinBox_current->blockSignals(false);
+    int i = 0;
+    for (auto const& section : sectionNames){
+        spinBoxs[i]->blockSignals(true);
+        double v = settings->getValueByPath(QStringLiteral("Monitor/") + section, defaultValues[i]).toDouble();
+        spinBoxs[i]->setValue(v);
+        spinBoxs[i]->blockSignals(false);
+        ++i;
+    }
 }
 
 void MainWindow::saveMonitorAlarmSettings()
 {
+    QList<QDoubleSpinBox*> spinBoxs;
+    spinBoxs << ui->doubleSpinBox_dev1_temp_1 << ui->doubleSpinBox_dev1_temp_2 << ui->doubleSpinBox_dev1_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev1_voltage;
+    spinBoxs << ui->doubleSpinBox_dev1_current;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_1 << ui->doubleSpinBox_dev2_temp_2 << ui->doubleSpinBox_dev2_temp_3;
+    spinBoxs << ui->doubleSpinBox_dev2_temp_4 << ui->doubleSpinBox_dev2_temp_5 << ui->doubleSpinBox_dev2_temp_6;
+    spinBoxs << ui->doubleSpinBox_dev2_voltage_1 << ui->doubleSpinBox_dev2_voltage_2 << ui->doubleSpinBox_dev2_voltage_3 << ui->doubleSpinBox_dev2_voltage_4;
+    spinBoxs << ui->doubleSpinBox_dev2_current_1 << ui->doubleSpinBox_dev2_current_2 << ui->doubleSpinBox_dev2_current_3 << ui->doubleSpinBox_dev2_current_4;
+
+    QList<QString> sectionNames;
+    sectionNames << "dev1_tempAlarmThreshold1" << "dev1_tempAlarmThreshold2" << "dev1_tempAlarmThreshold3";
+    sectionNames << "dev1_voltageAlarmThreshold";
+    sectionNames << "dev1_currentAlarmThreshold";
+    sectionNames << "dev2_tempAlarmThreshold1" << "dev2_tempAlarmThreshold2" << "dev2_tempAlarmThreshold3";
+    sectionNames << "dev2_tempAlarmThreshold4" << "dev2_tempAlarmThreshold5" << "dev2_tempAlarmThreshold6";
+    sectionNames << "dev2_voltageAlarmThreshold1" << "dev2_voltageAlarmThreshold2" << "dev2_voltageAlarmThreshold3" << "dev2_voltageAlarmThreshold4";
+    sectionNames << "dev2_currentAlarmThreshold1" << "dev2_currentAlarmThreshold2" << "dev2_currentAlarmThreshold3" << "dev2_currentAlarmThreshold4";
+
+    QVector<double> defaultValues;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 5.0;
+    defaultValues << 1.25;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 65.0 << 65.0 << 65.0;
+    defaultValues << 5.0 << 5.0 << 5.0 << 5.0;
+    defaultValues << 1.25 << 1.25 << 1.25 << 1.25;
+
     JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
     ScopedFileLock lock(settings);
 
-    settings->setValueByPath(QStringLiteral("Monitor/tempAlarmThreshold"),
-                             ui->doubleSpinBox_temp->value());
-    settings->setValueByPath(QStringLiteral("Monitor/voltageAlarmThreshold"),
-                             ui->doubleSpinBox_voltage->value());
-    settings->setValueByPath(QStringLiteral("Monitor/currentAlarmThreshold"),
-                             ui->doubleSpinBox_current->value());
+    int i = 0;
+    for (auto const& section : sectionNames){
+        spinBoxs[i]->blockSignals(true);
+        settings->setValueByPath(QStringLiteral("Monitor/") + section, spinBoxs[i]->value());
+        spinBoxs[i]->blockSignals(false);
+        ++i;
+    }
     settings->save();
 }
 
@@ -2450,14 +2602,14 @@ void MainWindow::on_action_signalWidth_triggered()
 
 void MainWindow::on_radioButton_spec_clicked()
 {
-    ui->stackedWidget->setCurrentWidget(ui->page_spectrum);
+    ui->stackedWidget_spectrum->setCurrentWidget(ui->page_spectrum);
     refreshSpectrumPlot();
 }
 
 
 void MainWindow::on_radioButton_cps_clicked()
 {
-    ui->stackedWidget->setCurrentWidget(ui->page_cps);
+    ui->stackedWidget_spectrum->setCurrentWidget(ui->page_cps);
     refreshSpectrumPlot();
 }
 
@@ -2474,7 +2626,7 @@ void MainWindow::onMeasureStarted()
 }
 
 #include <QRandomGenerator>
-QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(QWidget* wigetContainer, const QString& title)
+QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title)
 {
     const int channelCount = 16;
     const int timePoints = 101;
@@ -2608,12 +2760,12 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(QWidget* wiget
         const float valMin = 0.0f, valMax = 65536.0f;
 
         QVector<QVector<ChannelProfileEntry>> data;
-        data.reserve(channelCount);
+        data.resize(channelCount);
 
         for (int chIdx = 0; chIdx < channelCount; ++chIdx)
         {
             QVector<ChannelProfileEntry> entrys;
-            entrys.reserve(timePoints);
+            entrys.resize(timePoints);
             for (int tIdx = 0; tIdx < timePoints; ++tIdx)
             {
                 float currentX = timeMin + tIdx * (timeMax - timeMin) / (timePoints - 1);
@@ -2626,19 +2778,17 @@ QtDataVisualization::QSurfaceDataProxy* MainWindow::init3DSurface(QWidget* wiget
             data[chIdx] = entrys;
         }
 
-        emit showProfileChart(data);
+        emit showProfileChart(detectorIndex, data);
     });
     timer->start(5000);
 
     return profileProxy;
 }
 
-void MainWindow::onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>& data)
+void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVector<ChannelProfileEntry>>& data)
 {
     const int channelCount = 16;
     const int timePoints = data[0].size();
-    const float timeMin = 0.0f, timeMax = 10000.0f;
-    const float valMin = 0.0f, valMax = 65536.0f;
 
     QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
     fullProfileData->reserve(timePoints);
@@ -2657,7 +2807,9 @@ void MainWindow::onShowProfileChart(const QVector<QVector<ChannelProfileEntry>>&
 
         fullProfileData->append(timeRow);
     }
-    m_horDataProxy->resetArray(fullProfileData);
 
-    //emit showProfileChart(data);
+    if (1== detectorIndex)
+        m_horDataProxy->resetArray(fullProfileData);
+    else
+        m_verDataProxy->resetArray(fullProfileData);
 }

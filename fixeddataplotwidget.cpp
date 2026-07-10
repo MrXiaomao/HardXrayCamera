@@ -1,4 +1,4 @@
-/*
+﻿/*
  * @Author: MrPan
  * @Date: 2026-03-23 16:15:48
  * @LastEditors: Maoxiaoqing
@@ -6,7 +6,6 @@
  * @Description: 请填写简介
  */
 #include "fixeddataplotwidget.h"
-#include "qcustomplot.h"
 #include <QSizePolicy>
 #include <QVBoxLayout>
 
@@ -23,6 +22,8 @@ FixedDataPlotWidget::FixedDataPlotWidget(QWidget *parent)
     layout->addWidget(m_plot);
 
     m_plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
+    QCustomPlotHelper* customPlotHelper = new QCustomPlotHelper(m_plot, this);
+    (void)customPlotHelper;
 
     //创建一条曲线
     ensureGraphCount(1);

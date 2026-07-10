@@ -24,7 +24,6 @@ SOURCES += \
     mainwindow.cpp \
     offlinewindow.cpp \
     order.cpp \
-    qcustomplot.cpp \
     switchbutton.cpp \
     tcpclient.cpp \
     trendplotwidget.cpp
@@ -41,7 +40,6 @@ HEADERS += \
     mainwindow.h \
     offlinewindow.h \
     order.h \
-    qcustomplot.h \
     switchbutton.h \
     tcpclient.h \
     trendplotwidget.h
@@ -67,6 +65,12 @@ contains(QT_ARCH, x86_64) {
     DESTDIR = $$DESTDIR/x86
 }
 
+CONFIG -= debug_and_release
+#指定编译产生的文件分门别类放到对应目录
+MOC_DIR     = temp/moc
+RCC_DIR     = temp/rcc
+UI_DIR      = temp/ui
+OBJECTS_DIR = temp/obj
 
 # 获取QT版本
 #############################################################################################################
@@ -118,6 +122,7 @@ RC_ICONS = $$PWD/resource/LOGO.ico
 
 # 第三方库
 include($$PWD/log4qt/Include/log4qt.pri)
+include($$PWD/../3rdParty/QCustomplot/QCustomplot.pri)
 include($$PWD/QGoodWindow/QGoodWindowHelper/QGoodWindowHelper.pri)
 
 # 3D剖面图

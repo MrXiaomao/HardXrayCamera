@@ -1,10 +1,11 @@
-#ifndef FIXEDDATAPLOTWIDGET_H
+﻿#ifndef FIXEDDATAPLOTWIDGET_H
 #define FIXEDDATAPLOTWIDGET_H
 
 #include <QWidget>
-class QCustomPlot;
+#include "qcustomplothelper.h"
+/*class QCustomPlot;
 class QCPTextElement;
-class QCPGraph;
+class QCPGraph;*/
 
 // 用于绘制固定长度的数据类型，比如波形、能谱
 class FixedDataPlotWidget : public QWidget

@@ -1,4 +1,4 @@
-#ifndef DETECTORSETTING_H
+﻿#ifndef DETECTORSETTING_H
 #define DETECTORSETTING_H
 
 #include <QDialog>
@@ -34,12 +34,6 @@ private slots:
     void onSelectCsvFile();
 
 private:
-    void initThresholdTable();
-    void applyThresholdToAll();
-    void applyThresholdToChecked();
-    int thresholdValue(int channel) const;
-    void setThresholdValue(int channel, int value);
-
     QString m_csvFilePath;
     Ui::DetectorSetting *ui;
 };

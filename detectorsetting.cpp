@@ -96,12 +96,6 @@ DetectorSetting::DetectorSetting(QWidget *parent)
 {
     ui->setupUi(this);
 
-    ui->pushButton->setText("应用到全部");
-    ui->pushButton_2->setText("应用到选中通道");
-    ui->spb_waveThreshold1->setRange(ThresholdMin, ThresholdMax);
-    initThresholdTable();
-    connect(ui->pushButton, &QPushButton::clicked, this, &DetectorSetting::applyThresholdToAll);
-    connect(ui->pushButton_2, &QPushButton::clicked, this, &DetectorSetting::applyThresholdToChecked);
     connect(ui->bt_selectCsv, &QPushButton::clicked, this, &DetectorSetting::onSelectCsvFile);
     //给一个默认IP
     ui->widget_fpga1MainIP->setIP("0.0.0.0");
@@ -156,12 +150,6 @@ void DetectorSetting::loadSettings()
     // 硬件参数读取
     ui->spb_threshold->setValue(settings->getValueByPath("FPGA/threshold").toInt());
     ui->spb_deadTime->setValue(settings->getValueByPath("FPGA/deadTime").toInt());
-    ui->spb_waveThreshold1->setValue(settings->getValueByPath("FPGA/wave/threshold1", DefaultThreshold).toInt());
-    for (int channel = 1; channel <= ChannelCount; ++channel) {
-        const int value = settings->getValueByPath(QString("FPGA/wave/threshold%1").arg(channel),
-                                                   DefaultThreshold).toInt();
-        setThresholdValue(channel, value);
-    }
 
     const QString csvPath = settings->getValueByPath("FPGA/16SpecEnWindow_csv_path").toString();
     if (!csvPath.isEmpty() && QFile::exists(csvPath)) {
@@ -214,12 +202,6 @@ void DetectorSetting::on_btn_ok_accepted()
     //硬件参数读取
     settings->setValueByPath("FPGA/threshold", ui->spb_threshold->text());
     settings->setValueByPath("FPGA/deadTime", ui->spb_deadTime->text());
-
-    for (int channel = 1; channel <= ChannelCount; ++channel) {
-        settings->setValueByPath(QString("FPGA/wave/threshold%1").arg(channel),
-                                 thresholdValue(channel));
-    }
-
     settings->setValueByPath("FPGA/16SpecEnWindow_csv_path", m_csvFilePath);
 
     settings->save();
@@ -376,78 +358,3 @@ void DetectorSetting::onSelectCsvFile()
     m_csvFilePath = filePath;
     ui->lineEdit_csvPath->setText(filePath);
 }
-
-void DetectorSetting::initThresholdTable()
-{
-    ui->tableThreshold->clear();
-    ui->tableThreshold->setColumnCount(ThresholdTableColumns);
-    ui->tableThreshold->setRowCount(ThresholdTableRows);
-    QStringList headers;
-    for (int i = 0; i < ThresholdChannelsPerRow; ++i)
-        headers << "通道号" << "波形阈值";
-    ui->tableThreshold->setHorizontalHeaderLabels(headers);
-    ui->tableThreshold->verticalHeader()->setVisible(false);
-    ui->tableThreshold->horizontalHeader()->setStretchLastSection(true);
-    for (int col = 0; col < ThresholdTableColumns; ++col) {
-        ui->tableThreshold->horizontalHeader()->setSectionResizeMode(
-            col, (col % 2 == 0) ? QHeaderView::ResizeToContents : QHeaderView::Stretch);
-    }
-    ui->tableThreshold->setSelectionBehavior(QAbstractItemView::SelectRows);
-    ui->tableThreshold->setEditTriggers(QAbstractItemView::NoEditTriggers);
-
-    for (int row = 0; row < ThresholdTableRows; ++row) {
-        for (int side = 0; side < ThresholdChannelsPerRow; ++side) {
-            const int channel = row * ThresholdChannelsPerRow + side + 1;
-            const int channelColumn = side * 2;
-            const int thresholdColumn = channelColumn + 1;
-
-            QTableWidgetItem* channelItem = new QTableWidgetItem(QString("CH%1").arg(channel));
-            channelItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
-            channelItem->setCheckState(Qt::Unchecked);
-            ui->tableThreshold->setItem(row, channelColumn, channelItem);
-
-            QSpinBox* thresholdSpinBox = new NoWheelSpinBox(ui->tableThreshold);
-            thresholdSpinBox->setRange(ThresholdMin, ThresholdMax);
-            thresholdSpinBox->setValue(DefaultThreshold);
-            thresholdSpinBox->setAlignment(Qt::AlignCenter);
-            ui->tableThreshold->setCellWidget(row, thresholdColumn, thresholdSpinBox);
-        }
-    }
-}
-
-void DetectorSetting::applyThresholdToAll()
-{
-    const int value = ui->spb_waveThreshold1->value();
-    for (int channel = 1; channel <= ChannelCount; ++channel)
-        setThresholdValue(channel, value);
-}
-
-void DetectorSetting::applyThresholdToChecked()
-{
-    const int value = ui->spb_waveThreshold1->value();
-    for (int channel = 1; channel <= ChannelCount; ++channel) {
-        const int row = (channel - 1) / ThresholdChannelsPerRow;
-        const int channelColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2;
-        QTableWidgetItem* item = ui->tableThreshold->item(row, channelColumn);
-        if (item && item->checkState() == Qt::Checked)
-            setThresholdValue(channel, value);
-    }
-}
-
-int DetectorSetting::thresholdValue(int channel) const
-{
-    const int row = (channel - 1) / ThresholdChannelsPerRow;
-    const int thresholdColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2 + 1;
-    QSpinBox* spinBox = qobject_cast<QSpinBox*>(ui->tableThreshold->cellWidget(row, thresholdColumn));
-    return spinBox ? spinBox->value() : DefaultThreshold;
-}
-
-void DetectorSetting::setThresholdValue(int channel, int value)
-{
-    const int row = (channel - 1) / ThresholdChannelsPerRow;
-    const int thresholdColumn = ((channel - 1) % ThresholdChannelsPerRow) * 2 + 1;
-    QSpinBox* spinBox = qobject_cast<QSpinBox*>(ui->tableThreshold->cellWidget(row, thresholdColumn));
-    if (spinBox)
-        spinBox->setValue(qBound(ThresholdMin, value, ThresholdMax));
-}
-
