@@ -200,7 +200,9 @@ MainWindow::MainWindow(QWidget *parent)
         splitterV1->addWidget(ui->plotWave);
         splitterV1->addWidget(ui->stackedWidget_spectrum);
         splitterV1->addWidget(ui->stackedWidget_3D);
-        splitterV1->setSizes(QList<int>() << 1 << 1 << 3);
+        splitterV1->setStretchFactor(0, 1);
+        splitterV1->setStretchFactor(1, 1);
+        splitterV1->setStretchFactor(2, 2.5);
         ui->widget_2->layout()->addWidget(splitterV1);
         ui->widget_2->layout()->addWidget(ui->groupBox_pictureSetting);
 
@@ -208,7 +210,7 @@ MainWindow::MainWindow(QWidget *parent)
         splitterH1->setHandleWidth(1);
         splitterH1->addWidget(ui->widget_hor);
         splitterH1->addWidget(ui->widget_ver);
-        splitterH1->setSizes(QList<int>() << 1 << 1);
+        //splitterH1->setSizes(QList<int>() << 1 << 1);
         ui->page_3DSurface->layout()->addWidget(splitterH1);
     }
 
@@ -226,8 +228,8 @@ MainWindow::MainWindow(QWidget *parent)
         // ui->action_relayNetOpen->setText(QStringLiteral("连接远程控制"));
         // ui->action_relayNetOpen->blockSignals(false);
 
-        ui->action_relayNetOpen->setEnabled(true);
-        ui->action_relayNetClose->setEnabled(false);
+        ui->action_relayNetOpen->setVisible(true);
+        ui->action_relayNetClose->setVisible(false);
     });
     connect(commandHelper, &CommandHelper::sigRelayPowerStatus, this, &MainWindow::onRelayPowerStatusChanged);
     connect(commandHelper, &CommandHelper::sigDetector1Status, this, &MainWindow::onDetector1StatusChanged);
@@ -316,8 +318,8 @@ MainWindow::MainWindow(QWidget *parent)
     // ui->action_relayNetOpen->setCheckable(true);
     // ui->action_relayNetOpen->setChecked(false);
     // ui->action_relayNetOpen->setText(QStringLiteral("连接远程控制"));
-    ui->action_relayNetOpen->setEnabled(true);
-    ui->action_relayNetClose->setEnabled(false);
+    ui->action_relayNetOpen->setVisible(true);
+    ui->action_relayNetClose->setVisible(false);
 
     // ui->action_connectDet->setCheckable(true);
     // ui->action_connectDet->setChecked(false);
@@ -388,6 +390,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_logBuffer.clear();
     });
 
+    startUdpListening();
     // 开机自动最大化：一次性延迟调用，保留 lambda
     QTimer::singleShot(0, this, [this] { showMaximized(); });
 }
@@ -533,8 +536,8 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
     syncPowerSwitchFromRelay(on);
     // ui->action_relayNetOpen->setEnabled(!on);
     // ui->action_relayNetClose->setEnabled(on);
-    ui->action_powerOn->setEnabled(!on);
-    ui->action_powerOff->setEnabled(on);
+    ui->action_powerOn->setVisible(!on);
+    ui->action_powerOff->setVisible(on);
 
     if (on) {
         ui->action_connectDet->setEnabled(true);
@@ -1283,7 +1286,7 @@ void MainWindow::updateUnattendedControls()
     ui->dateTimeEdit_shutdown->setVisible(unattendedMode);
 
     if (index == 2){
-        // 无人值守
+        // 无人值守        
         ui->action_startMeasure->setEnabled(true);
         ui->checkBox_alarm->setEnabled(false);
         ui->checkBox_alarm->setChecked(true);
@@ -1291,6 +1294,7 @@ void MainWindow::updateUnattendedControls()
         ui->dateTimeEdit_shutdown->setEnabled(true);
     }
     else{
+        ui->lineEdit_shotID->setEnabled(true);
         ui->action_startMeasure->setEnabled(replayPowerOn ? !ui->action_connectDet->isEnabled() : false);
         ui->checkBox_alarm->setEnabled(true);
         ui->checkBox_alarm->setChecked(false);
@@ -2192,16 +2196,16 @@ void MainWindow::on_action_powerOn_triggered()
 {
     commandHelper->PowerOnRelay();
     showHardwareStartupWaitDialog();
-    ui->action_powerOn->setEnabled(false);
-    ui->action_powerOff->setEnabled(true);
+    ui->action_powerOn->setVisible(false);
+    ui->action_powerOff->setVisible(true);
 }
 
 
 void MainWindow::on_action_powerOff_triggered()
 {
     commandHelper->PowerOffRelay();
-    ui->action_powerOn->setEnabled(true);
-    ui->action_powerOff->setEnabled(false);
+    ui->action_powerOn->setVisible(true);
+    ui->action_powerOff->setVisible(false);
 }
 
 void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
@@ -2222,11 +2226,11 @@ void MainWindow::syncPowerSwitchFromRelay(bool powerOn)
 
 void MainWindow::setPowerSwitchEnabled(bool enabled)
 {
-    ui->action_powerOn->setEnabled(replayOnline ? !enabled : false);
-    ui->action_powerOff->setEnabled(enabled);
+    ui->action_powerOn->setVisible(replayOnline ? !enabled : false);
+    ui->action_powerOff->setVisible(enabled);
 
-    ui->action_relayNetOpen->setEnabled(!enabled);
-    ui->action_relayNetClose->setEnabled(enabled);
+    ui->action_relayNetOpen->setVisible(!enabled);
+    ui->action_relayNetClose->setVisible(enabled);
 }
 
 void MainWindow::syncDetectorConnectButton()
@@ -2446,7 +2450,7 @@ void MainWindow::showHardwareStartupWaitDialog()
 
 void MainWindow::on_action_connectDet_triggered()
 {
-    startUdpListening();
+    //startUdpListening();// 改为系统启动自动开启
     commandHelper->connectDetector();
 }
 
@@ -2454,7 +2458,7 @@ void MainWindow::on_action_connectDet_triggered()
 
 void MainWindow::on_action_disconnectDet_triggered()
 {
-    stopUdpListening();
+    //stopUdpListening();
     commandHelper->disconnectDetector();
 }
 
