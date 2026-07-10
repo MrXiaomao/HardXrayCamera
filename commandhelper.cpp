@@ -375,6 +375,8 @@ void CommandHelper::initFPGA2Commands()
 bool CommandHelper::configureMeasure(const DetParameter &measurement)
 {
     m_detPara = measurement;
+    mHardTriggered[0].store(false);
+    mHardTriggered[1].store(false);
 
     sendCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
                 "传输模式设置",
@@ -583,7 +585,6 @@ void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
 void CommandHelper::startMeasure(DetParameter detPara)
 {
     const DetParameter measurement = detPara;
-
     if (!configureMeasure(measurement))
         return;
 

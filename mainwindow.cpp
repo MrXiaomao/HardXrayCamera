@@ -457,11 +457,15 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
-        // ui->action_startMeasure->setEnabled(true);
-        // ui->action_stopMeasure->setEnabled(false);
-        // ui->comboBox_measureMode->setEnabled(true);
-        // ui->dateTimeEdit_startup->setEnabled(true);
-        // ui->dateTimeEdit_shutdown->setEnabled(true);
+        printWaveformCollectionSummary();
+        printSpectrumSequenceSummary();
+        finalizeMeasurementPlots();
+
+        ui->action_startMeasure->setEnabled(true);
+        ui->action_stopMeasure->setEnabled(false);
+        ui->comboBox_measureMode->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
         qInfo().nospace() << "炮号["<< m_currentShotNumber << "]自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
 
         // 自动进入下一次自动测量阶段，直到手动点击停止按钮为止
@@ -473,7 +477,6 @@ void MainWindow::onMeasureTimerTimeout()
     commandHelper->stopMeasure();
     printWaveformCollectionSummary();
     printSpectrumSequenceSummary();
-    measureTimer->stop();
     finalizeMeasurementPlots();
 
     ui->action_startMeasure->setEnabled(true);
@@ -2447,6 +2450,11 @@ void MainWindow::on_action_stopMeasure_triggered()
 
     if (m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
+        ui->comboBox_measureMode->setEnabled(true);
+        ui->dateTimeEdit_startup->setEnabled(true);
+        ui->dateTimeEdit_shutdown->setEnabled(true);
+        ui->action_startMeasure->setEnabled(true);
+        ui->action_stopMeasure->setEnabled(false);
         qInfo() << "自动测量已手动停止，已发送硬件停止指令";
         return;
     }
