@@ -154,6 +154,8 @@ private slots:
     bool startMeasureInternal();
     bool buildDetParameter(DetParameter &detPara, Order::TriggerMode trigMode) const;
     void triggerAutoMeasureFromShot(const QString &shotNumber);
+    void enterUnattendedWaitingShot();
+    void triggerUnattendedMeasureFromShot(const QString &shotNumber);
     void stopAutoMeasureSession();
     bool isMeasureSessionActive() const;
     int measureDurationMs() const;

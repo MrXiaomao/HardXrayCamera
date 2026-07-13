@@ -471,6 +471,21 @@ void MainWindow::onMeasureTimerTimeout()
         return;
     }
 
+    if (measureMode == 2 && isTaskRunning && m_enableAutoMated
+        && m_autoMeasureState == AutoMeasureState::Measuring) {
+        waveformPlotTimer->stop();
+        commandHelper->stopMeasure();
+        printWaveformCollectionSummary();
+        printSpectrumSequenceSummary();
+        finalizeMeasurementPlots();
+        resetMeasurementPlotData();
+
+        qInfo().nospace() << "无人值守炮号[" << m_currentShotNumber
+                          << "]测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
+        enterUnattendedWaitingShot();
+        return;
+    }
+
     waveformPlotTimer->stop();
     commandHelper->stopMeasure();
     printWaveformCollectionSummary();
@@ -486,7 +501,7 @@ void MainWindow::onMeasureTimerTimeout()
 
     if (measureMode == 0)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
-    else if (measureMode == 2){
+    else if (measureMode == 2) {
         emit ui->action_disconnectDet->trigger();
         emit ui->action_disconnectMonitor->trigger();
         emit ui->action_relayNetClose->trigger();
@@ -1829,14 +1844,24 @@ void MainWindow::onUdpShotNumberChanged(const QString &shotNumber)
     const QString info = tr("炮号已刷新：%1").arg(shotNumber);
     appendUdpLog(info);
 
-    if (ui->comboBox_measureMode->currentIndex() == 1
-        && m_autoMeasureState == AutoMeasureState::WaitingShot) {
+    if (m_autoMeasureState != AutoMeasureState::WaitingShot)
+        return;
+
+    const int measureMode = ui->comboBox_measureMode->currentIndex();
+    if (measureMode == 1) {
         qInfo() << info;
 
         m_currentShotNumber = shotNumber;
         ui->lineEdit_shotID->setText(shotNumber);
         saveShotNumberFile(shotNumber);
         triggerAutoMeasureFromShot(shotNumber);
+    } else if (measureMode == 2 && m_enableAutoMated) {
+        qInfo() << info;
+
+        m_currentShotNumber = shotNumber;
+        ui->lineEdit_shotID->setText(shotNumber);
+        saveShotNumberFile(shotNumber);
+        triggerUnattendedMeasureFromShot(shotNumber);
     }
 }
 
@@ -1891,6 +1916,55 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     ui->action_stopMeasure->setEnabled(true);
     updateMeasureParamsGroupEnabled();
     qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
+            << measureDurationMs() << "ms";
+}
+
+void MainWindow::enterUnattendedWaitingShot()
+{
+    startUdpListening();
+
+    mdetPara.trigMode = Order::TriggerMode::HardwareTrigger;
+    m_autoMeasureDurationTimerStarted = false;
+
+    if (!commandHelper->configureMeasure(mdetPara))
+        return;
+
+    if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
+        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+    } else {
+        ui->plotSpec->setXRange(1, 512);
+    }
+
+    m_autoMeasureState = AutoMeasureState::WaitingShot;
+    ui->action_startMeasure->setEnabled(false);
+    ui->action_stopMeasure->setEnabled(true);
+    updateMeasureParamsGroupEnabled();
+    qInfo() << "无人值守已就绪，等待炮号...";
+}
+
+void MainWindow::triggerUnattendedMeasureFromShot(const QString &shotNumber)
+{
+    commandHelper->setShotNumber(shotNumber);
+    m_autoMeasureDurationTimerStarted = false;
+
+    resetMeasurementPlotData();
+    spectrumPlotThrottle.invalidate();
+
+    mdetPara.trigMode = Order::TriggerMode::HardwareTrigger;
+    commandHelper->startMeasure(mdetPara);
+
+    if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
+        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+    } else {
+        ui->plotSpec->setXRange(1, 512);
+    }
+
+    waveformPlotTimer->start();
+
+    m_autoMeasureState = AutoMeasureState::Measuring;
+    ui->action_stopMeasure->setEnabled(true);
+    updateMeasureParamsGroupEnabled();
+    qInfo() << "炮号" << shotNumber << "触发无人值守测量，等待硬件触发，时长:"
             << measureDurationMs() << "ms";
 }
 
@@ -2062,15 +2136,15 @@ bool MainWindow::startMeasureInternal()
             if (stopTimer->isActive())
                 stopTimer->stop();
 
-            if (measureTimer->isActive()){
-                // 测量时长未到（原因：由于连接继电器到可以正常开始测量，耗时大约1分钟，如果开机时刻~关机时刻时间间隔太短，很可能关机时刻已经到了，但是测量还未结束）
-                emit ui->action_disconnectDet->trigger();
-                emit ui->action_disconnectMonitor->trigger();
-                emit ui->action_relayNetClose->trigger();
+            if (measureTimer->isActive())
                 measureTimer->stop();
-            }
 
-            // 停止工作定
+            // 关机时刻到达：无论正在测量还是等待炮号，都断开硬件连接
+            emit ui->action_disconnectDet->trigger();
+            emit ui->action_disconnectMonitor->trigger();
+            emit ui->action_relayNetClose->trigger();
+
+            // 停止工作
             waveformPlotTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
@@ -2600,16 +2674,13 @@ void MainWindow::initStateMachine()
         }
     });
 
-    connect(stFinish, &QState::entered, this, [=](){
+    connect(stFinish, &QState::entered, this, [this](){
         if (!m_enableAutoMated)
             return;
 
-        // 启动工作
-        ui->action_startMeasure->setEnabled(false);
-        commandHelper->startMeasure(mdetPara);
-        startMeasureDurationTimer();
-        waveformPlotTimer->start();
-        qInfo() << "系统开机，测量已开始，炮号:" << m_currentShotNumber << "时长:" << measureDurationMs() << "ms";
+        // 启动工作：先监听炮号，收到新炮号后再硬触发测量
+        qInfo() << "系统开机完成，进入等待炮号阶段";
+        enterUnattendedWaitingShot();
     });
 }
 
@@ -2696,9 +2767,10 @@ void MainWindow::on_radioButton_cps_clicked()
 
 void MainWindow::onMeasureStarted()
 {
-    // 自动测量开始计时
+    // 硬触发模式：收到硬件触发后开始计时
+    const int measureMode = ui->comboBox_measureMode->currentIndex();
     if (m_autoMeasureState == AutoMeasureState::Measuring
-        && ui->comboBox_measureMode->currentIndex() == 1
+        && (measureMode == 1 || measureMode == 2)
         && !m_autoMeasureDurationTimerStarted) {
         m_autoMeasureDurationTimerStarted = true;
         startMeasureDurationTimer();
