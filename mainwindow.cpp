@@ -193,6 +193,17 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
+    // 工作区
+    {
+        QSplitter *splitterH1 = new QSplitter(Qt::Horizontal,this);
+        splitterH1->setHandleWidth(1);
+        splitterH1->addWidget(ui->tabWidget_2);
+        splitterH1->addWidget(ui->widget_right);
+        splitterH1->setStretchFactor(0, 6);
+        splitterH1->setStretchFactor(1, 1);
+        //splitterH1->setSizes(QList<int>() << 1 << 1);
+        ui->centralwidget->layout()->addWidget(splitterH1);
+    }
     // 分隔栏
     {
         QSplitter *splitterV1 = new QSplitter(Qt::Vertical,this);
@@ -200,9 +211,9 @@ MainWindow::MainWindow(QWidget *parent)
         splitterV1->addWidget(ui->plotWave);
         splitterV1->addWidget(ui->stackedWidget_spectrum);
         splitterV1->addWidget(ui->stackedWidget_3D);
-        splitterV1->setStretchFactor(0, 1);
-        splitterV1->setStretchFactor(1, 1);
-        splitterV1->setStretchFactor(2, 2.5);
+        splitterV1->setStretchFactor(0, 10);
+        splitterV1->setStretchFactor(1, 10);
+        splitterV1->setStretchFactor(2, 25);
         ui->widget_2->layout()->addWidget(splitterV1);
         ui->widget_2->layout()->addWidget(ui->groupBox_pictureSetting);
 
@@ -1093,9 +1104,10 @@ void MainWindow::clearSpectrumData()
 
     // for (auto &channelSpectra : m_spectrumByChannel)
     //     channelSpectra.clear();
-    for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
-        channelSpectrumCounts.clear();
+    // for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
+    //     channelSpectrumCounts.clear();
     m_spectrumByChannel.clear();
+    m_spectrumCountsByChannel.clear();
 
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setValue(0);

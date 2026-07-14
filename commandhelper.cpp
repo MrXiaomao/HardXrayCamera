@@ -538,25 +538,25 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
-                             .arg(mfileFormat == Binary ? "dat" : "txt");
+                             .arg(mfileFormat == Binary ? "dat" : "csv");
     mfileNameFpga2Main = QString("%1/Fpga2_%2_%3_%4_spec.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
-                             .arg(mfileFormat == Binary ? "dat" : "txt");
+                             .arg(mfileFormat == Binary ? "dat" : "csv");
     mfileNameFpga1Wave = QString("%1/Fpga1_%2_%3_%4_wave.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
-                             .arg(mfileFormat == Binary ? "dat" : "txt");
+                             .arg(mfileFormat == Binary ? "dat" : "csv");
     mfileNameFpga2Wave = QString("%1/Fpga2_%2_%3_%4_wave.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
-                             .arg(mfileFormat == Binary ? "dat" : "txt");
+                             .arg(mfileFormat == Binary ? "dat" : "csv");
 
     QDir dir(mSavePath);
     if (!dir.exists())
@@ -623,7 +623,7 @@ void CommandHelper::stopMeasure()
     measure_started = false;
     closeMeasurementFilesLocked();
 
-    qDebug() << "Measurement stopped.";
+    qDebug() << "测量停止";
 }
 
 void CommandHelper::closeMeasurementFiles()

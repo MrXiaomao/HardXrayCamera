@@ -106,12 +106,12 @@ protected:
 #include <cassert>
 
 template<typename T>
-class DynamicPreallocSpectrumArray {
+class DynamicPreallocArray {
 public:
     static constexpr int FIXED_CHANNEL_COUNT = 32;
 
     // 构造时传入自定义的单通道预分配容量，灵活适配1000/10000/100000等不同采集量级
-    explicit DynamicPreallocSpectrumArray(int perChannelPreallocSize) {
+    explicit DynamicPreallocArray(int perChannelPreallocSize) {
         resize(FIXED_CHANNEL_COUNT);
         resizePreallocSize(perChannelPreallocSize);
     }
@@ -447,16 +447,17 @@ private:
     QTimer* measureTimer = nullptr;
     //QElapsedTimer spectrumPlotThrottle;
     // 按逻辑通道(1~32)存储：探测器1为1~16，探测器2为17~32
-    DynamicPreallocSpectrumArray<SpectrumEntry> m_spectrumByChannel{600000};// 预分配15秒数据存储量
+    DynamicPreallocArray<SpectrumEntry> m_spectrumByChannel{600000};// 预分配60秒数据存储量
     // QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
     QVector<quint32> m_spectrumBinAddresses; // 统一道址 1..N，绘图时复用
     QVector<QVector<quint32>> m_spectrumSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
     QVector<quint32> m_lastSpectrumSequenceByChannel;
-    QVector<QVector<SpectrumCountsEntry>> m_spectrumCountsByChannel;//记录计数率
+    DynamicPreallocArray<SpectrumCountsEntry> m_spectrumCountsByChannel{60000};//记录计数率
+    //QVector<QVector<SpectrumCountsEntry>> m_spectrumCountsByChannel;//记录计数率
     QVector<bool> m_hasSpectrumSequenceByChannel;
     // 按逻辑通道(1~32)存储波形历史
-    DynamicPreallocSpectrumArray<WaveformEntry> m_waveformByChannel{60000};// 预分配15秒数据存储量
+    DynamicPreallocArray<WaveformEntry> m_waveformByChannel{60000};// 预分配60秒数据存储量
     // QVector<QVector<WaveformEntry>> m_waveformByChannel;
     QVector<QVector<quint32>> m_waveformSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingWaveformNumbersByChannel;

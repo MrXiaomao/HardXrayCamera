@@ -33,12 +33,6 @@
     </property>
     <item>
      <widget class="QTabWidget" name="tabWidget_2">
-      <property name="minimumSize">
-       <size>
-        <width>600</width>
-        <height>0</height>
-       </size>
-      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -766,6 +760,12 @@
                      </sizepolicy>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_7">
+                     <property name="topMargin">
+                      <number>0</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>2</number>
+                     </property>
                      <item row="0" column="0">
                       <widget class="QCheckBox" name="checkBox_alarm">
                        <property name="sizePolicy">
@@ -788,179 +788,233 @@
                         </sizepolicy>
                        </property>
                        <property name="title">
-                        <string>信号采集机箱</string>
+                        <string>信号采集机箱报警阈值</string>
                        </property>
                        <layout class="QGridLayout" name="gridLayout_5">
-                        <item row="0" column="0">
-                         <widget class="QLabel" name="label_16">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>点位#1温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="0" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_1">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
+                        <property name="verticalSpacing">
+                         <number>2</number>
+                        </property>
+                        <item row="1" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_5">
                           <property name="minimumSize">
                            <size>
-                            <width>60</width>
+                            <width>0</width>
                             <height>0</height>
                            </size>
                           </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
+                          <property name="title">
+                           <string>电压</string>
                           </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
+                          <layout class="QGridLayout" name="gridLayout_9">
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_14">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-系统输入电压/V           </string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_voltage">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="value">
+                              <double>5.020000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
                          </widget>
                         </item>
-                        <item row="1" column="0">
-                         <widget class="QLabel" name="label_21">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>点位#2温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="1" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_2">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
+                        <item row="2" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_6">
                           <property name="minimumSize">
                            <size>
-                            <width>60</width>
+                            <width>0</width>
                             <height>0</height>
                            </size>
                           </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
+                          <property name="title">
+                           <string>电流</string>
                           </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
+                          <layout class="QGridLayout" name="gridLayout_10">
+                           <property name="verticalSpacing">
+                            <number>2</number>
+                           </property>
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_15">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-信号采集机箱总电流/A</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_current">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>10.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>1.250000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
                          </widget>
                         </item>
-                        <item row="2" column="0">
-                         <widget class="QLabel" name="label_22">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>点位#3温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="2" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_3">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
+                        <item row="0" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_2">
                           <property name="minimumSize">
                            <size>
-                            <width>60</width>
+                            <width>0</width>
                             <height>0</height>
                            </size>
                           </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
+                          <property name="title">
+                           <string>温度</string>
                           </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="3" column="0">
-                         <widget class="QLabel" name="label_14">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>总电压报警阈值/V</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="3" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_voltage">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="value">
-                           <double>5.020000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="4" column="0">
-                         <widget class="QLabel" name="label_15">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>总电流报警阈值/A</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="4" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_current">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>10.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>1.250000000000000</double>
-                          </property>
+                          <layout class="QGridLayout" name="gridLayout_8">
+                           <property name="verticalSpacing">
+                            <number>2</number>
+                           </property>
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_16">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_1">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="0">
+                            <widget class="QLabel" name="label_21">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>2-温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_2">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="0">
+                            <widget class="QLabel" name="label_22">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>3-温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev1_temp_3">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
                          </widget>
                         </item>
                        </layout>
@@ -969,485 +1023,542 @@
                      <item row="2" column="0">
                       <widget class="QGroupBox" name="groupBox_4">
                        <property name="title">
-                        <string>电源机箱</string>
+                        <string>电源机箱报警阈值</string>
                        </property>
                        <layout class="QGridLayout" name="gridLayout_6">
-                        <item row="6" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_1">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
+                        <property name="verticalSpacing">
+                         <number>2</number>
+                        </property>
+                        <item row="0" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_7">
                           <property name="minimumSize">
                            <size>
-                            <width>60</width>
+                            <width>0</width>
                             <height>0</height>
                            </size>
                           </property>
-                          <property name="value">
-                           <double>5.020000000000000</double>
+                          <property name="title">
+                           <string>温度</string>
                           </property>
+                          <layout class="QGridLayout" name="gridLayout_11">
+                           <property name="verticalSpacing">
+                            <number>2</number>
+                           </property>
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_23">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-水平相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_1">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="0">
+                            <widget class="QLabel" name="label_26">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>2-水平相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_2">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="0">
+                            <widget class="QLabel" name="label_27">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>3-水平相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_3">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="0">
+                            <widget class="QLabel" name="label_34">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>4-垂直相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_4">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="4" column="0">
+                            <widget class="QLabel" name="label_35">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>5-垂直相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="4" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_5">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="5" column="0">
+                            <widget class="QLabel" name="label_36">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>6-垂直相机温度/°C</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="5" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_6">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>90.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>65.000000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
                          </widget>
                         </item>
-                        <item row="8" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_3">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
+                        <item row="1" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_8">
+                          <property name="title">
+                           <string>电压</string>
                           </property>
+                          <layout class="QGridLayout" name="gridLayout_12">
+                           <property name="verticalSpacing">
+                            <number>2</number>
+                           </property>
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_25">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-垂直相机高压电压/V</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_1">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="value">
+                              <double>5.020000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="0">
+                            <widget class="QLabel" name="label_31">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>2-垂直相机低压电压/V</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_2">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="value">
+                              <double>5.020000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="0">
+                            <widget class="QLabel" name="label_32">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>3-水平相机高压电压/V</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_3">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="value">
+                              <double>5.020000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="0">
+                            <widget class="QLabel" name="label_33">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>4-水平相机低压电压/V</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_4">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="value">
+                              <double>5.020000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
+                         </widget>
+                        </item>
+                        <item row="2" column="0" colspan="2">
+                         <widget class="QGroupBox" name="groupBox_9">
                           <property name="minimumSize">
                            <size>
-                            <width>60</width>
+                            <width>0</width>
                             <height>0</height>
                            </size>
                           </property>
-                          <property name="value">
-                           <double>5.020000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="3" column="0">
-                         <widget class="QLabel" name="label_34">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机点位#1温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="1" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_2">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="5" column="0">
-                         <widget class="QLabel" name="label_36">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机点位#3温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="13" column="0">
-                         <widget class="QLabel" name="label_30">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机低压电流报警阈值/A</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="9" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_4">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="value">
-                           <double>5.020000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="4" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_5">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="1" column="0">
-                         <widget class="QLabel" name="label_26">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机点位#2温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="9" column="0">
-                         <widget class="QLabel" name="label_33">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机低压电压报警阈值/V</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="6" column="0">
-                         <widget class="QLabel" name="label_25">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机高压电压报警阈值/V</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="0" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_1">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="2" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_3">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="7" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_voltage_2">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="value">
-                           <double>5.020000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="11" column="0">
-                         <widget class="QLabel" name="label_28">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机低压电流报警阈值/A</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="0" column="0">
-                         <widget class="QLabel" name="label_23">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机点位#1温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="2" column="0">
-                         <widget class="QLabel" name="label_27">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机点位#3温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="10" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_1">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>10.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>1.250000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="4" column="0">
-                         <widget class="QLabel" name="label_35">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机点位#2温度报警阈值/°C</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="7" column="0">
-                         <widget class="QLabel" name="label_31">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机低压电压报警阈值/V</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="13" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_4">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>10.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>1.250000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="12" column="0">
-                         <widget class="QLabel" name="label_29">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机高压电流报警阈值/A</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="8" column="0">
-                         <widget class="QLabel" name="label_32">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>水平相机高压电压报警阈值/V</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="10" column="0">
-                         <widget class="QLabel" name="label_24">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="text">
-                           <string>垂直相机高压电流报警阈值/A</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="3" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_4">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="5" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_temp_6">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>90.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>65.000000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="11" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_2">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>10.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>1.250000000000000</double>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="12" column="1">
-                         <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_3">
-                          <property name="sizePolicy">
-                           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                            <horstretch>0</horstretch>
-                            <verstretch>0</verstretch>
-                           </sizepolicy>
-                          </property>
-                          <property name="minimumSize">
-                           <size>
-                            <width>60</width>
-                            <height>0</height>
-                           </size>
-                          </property>
-                          <property name="maximum">
-                           <double>10.000000000000000</double>
-                          </property>
-                          <property name="value">
-                           <double>1.250000000000000</double>
-                          </property>
+                          <property name="title">
+                           <string>电流</string>
+                          </property>
+                          <layout class="QGridLayout" name="gridLayout_13">
+                           <property name="topMargin">
+                            <number>6</number>
+                           </property>
+                           <property name="bottomMargin">
+                            <number>6</number>
+                           </property>
+                           <property name="verticalSpacing">
+                            <number>2</number>
+                           </property>
+                           <item row="0" column="0">
+                            <widget class="QLabel" name="label_24">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>1-垂直相机高压电流/A</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="0" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_1">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>10.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>1.250000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="0">
+                            <widget class="QLabel" name="label_28">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>2-直相机低压电流/A</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="1" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_2">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>10.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>1.250000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="0">
+                            <widget class="QLabel" name="label_29">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>3-水平相机高压电流/A</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="2" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_3">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>10.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>1.250000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="0">
+                            <widget class="QLabel" name="label_30">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="text">
+                              <string>4-水平相机低压电流/A</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item row="3" column="1">
+                            <widget class="QDoubleSpinBox" name="doubleSpinBox_dev2_current_4">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="minimumSize">
+                              <size>
+                               <width>60</width>
+                               <height>0</height>
+                              </size>
+                             </property>
+                             <property name="maximum">
+                              <double>10.000000000000000</double>
+                             </property>
+                             <property name="value">
+                              <double>1.250000000000000</double>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
                          </widget>
                         </item>
                        </layout>
@@ -1566,7 +1677,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QWidget" name="widget" native="true">
+     <widget class="QWidget" name="widget_right" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
         <horstretch>0</horstretch>
@@ -1800,7 +1911,7 @@
               </item>
               <item>
                <property name="text">
-                <string>文本(*.txt)</string>
+                <string>表格(*.csv)</string>
                </property>
               </item>
              </widget>
@@ -2295,9 +2406,6 @@
   <tabstop>pushButton_clearSysLog</tabstop>
   <tabstop>tbLog_UDP</tabstop>
   <tabstop>pushButton_clearNetLog</tabstop>
-  <tabstop>doubleSpinBox_dev1_temp_1</tabstop>
-  <tabstop>doubleSpinBox_dev1_voltage</tabstop>
-  <tabstop>doubleSpinBox_dev1_current</tabstop>
  </tabstops>
  <resources>
   <include location="resource.qrc"/>
