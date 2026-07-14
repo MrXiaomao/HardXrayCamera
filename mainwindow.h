@@ -99,6 +99,123 @@ protected:
 };
 #endif //QT_DATAVISUALIZATION
 
+#include <QVector>
+#include <cassert>
+
+#include <QVector>
+#include <cassert>
+
+template<typename T>
+class DynamicPreallocSpectrumArray {
+public:
+    static constexpr int FIXED_CHANNEL_COUNT = 32;
+
+    // 构造时传入自定义的单通道预分配容量，灵活适配1000/10000/100000等不同采集量级
+    explicit DynamicPreallocSpectrumArray(int perChannelPreallocSize) {
+        resize(FIXED_CHANNEL_COUNT);
+        resizePreallocSize(perChannelPreallocSize);
+    }
+
+    void resize(int newChannelCount) {
+        Q_ASSERT_X(newChannelCount >= 0, "DynamicSpectrumArray::resize", "通道数不能为负数");
+        if (newChannelCount == m_channelCount) return;
+
+        // 新建临时数组搬移已有数据，避免旧数据丢失
+        QVector<T>* newData = new QVector<T>[newChannelCount];
+        int copyCount = qMin(newChannelCount, m_channelCount);
+        for (int i = 0; i < copyCount; i++) {
+            newData[i] = std::move(m_data[i]);
+        }
+        // 新增通道自动执行预分配
+        for (int i = copyCount; i < newChannelCount; i++) {
+            newData[i].reserve(m_perChannelCapacity);
+        }
+        // 释放旧资源，替换内部指针
+        delete[] m_data;
+        m_data = newData;
+        m_channelCount = newChannelCount;
+    }
+
+    int size() const noexcept { return m_channelCount; }
+
+    // 支持运行时动态重新配置预分配大小，所有旧数据自动清空，重新申请统一容量
+    void resizePreallocSize(int newPreallocSize) {
+        assert(newPreallocSize > 0 && "预分配容量必须大于0");
+        m_perChannelCapacity = newPreallocSize;
+        // 批量重新为32个通道申请指定大小的连续内存，一次性完成无碎片
+        for (int ch = 0; ch < m_channelCount; ch++) {
+            m_data[ch].clear();
+            m_data[ch].reserve(m_perChannelCapacity);
+        }
+    }
+
+    // 追加元素接口，自动校验容量边界
+    void append(int channelIdx, const T& entry) {
+        assert(channelIdx >= 0 && channelIdx < m_channelCount);
+        assert(m_data[channelIdx].size() < m_perChannelCapacity && "单通道预分配容量已满");
+        m_data[channelIdx].push_back(entry);
+    }
+
+    // 极速清空：仅重置size到0，永远保留当前设定的预分配容量，不释放内存
+    void fastClear() {
+        for (int ch = 0; ch < m_channelCount; ch++) {
+            m_data[ch].resize(0);
+        }
+    }
+
+    int size(int channelIdx) const {
+        assert(channelIdx >= 0 && channelIdx < m_channelCount);
+        return m_data[channelIdx].size();
+    }
+
+    // 补上迭代器接口，适配范围for
+    using ChannelIterator = QVector<T>*;
+    using ConstChannelIterator = const QVector<T>*;
+
+    // 非const遍历入口
+    ChannelIterator begin() noexcept { return m_data; }
+    ChannelIterator end() noexcept { return m_data + m_channelCount; }
+
+    // const场景遍历入口
+    ConstChannelIterator begin() const noexcept { return m_data; }
+    ConstChannelIterator end() const noexcept { return m_data + m_channelCount; }
+    ConstChannelIterator cbegin() const noexcept { return m_data; }
+    ConstChannelIterator cend() const noexcept { return m_data; }
+
+    QVector<T>& at(int channelIdx) {
+        // 带边界检查，越界直接抛Qt风格断言，开发阶段快速定位非法通道号
+        if (channelIdx < 0 || channelIdx >= m_channelCount) {
+            qFatal("访问通道索引 %d 越界，合法范围0~31", channelIdx);
+        }
+        return m_data[channelIdx];
+    }
+
+    // const版本：const修饰场景下也能安全调用，符合Qt标准库的一致性设计
+    const QVector<T>& at(int channelIdx) const {
+        if (channelIdx < 0 || channelIdx >= m_channelCount) {
+            qFatal("访问通道索引 %d 越界，合法范围0~31", channelIdx);
+        }
+        return m_data[channelIdx];
+    }
+
+    QVector<T>& operator[](int channelIdx) {
+        assert(channelIdx >= 0 && channelIdx < m_channelCount);
+        return m_data[channelIdx];
+    }
+
+    const QVector<T>& operator[](int channelIdx) const {
+        assert(channelIdx >= 0 && channelIdx < m_channelCount);
+        return m_data[channelIdx];
+    }
+
+    int currentPreallocSize() const { return m_perChannelCapacity; }
+
+private:
+    QVector<T>* m_data = nullptr;
+    int m_channelCount = 0;
+    int m_perChannelCapacity = 10000;
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -328,12 +445,10 @@ private:
     DetParameter mdetPara; //测量参数，包含触发模式、传输模式、测量时长等
     // 定时测量定时器
     QTimer* measureTimer = nullptr;
-    QElapsedTimer spectrumPlotThrottle;
-    std::atomic_bool mUsePrimaryPartition = true; // 是否使用主分区
+    //QElapsedTimer spectrumPlotThrottle;
     // 按逻辑通道(1~32)存储：探测器1为1~16，探测器2为17~32
-    QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
-    QVector<QVector<SpectrumEntry>> m_spectrumByChannelBackup;
-    QVector<QVector<SpectrumEntry>>& getSpectrumByChannel();
+    DynamicPreallocSpectrumArray<SpectrumEntry> m_spectrumByChannel{600000};// 预分配15秒数据存储量
+    // QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
     QVector<quint32> m_spectrumBinAddresses; // 统一道址 1..N，绘图时复用
     QVector<QVector<quint32>> m_spectrumSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
@@ -341,17 +456,15 @@ private:
     QVector<QVector<SpectrumCountsEntry>> m_spectrumCountsByChannel;//记录计数率
     QVector<bool> m_hasSpectrumSequenceByChannel;
     // 按逻辑通道(1~32)存储波形历史
-    QVector<QVector<WaveformEntry>> m_waveformByChannel;
-    QVector<QVector<WaveformEntry>> m_waveformByChannelBackup;
-    QVector<QVector<WaveformEntry>>& getWaveformByChannel();
+    DynamicPreallocSpectrumArray<WaveformEntry> m_waveformByChannel{60000};// 预分配15秒数据存储量
+    // QVector<QVector<WaveformEntry>> m_waveformByChannel;
     QVector<QVector<quint32>> m_waveformSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingWaveformNumbersByChannel;
     QVector<quint32> m_lastWaveformSequenceByChannel;
     QVector<bool> m_hasWaveformSequenceByChannel;
-    QTimer* waveformPlotTimer = nullptr;
+    QTimer* m_plotRefreshTimer = nullptr;
     QVector<EnergyCalibration> m_energyCalibration;
 
-    void switchDataStoragePartition();
     // 继电器电源开关状态
     bool replayPowerOn = false;
     bool replayOnline = false;

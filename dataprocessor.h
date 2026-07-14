@@ -78,6 +78,8 @@ private:
     //硬触发信号
     std::atomic_bool mHardTriggered = false;
 
+    QVector<quint16> m_samples;
+
     quint16 readUInt16BE(const char* data);
     int channelNumberFromMask(quint32 channelMask);
     double parseArm2Temperature(quint8 highByte, quint8 lowByte);

@@ -1340,6 +1340,16 @@ void CommandHelper::loadEnergyCalibration()
     qDebug() << "成功加载" << m_channelEnergyCalib.size() << "路通道能量刻度";
 }
 
+static inline void appendNumber(QByteArray& buf, quint16 num) {
+    char numBuf[6];
+    char* p = numBuf + 5;
+    *p = '\0';
+    do {
+        *--p = '0' + (num % 10);
+        num /= 10;
+    } while(num);
+    buf.append(p);
+}
 void CommandHelper::initDataProcessor()
 {
     // FPGA主板1主网口(控制/能谱)
@@ -1367,7 +1377,7 @@ void CommandHelper::initDataProcessor()
                     //fpgaMainFile[detectorIndex-1]->flush();
                 }
             }
-        }, Qt::QueuedConnection);
+        }, Qt::DirectConnection);
     }
 
     // FPGA主板2主网口(控制/能谱)
@@ -1395,7 +1405,7 @@ void CommandHelper::initDataProcessor()
                     //fpgaMainFile[detectorIndex-1]->flush();
                 }
             }
-        }, Qt::QueuedConnection);
+        }, Qt::DirectConnection);
     }
 
     // 副网口，仅接收波形（FPGA主板1）
@@ -1416,20 +1426,38 @@ void CommandHelper::initDataProcessor()
         connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this, [=](int detectorIndex, int channelNumber, quint32 timeUnits,
                                                                                      const QVector<quint16>& samples){
             if (mfileFormat == Text){
-                QStringList strCounts;
-                strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
-                for (int i = 0; i < 580; ++i) {
-                    strCounts << QString::number(samples[i]);
-                }
+                // QStringList strCounts;
+                // strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
+                // for (int i = 0; i < 580; ++i) {
+                //     strCounts << QString::number(samples[i]);
+                // }
 
                 QFile* fpgaWaveFile[] = {&m_fpga1WaveFile, &m_fpga2WaveFile};
+                // if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
+                //     fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
+                //     fpgaWaveFile[detectorIndex-1]->write("\n");
+                //     //fpgaWaveFile[detectorIndex-1]->flush();
+                // }
                 if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                    fpgaWaveFile[detectorIndex-1]->write("\n");
-                    //fpgaWaveFile[detectorIndex-1]->flush();
+                    static QByteArray m_reusableLineBuffer;
+                    QByteArray& lineBuffer = m_reusableLineBuffer; // 把这个变量作为类成员，全程复用不释放
+                    lineBuffer.clear();
+                    lineBuffer.reserve(4096); // 预分配固定4K缓冲，足够存下一行582个数字+逗号
+
+                    appendNumber(lineBuffer, timeUnits/10);
+                    lineBuffer.append(',');
+                    appendNumber(lineBuffer, channelNumber);
+
+                    for (int i = 0; i < 580; ++i) {
+                        lineBuffer.append(',');
+                        appendNumber(lineBuffer, samples[i]);
+                    }
+                    lineBuffer.append('\n');
+
+                    fpgaWaveFile[detectorIndex-1]->write(lineBuffer);
                 }
             }
-        }, Qt::QueuedConnection);
+        }, Qt::DirectConnection);
     }
 
     client_fpga2_wave = new TcpClient(this); // 副网口，仅接收波形（FPGA主板2）
@@ -1450,19 +1478,37 @@ void CommandHelper::initDataProcessor()
         connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this, [=](int detectorIndex, int channelNumber, quint32 timeUnits,
                                                                                      const QVector<quint16>& samples){
             if (mfileFormat == Text){
-                QStringList strCounts;
-                strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
-                for (int i = 0; i < 580; ++i) {
-                    strCounts << QString::number(samples[i]);
-                }
+                // QStringList strCounts;
+                // strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
+                // for (int i = 0; i < 580; ++i) {
+                //     strCounts << QString::number(samples[i]);
+                // }
 
                 QFile* fpgaWaveFile[] = {&m_fpga1WaveFile, &m_fpga2WaveFile};
+                // if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
+                //     fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
+                //     fpgaWaveFile[detectorIndex-1]->write("\n");
+                //     //fpgaWaveFile[detectorIndex-3]->flush();
+                // }
                 if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                    fpgaWaveFile[detectorIndex-1]->write("\n");
-                    //fpgaWaveFile[detectorIndex-3]->flush();
+                    static QByteArray m_reusableLineBuffer;
+                    QByteArray& lineBuffer = m_reusableLineBuffer; // 把这个变量作为类成员，全程复用不释放
+                    lineBuffer.clear();
+                    lineBuffer.reserve(4096); // 预分配固定4K缓冲，足够存下一行582个数字+逗号
+
+                    appendNumber(lineBuffer, timeUnits/10);
+                    lineBuffer.append(',');
+                    appendNumber(lineBuffer, channelNumber);
+
+                    for (int i = 0; i < 580; ++i) {
+                        lineBuffer.append(',');
+                        appendNumber(lineBuffer, samples[i]);
+                    }
+                    lineBuffer.append('\n');
+
+                    fpgaWaveFile[detectorIndex-1]->write(lineBuffer);
                 }
             }
-        }, Qt::QueuedConnection);
+        }, Qt::DirectConnection);
     }
 }

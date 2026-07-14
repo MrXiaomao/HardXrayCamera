@@ -5,6 +5,7 @@ DataProcessor::DataProcessor(quint8 detectorIndex, QObject *parent)
     : QObject{parent}
     , mDetectorIndex(detectorIndex)
 {
+    m_samples.resize(580);
     m_workThread.start();
     moveToThread(&m_workThread);
     // 启动处理循环
@@ -393,15 +394,16 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
             const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2)*10;
             const int channelNumber = channelNumberFromMask(channelMask);
 
-            QVector<quint16> samples;
-            samples.reserve(580);
+            //QVector<quint16> samples;
+            //samples.reserve(580);
 
             const char* sampleData = p + WaveformHeader.size() + 4;
             for (int i = 0; i < 580; ++i) {
-                samples.append(readUInt16BE(sampleData + i * 2));
+                //samples.append(readUInt16BE(sampleData + i * 2));
+                m_samples[i] = readUInt16BE(sampleData + i * 2);
             }
 
-            emit sigWaveformData(detectorIndex, channelNumber, timeUnits, samples);
+            emit sigWaveformData(detectorIndex, channelNumber, timeUnits, m_samples);
             offset += static_cast<int>(WaveformPacketSize);
 
         } else {
