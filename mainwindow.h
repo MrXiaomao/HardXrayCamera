@@ -157,7 +157,7 @@ public:
     }
 
     // 极速清空：仅重置size到0，永远保留当前设定的预分配容量，不释放内存
-    void fastClear() {
+    void clear() {
         for (int ch = 0; ch < m_channelCount; ch++) {
             m_data[ch].resize(0);
         }
