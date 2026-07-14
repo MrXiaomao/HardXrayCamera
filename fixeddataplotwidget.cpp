@@ -14,6 +14,7 @@ FixedDataPlotWidget::FixedDataPlotWidget(QWidget *parent)
 {
     m_plot = new QCustomPlot(this);
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_plot->legend->setVisible(false);
 
     // Use a layout so QCustomPlot always fills this widget on resize.
     auto *layout = new QVBoxLayout(this);

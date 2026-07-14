@@ -70,7 +70,7 @@ QByteArray Order::setTriggerSignalTimeWidth(quint16 timeWidth16ns)
 
 QByteArray Order::setTimeSpectrumRange(quint8 index, quint16 start, quint16 end)
 {
-    return makeCommand(0xFB, index, start, end);
+    return makeCommand(0xFB, index, end, start);
 }
 
 QVector<QByteArray> Order::setTimeSpectrumRangeChannel(quint8 channelIndex,

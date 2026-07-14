@@ -109,6 +109,7 @@ DetectorSetting::DetectorSetting(QWidget *parent)
     ui->widget_armIP1->setIP("192.168.0.90");
     ui->widget_armIP2->setIP("192.168.0.91");
     ui->widget_relayIP->setIP("0.0.0.0");
+    ui->widget_HDASrvIP->setIP("172.30.20.11");
 
     loadSettings();
 }
@@ -132,6 +133,7 @@ void DetectorSetting::loadSettings()
     QString ip_arm1 = settings->getValueByPath("network/ip_arm1").toString();
     QString ip_arm2 = settings->getValueByPath("network/ip_arm2").toString();
     QString ip_relay = settings->getValueByPath("network/ip_relay").toString();
+    QString ip_HDASrv = settings->getValueByPath("network/ip_hdaSrv").toString();
     ui->widget_fpga1MainIP->setIP(ip_fpga1_main);
     ui->widget_fpga2MainIP->setIP(ip_fpga2_main);
     ui->widget_fpga1WaveIP->setIP(ip_fpga1_wave);
@@ -139,6 +141,7 @@ void DetectorSetting::loadSettings()
     ui->widget_armIP1->setIP(ip_arm1);
     ui->widget_armIP2->setIP(ip_arm2);
     ui->widget_relayIP->setIP(ip_relay);
+    ui->widget_HDASrvIP->setIP(ip_HDASrv);
     ui->spinBox_portFpga1Main->setValue(settings->getValueByPath("network/port_fpga1_main").toInt());
     ui->spinBox_portFpga2Main->setValue(settings->getValueByPath("network/port_fpga2_main").toInt());
     ui->spinBox_portFpga1Wave->setValue(settings->getValueByPath("network/port_fpga1_wave").toInt());
@@ -146,6 +149,7 @@ void DetectorSetting::loadSettings()
     ui->spinBox_armPort1->setValue(settings->getValueByPath("network/port_arm1").toInt());
     ui->spinBox_armPort2->setValue(settings->getValueByPath("network/port_arm2").toInt());
     ui->spinBox_portRelay->setValue(settings->getValueByPath("network/port_relay").toInt());
+    ui->spinBox_portHDASrv->setValue(settings->getValueByPath("network/port_hdaSrv", 9090).toInt());
 
     JsonSettings *runSettings = GlobalSettings::instance()->mRunSettings;
     ScopedFileLock runLock(runSettings);
@@ -181,6 +185,7 @@ void DetectorSetting::on_btn_ok_accepted()
     QString ip_arm1 = ui->widget_armIP1->getIP();
     QString ip_arm2 = ui->widget_armIP2->getIP();
     QString ip_relay = ui->widget_relayIP->getIP();
+    QString ip_HDASrv = ui->widget_HDASrvIP->getIP();
 
     int port_fpga1_main = ui->spinBox_portFpga1Main->value();
     int port_fpga2_main = ui->spinBox_portFpga2Main->value();
@@ -189,6 +194,7 @@ void DetectorSetting::on_btn_ok_accepted()
     int port_arm1 = ui->spinBox_armPort1->value();
     int port_arm2 = ui->spinBox_armPort2->value();
     int port_relay = ui->spinBox_portRelay->value();
+    int port_HDASrv = ui->spinBox_portHDASrv->value();
 
     settings->setValueByPath("network/ip_fpga1_main", ip_fpga1_main);
     settings->setValueByPath("network/ip_fpga2_main", ip_fpga2_main);
@@ -197,6 +203,7 @@ void DetectorSetting::on_btn_ok_accepted()
     settings->setValueByPath("network/ip_arm1", ip_arm1);
     settings->setValueByPath("network/ip_arm2", ip_arm2);
     settings->setValueByPath("network/ip_relay", ip_relay);
+    settings->setValueByPath("network/ip_hdaSrv", ip_HDASrv);
     settings->setValueByPath("network/port_fpga1_main", port_fpga1_main);
     settings->setValueByPath("network/port_fpga2_main", port_fpga2_main);
     settings->setValueByPath("network/port_fpga1_wave", port_fpga1_wave);
@@ -204,6 +211,7 @@ void DetectorSetting::on_btn_ok_accepted()
     settings->setValueByPath("network/port_arm1", port_arm1);
     settings->setValueByPath("network/port_arm2", port_arm2);
     settings->setValueByPath("network/port_relay", port_relay);
+    settings->setValueByPath("network/port_hdaSrv", port_HDASrv);
 
     //硬件参数读取
     settings->setValueByPath("FPGA/threshold", ui->spb_threshold->text());

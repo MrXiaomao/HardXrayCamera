@@ -15,5 +15,6 @@
         <file>resource/empty.png</file>
         <file>resource/surface.png</file>
         <file>resource/LOGO.ico</file>
+        <file>resource/export.png</file>
     </qresource>
 </RCC>

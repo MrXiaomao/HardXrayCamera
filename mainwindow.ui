@@ -263,7 +263,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QSpinBox" name="spinBox_4">
+                 <widget class="QSpinBox" name="spinBox_refreshTimeLength">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                     <horstretch>0</horstretch>
@@ -501,6 +501,17 @@
                  </widget>
                 </item>
                 <item>
+                 <widget class="QPushButton" name="btn_exportProfile">
+                  <property name="text">
+                   <string>导出剖面数据</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="resource.qrc">
+                    <normaloff>:/resource/export.png</normaloff>:/resource/export.png</iconset>
+                  </property>
+                 </widget>
+                </item>
+                <item>
                  <spacer name="horizontalSpacer_profile">
                   <property name="orientation">
                    <enum>Qt::Horizontal</enum>
@@ -657,7 +668,7 @@
                 </property>
                 <property name="maximumSize">
                  <size>
-                  <width>200</width>
+                  <width>250</width>
                   <height>16777215</height>
                  </size>
                 </property>
@@ -789,7 +800,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>点位#1温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -824,7 +835,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>点位#2温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -859,7 +870,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>点位#3温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -894,7 +905,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电压报警阈值/V</string>
+                           <string>总电压报警阈值/V</string>
                           </property>
                          </widget>
                         </item>
@@ -926,7 +937,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电流报警阈值/A</string>
+                           <string>总电流报警阈值/A</string>
                           </property>
                          </widget>
                         </item>
@@ -1008,7 +1019,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>垂直相机点位#1温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1043,7 +1054,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>垂直相机点位#3温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1056,7 +1067,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电流报警阈值/A</string>
+                           <string>水平相机低压电流报警阈值/A</string>
                           </property>
                          </widget>
                         </item>
@@ -1110,7 +1121,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>水平相机点位#2温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1123,7 +1134,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电压报警阈值/V</string>
+                           <string>水平相机低压电压报警阈值/V</string>
                           </property>
                          </widget>
                         </item>
@@ -1136,7 +1147,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电压报警阈值/V</string>
+                           <string>垂直相机高压电压报警阈值/V</string>
                           </property>
                          </widget>
                         </item>
@@ -1212,7 +1223,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电流报警阈值/A</string>
+                           <string>垂直相机低压电流报警阈值/A</string>
                           </property>
                          </widget>
                         </item>
@@ -1225,7 +1236,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>水平相机点位#1温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1238,7 +1249,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>水平相机点位#3温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1273,7 +1284,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>温度报警阈值/°C</string>
+                           <string>垂直相机点位#2温度报警阈值/°C</string>
                           </property>
                          </widget>
                         </item>
@@ -1286,7 +1297,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电压报警阈值/V</string>
+                           <string>垂直相机低压电压报警阈值/V</string>
                           </property>
                          </widget>
                         </item>
@@ -1321,7 +1332,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电流报警阈值/A</string>
+                           <string>水平相机高压电流报警阈值/A</string>
                           </property>
                          </widget>
                         </item>
@@ -1334,7 +1345,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电压报警阈值/V</string>
+                           <string>水平相机高压电压报警阈值/V</string>
                           </property>
                          </widget>
                         </item>
@@ -1347,7 +1358,7 @@
                            </sizepolicy>
                           </property>
                           <property name="text">
-                           <string>电流报警阈值/A</string>
+                           <string>垂直相机高压电流报警阈值/A</string>
                           </property>
                          </widget>
                         </item>
@@ -2271,7 +2282,7 @@
   <tabstop>dateTimeEdit_shutdown</tabstop>
   <tabstop>btn_startMeasure</tabstop>
   <tabstop>btn_stopMeasure</tabstop>
-  <tabstop>spinBox_4</tabstop>
+  <tabstop>spinBox_refreshTimeLength</tabstop>
   <tabstop>spb_specID</tabstop>
   <tabstop>spb_hxrDisplayBins</tabstop>
   <tabstop>spb_waveID</tabstop>

@@ -13,6 +13,8 @@ CONFIG += c++17
 
 SOURCES += \
     commandhelper.cpp \
+    dataprocessor.cpp \
+    hdadataupload.cpp \
     otaupgradewindow.cpp \
     signalwidthsetting.cpp \
     udpshotreceiver.cpp \
@@ -30,6 +32,8 @@ SOURCES += \
 
 HEADERS += \
     commandhelper.h \
+    dataprocessor.h \
+    hdadataupload.h \
     otaupgradewindow.h \
     signalwidthsetting.h \
     udpshotreceiver.h \

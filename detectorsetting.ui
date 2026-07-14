@@ -38,8 +38,15 @@
       <property name="bottomMargin">
        <number>5</number>
       </property>
-      <item row="5" column="2">
-       <widget class="QLabel" name="label_15">
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_11">
+        <property name="text">
+         <string>水平相机副网口IP(波形接收)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="2">
+       <widget class="QLabel" name="label_31">
         <property name="text">
          <string>端口号</string>
         </property>
@@ -64,8 +71,14 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="1">
-       <widget class="IPAddress" name="widget_fpga2MainIP" native="true">
+      <item row="1" column="1">
+       <widget class="IPAddress" name="widget_fpga1MainIP" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -86,25 +99,8 @@
         </property>
        </widget>
       </item>
-      <item row="6" column="2">
-       <widget class="QLabel" name="label_31">
-        <property name="text">
-         <string>端口号</string>
-        </property>
-       </widget>
-      </item>
-      <item row="8" column="4">
-       <widget class="QSpinBox" name="spinBox_portRelay">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label">
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_2">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
           <horstretch>0</horstretch>
@@ -118,19 +114,93 @@
          </size>
         </property>
         <property name="text">
-         <string>水平相机主网口IP(控制/能谱)</string>
+         <string>垂直相机主网口IP(控制/能谱)</string>
         </property>
        </widget>
       </item>
-      <item row="7" column="2">
-       <widget class="QLabel" name="label_32">
+      <item row="4" column="4">
+       <widget class="QSpinBox" name="spinBox_portFpga2Main">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="1">
+       <widget class="IPAddress" name="widget_armIP2" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>120</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2" colspan="2">
+       <widget class="QLabel" name="label_3">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>40</width>
+          <height>0</height>
+         </size>
+        </property>
         <property name="text">
          <string>端口号</string>
         </property>
        </widget>
       </item>
-      <item row="3" column="1">
-       <widget class="IPAddress" name="widget_fpga1WaveIP" native="true">
+      <item row="1" column="6">
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="5" column="2">
+       <widget class="QLabel" name="label_15">
+        <property name="text">
+         <string>端口号</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="6">
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="6" column="1">
+       <widget class="IPAddress" name="widget_armIP1" native="true">
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -176,36 +246,18 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="IPAddress" name="widget_fpga1MainIP" native="true">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
+      <item row="8" column="4">
+       <widget class="QSpinBox" name="spinBox_portRelay">
+        <property name="maximum">
+         <number>65535</number>
         </property>
-        <property name="minimumSize">
-         <size>
-          <width>120</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>200</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="autoFillBackground">
-         <bool>true</bool>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
+        <property name="value">
+         <number>5000</number>
         </property>
        </widget>
       </item>
-      <item row="4" column="2">
-       <widget class="QLabel" name="label_4">
+      <item row="1" column="0">
+       <widget class="QLabel" name="label">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
           <horstretch>0</horstretch>
@@ -214,196 +266,12 @@
         </property>
         <property name="minimumSize">
          <size>
-          <width>40</width>
+          <width>60</width>
           <height>0</height>
          </size>
         </property>
         <property name="text">
-         <string>端口号</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="1">
-       <widget class="IPAddress" name="widget_armIP2" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>120</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>200</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="autoFillBackground">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_29">
-        <property name="text">
-         <string>信号采集机箱核心板IP：</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="0">
-       <widget class="QLabel" name="label_30">
-        <property name="text">
-         <string>电源机箱核心板的IP：</string>
-        </property>
-       </widget>
-      </item>
-      <item row="9" column="1">
-       <widget class="QSpinBox" name="spb_udpPort">
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>6000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="1">
-       <widget class="IPAddress" name="widget_fpga2WaveIP" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>120</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>200</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="autoFillBackground">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="4">
-       <widget class="QSpinBox" name="spinBox_portFpga1Wave">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="6">
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="2" colspan="2">
-       <widget class="QLabel" name="label_3">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>40</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>端口号</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="4">
-       <widget class="QSpinBox" name="spinBox_armPort1">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="2">
-       <widget class="QLabel" name="label_14">
-        <property name="text">
-         <string>端口号</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="4">
-       <widget class="QSpinBox" name="spinBox_armPort2">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="4">
-       <widget class="QSpinBox" name="spinBox_portFpga2Wave">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="6">
-       <spacer name="horizontalSpacer_4">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="7" column="6">
-       <spacer name="horizontalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="9" column="0">
-       <widget class="QLabel" name="label_udpPort">
-        <property name="text">
-         <string>炮号接收UDP端口</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_11">
-        <property name="text">
-         <string>水平相机副网口IP(波形接收)</string>
+         <string>水平相机主网口IP(控制/能谱)</string>
         </property>
        </widget>
       </item>
@@ -426,8 +294,31 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_2">
+      <item row="3" column="6">
+       <spacer name="horizontalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="3" column="4">
+       <widget class="QSpinBox" name="spinBox_portFpga1Wave">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="2">
+       <widget class="QLabel" name="label_4">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
           <horstretch>0</horstretch>
@@ -436,17 +327,34 @@
         </property>
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>40</width>
           <height>0</height>
          </size>
         </property>
         <property name="text">
-         <string>垂直相机主网口IP(控制/能谱)</string>
+         <string>端口号</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="6">
-       <spacer name="horizontalSpacer_3">
+      <item row="7" column="4">
+       <widget class="QSpinBox" name="spinBox_armPort2">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_29">
+        <property name="text">
+         <string>信号采集机箱核心板IP：</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="6">
+       <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -465,8 +373,29 @@
         </property>
        </widget>
       </item>
-      <item row="6" column="1">
-       <widget class="IPAddress" name="widget_armIP1" native="true">
+      <item row="7" column="0">
+       <widget class="QLabel" name="label_30">
+        <property name="text">
+         <string>电源机箱核心板的IP：</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="2">
+       <widget class="QLabel" name="label_32">
+        <property name="text">
+         <string>端口号</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="2">
+       <widget class="QLabel" name="label_14">
+        <property name="text">
+         <string>端口号</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="IPAddress" name="widget_fpga2WaveIP" native="true">
         <property name="minimumSize">
          <size>
           <width>120</width>
@@ -484,28 +413,8 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="4">
-       <widget class="QSpinBox" name="spinBox_portFpga2Main">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="4">
-       <widget class="QSpinBox" name="spinBox_portFpga1Main">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>5000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="6">
-       <spacer name="horizontalSpacer_2">
+      <item row="5" column="6">
+       <spacer name="horizontalSpacer_7">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -516,6 +425,29 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item row="6" column="4">
+       <widget class="QSpinBox" name="spinBox_armPort1">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="1">
+       <widget class="QSpinBox" name="spb_udpPort">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>6000</number>
+        </property>
+       </widget>
       </item>
       <item row="4" column="6">
        <spacer name="horizontalSpacer_6">
@@ -530,8 +462,120 @@
         </property>
        </spacer>
       </item>
-      <item row="5" column="6">
-       <spacer name="horizontalSpacer_7">
+      <item row="3" column="1">
+       <widget class="IPAddress" name="widget_fpga1WaveIP" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>120</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="4">
+       <widget class="QSpinBox" name="spinBox_portFpga2Wave">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="IPAddress" name="widget_fpga2MainIP" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>120</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>true</bool>
+        </property>
+        <property name="styleSheet">
+         <string notr="true"/>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="4">
+       <widget class="QSpinBox" name="spinBox_portFpga1Main">
+        <property name="maximum">
+         <number>65535</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0">
+       <widget class="QLabel" name="label_udpPort">
+        <property name="text">
+         <string>炮号接收UDP端口</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="6">
+       <spacer name="horizontalSpacer_5">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="9" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>HDA服务器</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="1">
+       <widget class="IPAddress" name="widget_HDASrvIP" native="true">
+        <property name="autoFillBackground">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="2">
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>端口号</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="4">
+       <widget class="QSpinBox" name="spinBox_portHDASrv">
+        <property name="maximum">
+         <number>65536</number>
+        </property>
+        <property name="value">
+         <number>9090</number>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="6">
+       <spacer name="horizontalSpacer_8">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>

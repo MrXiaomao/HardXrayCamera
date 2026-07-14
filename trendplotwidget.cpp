@@ -15,6 +15,7 @@ TrendPlotWidget::TrendPlotWidget(QWidget *parent)
 {
     m_plot = new QCustomPlot(this);
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_plot->legend->setVisible(false);
     QCustomPlotHelper* customPlotHelper = new QCustomPlotHelper(m_plot, this);
     (void)customPlotHelper;
 

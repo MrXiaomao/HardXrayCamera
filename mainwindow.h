@@ -32,6 +32,8 @@ using namespace QtDataVisualization;
 #include <QtDataVisualization/Q3DInputHandler>
 #include <QtDataVisualization/Q3DSurface>
 #include <QMouseEvent>
+#include <QAction>
+#include <QMenu>
 class QValue3DAxisFormatterX: public QtDataVisualization::QValue3DAxisFormatter
 {
    Q_OBJECT
@@ -40,7 +42,7 @@ public:
 
    virtual QString stringForValue(qreal value, const QString &/*format*/) const override
    {
-       if (value >= 1 && value <= 16)
+       if (value >= 1 && value <= 14)
            return QString("CH %1").arg(QString::number(value / 1.0, 'f', 0));
        else
            return QString();
@@ -50,7 +52,10 @@ public:
 class CustomSurface : public QtDataVisualization::Q3DSurface {
    Q_OBJECT
 public:
-   explicit CustomSurface(const QSurfaceFormat *format = nullptr, QWindow *parent = nullptr) : QtDataVisualization::Q3DSurface(format, parent) {}
+   explicit CustomSurface(const QSurfaceFormat *format = nullptr, QWindow *parent = nullptr)
+        : QtDataVisualization::Q3DSurface(format, parent) {
+
+   }
 
 protected:
    void mousePressEvent(QMouseEvent *event) override {
@@ -65,6 +70,13 @@ protected:
            QMouseEvent fakeLeftPress(event->type(), event->pos(),
                                      Qt::LeftButton, Qt::LeftButton, event->modifiers());
            Q3DSurface::mousePressEvent(&fakeLeftPress);
+
+           QMenu menu(nullptr);
+           QAction *resetAct = menu.addAction("恢复视图");
+           connect(resetAct, &QAction::triggered, this, [=](){
+               scene()->activeCamera()->setCameraPosition(-60.0f, 30.0f, 125.0f);
+           });
+           menu.exec(event->globalPos());
        } else {
            Q3DSurface::mousePressEvent(event);
        }
@@ -139,7 +151,7 @@ private slots:
     void onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
                                 const QVector<quint16> &samples);
 
-    void onMeasureStarted();
+    void onHardTriggeredSignalReceived();
 
     // 能谱/波形显示控件联动
     void onChannelSpinBoxChanged(int value);
@@ -203,6 +215,8 @@ private slots:
     void on_radioButton_spec_clicked();
 
     void on_radioButton_cps_clicked();
+
+    void on_btn_exportProfile_clicked();
 
 private:
     struct EnergyCalibration {
@@ -315,8 +329,11 @@ private:
     // 定时测量定时器
     QTimer* measureTimer = nullptr;
     QElapsedTimer spectrumPlotThrottle;
+    std::atomic_bool mUsePrimaryPartition = true; // 是否使用主分区
     // 按逻辑通道(1~32)存储：探测器1为1~16，探测器2为17~32
     QVector<QVector<SpectrumEntry>> m_spectrumByChannel;
+    QVector<QVector<SpectrumEntry>> m_spectrumByChannelBackup;
+    QVector<QVector<SpectrumEntry>>& getSpectrumByChannel();
     QVector<quint32> m_spectrumBinAddresses; // 统一道址 1..N，绘图时复用
     QVector<QVector<quint32>> m_spectrumSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingSpectrumNumbersByChannel;
@@ -325,6 +342,8 @@ private:
     QVector<bool> m_hasSpectrumSequenceByChannel;
     // 按逻辑通道(1~32)存储波形历史
     QVector<QVector<WaveformEntry>> m_waveformByChannel;
+    QVector<QVector<WaveformEntry>> m_waveformByChannelBackup;
+    QVector<QVector<WaveformEntry>>& getWaveformByChannel();
     QVector<QVector<quint32>> m_waveformSequenceNumbersByChannel;
     QVector<QVector<quint32>> m_missingWaveformNumbersByChannel;
     QVector<quint32> m_lastWaveformSequenceByChannel;
@@ -332,6 +351,7 @@ private:
     QTimer* waveformPlotTimer = nullptr;
     QVector<EnergyCalibration> m_energyCalibration;
 
+    void switchDataStoragePartition();
     // 继电器电源开关状态
     bool replayPowerOn = false;
     bool replayOnline = false;
@@ -354,6 +374,10 @@ private:
     // 3D剖面图
     CustomSurface *m_hor3DSurface = nullptr;
     CustomSurface *m_ver3DSurface = nullptr;
+    QVector<QVector<ChannelProfileEntry>> m_currentProfileData[2];
+
+    enum class MeasureMode { ManualMode/*手动模式*/, AutoMode/*自动模式*/, AutoMatedMode/*无人值守模式*/ };
+    MeasureMode m_measureMode;
 
 public:
     // 无人值守

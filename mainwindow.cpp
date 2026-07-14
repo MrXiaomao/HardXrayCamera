@@ -249,28 +249,36 @@ MainWindow::MainWindow(QWidget *parent)
         &MainWindow::onSpectrumDataReceived, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigWaveformData, this,
         &MainWindow::onWaveformDataReceived, Qt::QueuedConnection);
-    connect(commandHelper, &CommandHelper::sigMeasureStarted, this,
-            &MainWindow::onMeasureStarted, Qt::QueuedConnection);
+    connect(commandHelper, &CommandHelper::sigHardTriggeredSignalReceived, this,
+            &MainWindow::onHardTriggeredSignalReceived, Qt::QueuedConnection);
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
+    m_spectrumByChannelBackup.resize(kSpectrumChannelCount);
     m_spectrumSequenceNumbersByChannel.resize(kSpectrumChannelCount);
     m_missingSpectrumNumbersByChannel.resize(kSpectrumChannelCount);
     m_lastSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
     m_hasSpectrumSequenceByChannel.resize(kSpectrumChannelCount);
     m_spectrumCountsByChannel.resize(kSpectrumChannelCount);
     m_waveformByChannel.resize(kSpectrumChannelCount);
+    m_waveformByChannelBackup.resize(kSpectrumChannelCount);
     m_waveformSequenceNumbersByChannel.resize(kSpectrumChannelCount);
     m_missingWaveformNumbersByChannel.resize(kSpectrumChannelCount);
     m_lastWaveformSequenceByChannel.resize(kSpectrumChannelCount);
     m_hasWaveformSequenceByChannel.resize(kSpectrumChannelCount);
 
-    waveformPlotTimer = new QTimer(this);
-    waveformPlotTimer->setInterval(200); // 每200ms刷新一次波形
-    connect(waveformPlotTimer, &QTimer::timeout, this, &MainWindow::refreshWaveformPlot);
-    // waveformPlotTimer 仅在波形测量模式下启动
+    m_plotRefreshTimer = new QTimer(this);
+    m_plotRefreshTimer->setInterval(200); // 每200ms刷新一次波形
+    connect(m_plotRefreshTimer, &QTimer::timeout, this, [=]{
+        refreshSpectrumPlot();
+        refreshWaveformPlot();
+    });
 
     for (int i=0; i <32; ++i){
-        if (i<16)
+        if (i==7)
+            ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1) + QStringLiteral("(本底)"));
+        else if (i==13)
+            ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1) + QStringLiteral("(Am-241)"));
+        else if (i<16)
             ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1));
         else
             ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16 + 1));
@@ -303,9 +311,6 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateUnattendedControls);
     connect(ui->spb_hxrDisplayBins, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshSpectrumPlot);
-    loadMeasureSettings();
-
-    m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
 
     m_udpShotReceiver = new UdpShotReceiver(this);
     connect(m_udpShotReceiver, &UdpShotReceiver::datagramReceived,
@@ -350,6 +355,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_powerOff->setText(QStringLiteral("远程断电"));
     setPowerSwitchEnabled(false);
 
+    loadMeasureSettings();
+    m_currentShotNumber = ui->lineEdit_shotID->text().trimmed();
     emit ui->comboBox_measureMode->currentIndexChanged(ui->comboBox_measureMode->currentIndex());
 
     // 初始化状态机
@@ -358,8 +365,8 @@ MainWindow::MainWindow(QWidget *parent)
     // 开机自动最大化：一次性延迟调用，保留 lambda
     initStatusbar();
 
-    m_hor3DSurface = init3DSurface(1, ui->widget_hor, QStringLiteral("水平-16通道时序信号剖面图"));
-    m_ver3DSurface = init3DSurface(2, ui->widget_ver, QStringLiteral("垂直-16通道时序信号剖面图"));
+    m_hor3DSurface = init3DSurface(1, ui->widget_hor, QStringLiteral("水平-14通道时序计数率剖面图"));
+    m_ver3DSurface = init3DSurface(2, ui->widget_ver, QStringLiteral("垂直-14通道时序计数率剖面图"));
 
     // 构造函数中添加
     m_logFlushTimer = new QTimer(this);
@@ -456,9 +463,7 @@ void MainWindow::onMeasureTimerTimeout()
     if (!commandHelper)
         return;
 
-    const int measureMode = ui->comboBox_measureMode->currentIndex();
-
-    if (measureMode == 1 && m_autoMeasureState == AutoMeasureState::Measuring) {
+    if (m_measureMode == MeasureMode::AutoMode && m_autoMeasureState == AutoMeasureState::Measuring) {
         stopAutoMeasureSession();
 
         ui->action_startMeasure->setEnabled(true);
@@ -471,9 +476,9 @@ void MainWindow::onMeasureTimerTimeout()
         return;
     }
 
-    if (measureMode == 2 && isTaskRunning && m_enableAutoMated
+    if (m_measureMode == MeasureMode::AutoMatedMode && isTaskRunning && m_enableAutoMated
         && m_autoMeasureState == AutoMeasureState::Measuring) {
-        waveformPlotTimer->stop();
+        m_plotRefreshTimer->stop();
         commandHelper->stopMeasure();
         printWaveformCollectionSummary();
         printSpectrumSequenceSummary();
@@ -486,7 +491,7 @@ void MainWindow::onMeasureTimerTimeout()
         return;
     }
 
-    waveformPlotTimer->stop();
+    m_plotRefreshTimer->stop();
     commandHelper->stopMeasure();
     printWaveformCollectionSummary();
     printSpectrumSequenceSummary();
@@ -499,9 +504,9 @@ void MainWindow::onMeasureTimerTimeout()
     ui->dateTimeEdit_shutdown->setEnabled(true);
     updateMeasureParamsGroupEnabled();
 
-    if (measureMode == 0)
+    if (m_measureMode == MeasureMode::ManualMode)
         qInfo() << "手动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
-    else if (measureMode == 2) {
+    else if (m_measureMode == MeasureMode::AutoMatedMode) {
         emit ui->action_disconnectDet->trigger();
         emit ui->action_disconnectMonitor->trigger();
         emit ui->action_relayNetClose->trigger();
@@ -539,7 +544,7 @@ void MainWindow::onRelayStatusChanged(bool on)
         ui->action_disconnectDet->setEnabled(false);
         ui->action_connectMonitor->setEnabled(false);
         ui->action_disconnectMonitor->setEnabled(false);
-        ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+        ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
         ui->action_stopMeasure->setEnabled(false);
 
         qInfo() << "继电器网络状态: 已断开";
@@ -569,14 +574,14 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
         ui->action_disconnectDet->setEnabled(false);
         ui->action_connectMonitor->setEnabled(false);
         ui->action_disconnectMonitor->setEnabled(false);
-        ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+        ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
         ui->action_stopMeasure->setEnabled(false);
 
         qInfo() << "继电器控制的电源状态: 已关闭";
         replayPowerOn = false;
         if (m_autoMeasureState == AutoMeasureState::Measuring) {
             measureTimer->stop();
-            waveformPlotTimer->stop();
+            m_plotRefreshTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
             printSpectrumSequenceSummary();
@@ -586,7 +591,7 @@ void MainWindow::onRelayPowerStatusChanged(bool on)
             m_autoMeasureDurationTimerStarted = false;
         } else if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
             measureTimer->stop();
-            waveformPlotTimer->stop();
+            m_plotRefreshTimer->stop();
             commandHelper->closeMeasurementFiles();
             m_autoMeasureState = AutoMeasureState::Idle;
             m_autoMeasureDurationTimerStarted = false;
@@ -618,7 +623,7 @@ void MainWindow::onDetector1StatusChanged(bool on)
         detectOnline[0] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+            ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机主网口(控制/能谱)状态: 已断开";
@@ -639,7 +644,7 @@ void MainWindow::onDetector2StatusChanged(bool on)
         detectOnline[1] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+            ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机主网口(控制/能谱)状态: 已断开";
@@ -660,7 +665,7 @@ void MainWindow::onDetector3StatusChanged(bool on)
         detectOnline[2] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+            ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "水平相机副网口(波形接收)状态: 已断开";
@@ -681,7 +686,7 @@ void MainWindow::onDetector4StatusChanged(bool on)
         detectOnline[3] = true;
     } else {
         if (!isMeasureSessionActive()) {
-            ui->action_startMeasure->setEnabled(ui->comboBox_measureMode->currentIndex()==2);
+            ui->action_startMeasure->setEnabled(m_measureMode==MeasureMode::AutoMatedMode);
             ui->action_stopMeasure->setEnabled(false);
         }
         qInfo() << "垂直相机副网口(波形接收)状态: 已断开";
@@ -906,7 +911,8 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
     // }
 
     const int logicalChannel = logicalChannelNumber(detectorIndex, channelNumber);
-    if (logicalChannel < 1 || logicalChannel > m_spectrumByChannel.size())
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
+    if (logicalChannel < 1 || logicalChannel > spectrumByChannel.size())
         return;
 
     const int channelIndex = logicalChannel - 1;
@@ -932,11 +938,11 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
         return;
 
     // 限流刷新，避免高频能谱拖慢 UI
-    if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < 500)
-        return;
+    // if (spectrumPlotThrottle.isValid() && spectrumPlotThrottle.elapsed() < ui->spinBox_refreshTimeLength->value())
+    //     return;
 
-    spectrumPlotThrottle.restart();
-    refreshSpectrumPlot();
+    // spectrumPlotThrottle.restart();
+    // refreshSpectrumPlot();
 }
 
 void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -949,7 +955,8 @@ void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, qu
     const int channelIndex = logicalChannel - 1;
     appendWaveformData(detectorIndex, channelNumber, timeUnits, samples);
 
-    const quint32 waveformSequence = timeUnits/ui->spb_specRefashTime->value();
+    const quint8 waveTimeIntervalMs = 10;
+    const quint32 waveformSequence = timeUnits/waveTimeIntervalMs;
     m_waveformSequenceNumbersByChannel[channelIndex].append(waveformSequence);
     if (!m_hasWaveformSequenceByChannel[channelIndex]) {
         m_hasWaveformSequenceByChannel[channelIndex] = true;
@@ -1086,8 +1093,8 @@ void MainWindow::printSpectrumSequenceSummary() const
 
 void MainWindow::clearSpectrumData()
 {
-    for (auto &channelSpectra : m_spectrumByChannel)
-        channelSpectra.clear();
+    // for (auto &channelSpectra : m_spectrumByChannel)
+    //     channelSpectra.clear();
     for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
         channelSpectrumCounts.clear();
 
@@ -1103,8 +1110,8 @@ void MainWindow::clearSpectrumData()
 
 void MainWindow::clearWaveformData()
 {
-    for (auto &channelWaveforms : m_waveformByChannel)
-        channelWaveforms.clear();
+    // for (auto &channelWaveforms : m_waveformByChannel)
+    //     channelWaveforms.clear();
 
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setValue(0);
@@ -1129,6 +1136,7 @@ void MainWindow::clear3DSurface(CustomSurface *surface)
 
 void MainWindow::resetMeasurementPlotData()
 {
+    switchDataStoragePartition();
     clearSpectrumData();
     clearWaveformData();
     resetWaveformCounters();
@@ -1142,15 +1150,16 @@ void MainWindow::resetMeasurementPlotData()
 void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                                     const QVector<quint32> &counts)
 {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
     const int storageChannel = logicalChannelNumber(detectorIndex, channelNumber);
-    if (storageChannel < 1 || storageChannel > m_spectrumByChannel.size())
+    if (storageChannel < 1 || storageChannel > spectrumByChannel.size())
         return;
 
     SpectrumEntry entry;
     entry.detectorIndex = detectorIndex;
     entry.timeMs = timeMs;
     entry.counts = counts;
-    m_spectrumByChannel[storageChannel - 1].append(entry);
+    spectrumByChannel[storageChannel - 1].append(entry);
 
     SpectrumCountsEntry countsEntry;
     countsEntry.detectorIndex = detectorIndex;
@@ -1164,15 +1173,16 @@ void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint3
 void MainWindow::appendWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
                                     const QVector<quint16> &samples)
 {
+    QVector<QVector<WaveformEntry>>& waveformByChannel = getWaveformByChannel();
     const int storageChannel = logicalChannelNumber(detectorIndex, channelNumber);
-    if (storageChannel < 1 || storageChannel > m_waveformByChannel.size())
+    if (storageChannel < 1 || storageChannel > waveformByChannel.size())
         return;
 
     WaveformEntry entry;
     entry.detectorIndex = detectorIndex;
     entry.timeUnits = timeUnits;
     entry.samples = samples;
-    m_waveformByChannel[storageChannel - 1].append(entry);
+    waveformByChannel[storageChannel - 1].append(entry);
 }
 
 void MainWindow::ensureSpectrumBinAddresses(int binCount)
@@ -1188,9 +1198,10 @@ void MainWindow::ensureSpectrumBinAddresses(int binCount)
 
 void MainWindow::updateSpecIdSpinBoxRange()
 {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    const int specCount = (channel >= 1 && channel <= m_spectrumByChannel.size())
-                              ? m_spectrumByChannel.at(channel - 1).size()
+    const int specCount = (channel >= 1 && channel <= spectrumByChannel.size())
+                              ? spectrumByChannel.at(channel - 1).size()
                               : 0;
     const int maxSpecId = qMax(0, specCount - 1);
 
@@ -1203,9 +1214,10 @@ void MainWindow::updateSpecIdSpinBoxRange()
 
 void MainWindow::updateWaveIdSpinBoxRange()
 {
+    QVector<QVector<WaveformEntry>>& waveformByChannel = getWaveformByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    const int waveCount = (channel >= 1 && channel <= m_waveformByChannel.size())
-                              ? m_waveformByChannel.at(channel - 1).size()
+    const int waveCount = (channel >= 1 && channel <= waveformByChannel.size())
+                              ? waveformByChannel.at(channel - 1).size()
                               : 0;
     const int maxWaveId = qMax(0, waveCount - 1);
 
@@ -1218,11 +1230,12 @@ void MainWindow::updateWaveIdSpinBoxRange()
 
 void MainWindow::syncSpectrumSpinBoxToLatest()
 {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    if (channel < 1 || channel > m_spectrumByChannel.size())
+    if (channel < 1 || channel > spectrumByChannel.size())
         return;
 
-    const int maxSpecId = qMax(0, m_spectrumByChannel.at(channel - 1).size() - 1);
+    const int maxSpecId = qMax(0, spectrumByChannel.at(channel - 1).size() - 1);
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setMaximum(maxSpecId);
     ui->spb_specID->setValue(maxSpecId);
@@ -1231,11 +1244,12 @@ void MainWindow::syncSpectrumSpinBoxToLatest()
 
 void MainWindow::syncWaveformSpinBoxToLatest()
 {
+    QVector<QVector<WaveformEntry>>& waveformByChannel = getWaveformByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    if (channel < 1 || channel > m_waveformByChannel.size())
+    if (channel < 1 || channel > waveformByChannel.size())
         return;
 
-    const int maxWaveId = qMax(0, m_waveformByChannel.at(channel - 1).size() - 1);
+    const int maxWaveId = qMax(0, waveformByChannel.at(channel - 1).size() - 1);
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setMaximum(maxWaveId);
     ui->spb_waveID->setValue(maxWaveId);
@@ -1293,14 +1307,14 @@ void MainWindow::updateProfileControls()
 
 void MainWindow::updateUnattendedControls()
 {
-    int index = ui->comboBox_measureMode->currentIndex();
-    const bool unattendedMode = index == 2;
+    m_measureMode = (MeasureMode)ui->comboBox_measureMode->currentIndex();
+    const bool unattendedMode = m_measureMode == MeasureMode::AutoMatedMode;
     ui->label_9->setVisible(unattendedMode);
     ui->dateTimeEdit_startup->setVisible(unattendedMode);
     ui->label_10->setVisible(unattendedMode);
     ui->dateTimeEdit_shutdown->setVisible(unattendedMode);
 
-    if (index == 2){
+    if (m_measureMode == MeasureMode::AutoMatedMode){
         // 无人值守        
         ui->action_startMeasure->setEnabled(true);
         ui->checkBox_alarm->setEnabled(false);
@@ -1488,7 +1502,8 @@ void MainWindow::generateProfileSnapshots()
     }
 
     int profileCount = 0;
-    for (const QVector<SpectrumEntry> &channelSpectra : m_spectrumByChannel) {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
+    for (const QVector<SpectrumEntry> &channelSpectra : spectrumByChannel) {
         profileCount = qMax(profileCount, channelSpectra.size());
     }
     if (profileCount <= 0) {
@@ -1537,8 +1552,9 @@ void MainWindow::generateProfileSnapshots()
 
             QVector<ChannelProfileEntry> entrys;
             entrys.resize(profileCount);
+            QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
             for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
-                const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+                const QVector<SpectrumEntry> &spectra = spectrumByChannel.at(ch);
                 if (profileIndex >= spectra.size()) {
                     if (ch<16)
                         dataHor[ch%16] = entrys;
@@ -1569,8 +1585,9 @@ void MainWindow::generateProfileSnapshots()
 
             QVector<ChannelProfileEntry> entrys;
             entrys.resize(profileCount);
+            QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
             for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
-                const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
+                const QVector<SpectrumEntry> &spectra = spectrumByChannel.at(ch);
                 if (profileIndex >= spectra.size()) {
                     if (ch<16)
                         dataHor[ch%16] = entrys;
@@ -1639,13 +1656,14 @@ void MainWindow::refreshSpectrumPlot()
 
     const int channel = ui->cbb_channel->currentIndex() + 1;
     const int specId = ui->spb_specID->value();
-    if (channel < 1 || channel > m_spectrumByChannel.size()) {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
+    if (channel < 1 || channel > spectrumByChannel.size()) {
         ui->plotSpec->clearData();
         ui->plotSpec->refreshPlot();
         return;
     }
 
-    const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(channel - 1);
+    const QVector<SpectrumEntry> &spectra = spectrumByChannel.at(channel - 1);
     if (specId < 0 || specId >= spectra.size()) {
         ui->plotSpec->clearData();
         ui->plotSpec->setTitle(QString("能谱 CH%1 #%2 (无数据)").arg(channel).arg(specId));
@@ -1656,7 +1674,7 @@ void MainWindow::refreshSpectrumPlot()
     const SpectrumEntry &entry = spectra.at(specId);
     ui->plotSpec->setTitle(QString("能谱 %1 CH%2 #%3 t=%4ms")
                                .arg(entry.detectorIndex==1  ? QStringLiteral("水平") : QStringLiteral("垂直"))
-                               .arg(channel)
+                               .arg((channel-1) % 16 + 1)
                                .arg(specId)
                                .arg(entry.timeMs)
                                );
@@ -1681,8 +1699,8 @@ void MainWindow::refreshSpectrumPlot()
         const QVector<QVector<quint16>>& energyBoundaries = DetectorSetting::energyBoundaries();
 
         // 取出 energyBoundaries 中对应通道 specId 的右边界作为能量地址
-        if (channel < energyBoundaries.size()) {
-            const QVector<quint16> &boundaries = energyBoundaries.at(channel);
+        if (channel <= energyBoundaries.size()) {
+            const QVector<quint16> &boundaries = energyBoundaries.at(channel-1);
             for (const auto& addr : boundaries){
                 spectrumEneryAddresses.push_back(addr);
             }
@@ -1704,15 +1722,16 @@ void MainWindow::refreshWaveformPlot()
     if (isMeasureSessionActive())
         syncWaveformSpinBoxToLatest();
 
+    QVector<QVector<WaveformEntry>>& waveformByChannel = getWaveformByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
     const int waveId = ui->spb_waveID->value();
-    if (channel < 1 || channel > m_waveformByChannel.size()) {
+    if (channel < 1 || channel > waveformByChannel.size()) {
         ui->plotWave->clearData();
         ui->plotWave->refreshPlot();
         return;
     }
 
-    const QVector<WaveformEntry> &waveforms = m_waveformByChannel.at(channel - 1);
+    const QVector<WaveformEntry> &waveforms = waveformByChannel.at(channel - 1);
     if (waveId < 0 || waveId >= waveforms.size()) {
         ui->plotWave->clearData();
         ui->plotWave->setTitle(QString("波形 CH%1 #%2 (无数据)").arg(channel).arg(waveId));
@@ -1736,7 +1755,7 @@ void MainWindow::refreshWaveformPlot()
     ui->plotWave->setXRange(0, waveLenNs);
     ui->plotWave->setTitle(QString("波形 %1 CH%2 #%3 t=%4ms")
                                .arg(entry.detectorIndex==1 ? QStringLiteral("水平") : QStringLiteral("垂直"))
-                               .arg(channel)
+                               .arg((channel-1) % 16 + 1)
                                .arg(waveId)
                                .arg(entry.timeUnits));
     ui->plotWave->refreshPlot(false, true);
@@ -1744,8 +1763,9 @@ void MainWindow::refreshWaveformPlot()
 
 void MainWindow::refreshSpectrumCountsPlot()
 {
+    QVector<QVector<SpectrumEntry>>&  spectrumByChannel = getSpectrumByChannel();
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    if (channel < 1 || channel > m_spectrumByChannel.size()) {
+    if (channel < 1 || channel > spectrumByChannel.size()) {
         ui->plotCps->clearData();
         ui->plotCps->refreshPlot();
         return;
@@ -1847,15 +1867,14 @@ void MainWindow::onUdpShotNumberChanged(const QString &shotNumber)
     if (m_autoMeasureState != AutoMeasureState::WaitingShot)
         return;
 
-    const int measureMode = ui->comboBox_measureMode->currentIndex();
-    if (measureMode == 1) {
+    if (m_measureMode == MeasureMode::AutoMode) {
         qInfo() << info;
 
         m_currentShotNumber = shotNumber;
         ui->lineEdit_shotID->setText(shotNumber);
         saveShotNumberFile(shotNumber);
         triggerAutoMeasureFromShot(shotNumber);
-    } else if (measureMode == 2 && m_enableAutoMated) {
+    } else if (m_measureMode == MeasureMode::AutoMatedMode && m_enableAutoMated) {
         qInfo() << info;
 
         m_currentShotNumber = shotNumber;
@@ -1898,19 +1917,20 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     commandHelper->setShotNumber(shotNumber);
     m_autoMeasureDurationTimerStarted = false;
 
-    resetMeasurementPlotData();
-    spectrumPlotThrottle.invalidate();
+    // 接收炮号不清空图像，等到接收到硬触发信号之后再清空图像
+    //resetMeasurementPlotData();
+    //spectrumPlotThrottle.invalidate();
 
     commandHelper->beginRecording(mdetPara);
     commandHelper->sendSpectrumControl(Order::HardwareTrigger);
 
-    if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
-        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
-    } else {
-        ui->plotSpec->setXRange(1, 512);
-    }
+    // if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
+    //     ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+    // } else {
+    //     ui->plotSpec->setXRange(1, 512);
+    // }
 
-    waveformPlotTimer->start();
+    m_plotRefreshTimer->start(ui->spinBox_refreshTimeLength->value());
 
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->action_stopMeasure->setEnabled(true);
@@ -1947,8 +1967,8 @@ void MainWindow::triggerUnattendedMeasureFromShot(const QString &shotNumber)
     commandHelper->setShotNumber(shotNumber);
     m_autoMeasureDurationTimerStarted = false;
 
-    resetMeasurementPlotData();
-    spectrumPlotThrottle.invalidate();
+    //resetMeasurementPlotData();
+    //spectrumPlotThrottle.invalidate();
 
     mdetPara.trigMode = Order::TriggerMode::HardwareTrigger;
     commandHelper->startMeasure(mdetPara);
@@ -1959,7 +1979,7 @@ void MainWindow::triggerUnattendedMeasureFromShot(const QString &shotNumber)
         ui->plotSpec->setXRange(1, 512);
     }
 
-    waveformPlotTimer->start();
+    m_plotRefreshTimer->start(ui->spinBox_refreshTimeLength->value());
 
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->action_stopMeasure->setEnabled(true);
@@ -1993,7 +2013,7 @@ void MainWindow::stopAutoMeasureSession()
     }
 
     measureTimer->stop();
-    waveformPlotTimer->stop();
+    m_plotRefreshTimer->stop();
 
     if (stateBeforeStop == AutoMeasureState::Measuring) {
         // 炮号已到，开始测量指令已经发出，此时必须向硬件发送停止指令。
@@ -2001,7 +2021,7 @@ void MainWindow::stopAutoMeasureSession()
         printWaveformCollectionSummary();
         printSpectrumSequenceSummary();
         finalizeMeasurementPlots();
-        resetMeasurementPlotData();
+        //resetMeasurementPlotData();
     } else {
         // 炮号未到，硬件尚未开始测量，只取消等待，不发送停止指令。
         commandHelper->closeMeasurementFiles();
@@ -2021,18 +2041,19 @@ void MainWindow::stopAutoMeasureSession()
 #include <QtConcurrent>
 bool MainWindow::startMeasureInternal()
 {
-    const int measureMode = ui->comboBox_measureMode->currentIndex();
-    if (measureMode == 1 && m_autoMeasureState != AutoMeasureState::Idle)
+    if ((m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode) && m_autoMeasureState != AutoMeasureState::Idle)
         return true;
 
-    resetMeasurementPlotData();
-    spectrumPlotThrottle.invalidate();
-
     DetParameter detPara = {};
-    const Order::TriggerMode trigMode = (measureMode == 1)
+    const Order::TriggerMode trigMode = (m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode)
                                             ? Order::TriggerMode::HardwareTrigger
                                             : Order::TriggerMode::SoftwareTrigger;
     buildDetParameter(detPara, trigMode);
+
+    if (Order::TriggerMode::SoftwareTrigger == trigMode){
+        resetMeasurementPlotData();
+        spectrumPlotThrottle.invalidate();
+    }
 
     const QString savePath = ui->le_savePath->text();
     if (savePath.isEmpty()) {
@@ -2078,7 +2099,7 @@ bool MainWindow::startMeasureInternal()
         return true;
     }
 
-    m_enableAutoMated = (measureMode == 2);
+    m_enableAutoMated = (m_measureMode == MeasureMode::AutoMatedMode);
     if (m_enableAutoMated){
         // 开启无人值守模式
         // 1. 定义两个定时器和成员变量
@@ -2145,7 +2166,7 @@ bool MainWindow::startMeasureInternal()
             emit ui->action_relayNetClose->trigger();
 
             // 停止工作
-            waveformPlotTimer->stop();
+            m_plotRefreshTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
             printSpectrumSequenceSummary();
@@ -2173,7 +2194,7 @@ bool MainWindow::startMeasureInternal()
     else
     {
         // 手动测量
-        waveformPlotTimer->start();
+        m_plotRefreshTimer->start(ui->spinBox_refreshTimeLength->value());
 
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
             ui->plotSpec->setXRange(1, hxrDisplayBinCount());
@@ -2319,7 +2340,7 @@ void MainWindow::syncDetectorConnectButton()
     ui->action_connectDet->setEnabled(!allConnected && replayPowerOn);
     ui->action_disconnectDet->setEnabled(anyConnected);
 
-    ui->action_startMeasure->setEnabled(anyConnected || ui->comboBox_measureMode->currentIndex() == 2);
+    ui->action_startMeasure->setEnabled(anyConnected || m_measureMode==MeasureMode::AutoMatedMode);
     ui->action_stopMeasure->setEnabled(anyConnected);
 
     if (allConnected && m_enableAutoMated) {
@@ -2371,13 +2392,13 @@ void MainWindow::loadMonitorAlarmSettings()
     sectionNames << "dev2_currentAlarmThreshold1" << "dev2_currentAlarmThreshold2" << "dev2_currentAlarmThreshold3" << "dev2_currentAlarmThreshold4";
 
     QVector<double> defaultValues;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 5.0;
-    defaultValues << 1.25;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 5.0 << 5.0 << 5.0 << 5.0;
-    defaultValues << 1.25 << 1.25 << 1.25 << 1.25;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 24.0;
+    defaultValues << 1.0;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 62.0 << 13.0 << 62.0 << 13.0;
+    defaultValues << 0.01 << 0.05 << 0.01 << 0.05;
 
     JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
     ScopedFileLock lock(settings);
@@ -2413,13 +2434,13 @@ void MainWindow::saveMonitorAlarmSettings()
     sectionNames << "dev2_currentAlarmThreshold1" << "dev2_currentAlarmThreshold2" << "dev2_currentAlarmThreshold3" << "dev2_currentAlarmThreshold4";
 
     QVector<double> defaultValues;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 5.0;
-    defaultValues << 1.25;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 65.0 << 65.0 << 65.0;
-    defaultValues << 5.0 << 5.0 << 5.0 << 5.0;
-    defaultValues << 1.25 << 1.25 << 1.25 << 1.25;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 24.0;
+    defaultValues << 1.0;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 32.50 << 32.50 << 32.50;
+    defaultValues << 62.0 << 13.0 << 62.0 << 13.0;
+    defaultValues << 0.01 << 0.05 << 0.01 << 0.05;
 
     JsonSettings *settings = GlobalSettings::instance()->mUserSettings;
     ScopedFileLock lock(settings);
@@ -2482,6 +2503,7 @@ void MainWindow::loadMeasureSettings()
     updateHxrDisplayBinControls();
     updateProfileControls();
     updateUnattendedControls();
+    refreshWaveformPlot();
 }
 
 void MainWindow::saveMeasureSettings()
@@ -2542,9 +2564,21 @@ void MainWindow::on_action_startMeasure_triggered()
     startMeasureInternal();
 }
 
-
 void MainWindow::on_action_stopMeasure_triggered()
 {
+    if (isTaskRunning){
+        if (startTimer->isActive())
+            startTimer->stop();
+
+        if (stopTimer->isActive())
+            stopTimer->stop();
+
+        isTaskRunning = false;
+    }
+
+    m_enableAutoMated = false;
+    machine->stop();
+
     if (m_autoMeasureState == AutoMeasureState::WaitingShot) {
         stopAutoMeasureSession();
         ui->comboBox_measureMode->setEnabled(true);
@@ -2569,25 +2603,13 @@ void MainWindow::on_action_stopMeasure_triggered()
         return;
     }
 
-    if (isTaskRunning){
-        if (startTimer->isActive())
-            startTimer->stop();
-
-        if (stopTimer->isActive())
-            stopTimer->stop();
-
-        isTaskRunning = false;
-    }
-
-    m_enableAutoMated = false;
-    machine->stop();
     ui->action_startMeasure->setEnabled(true);
     ui->action_stopMeasure->setEnabled(false);
     ui->comboBox_measureMode->setEnabled(true);
     ui->dateTimeEdit_startup->setEnabled(true);
     ui->dateTimeEdit_shutdown->setEnabled(true);
 
-    waveformPlotTimer->stop();
+    m_plotRefreshTimer->stop();
     commandHelper->stopMeasure();
     printWaveformCollectionSummary();
     printSpectrumSequenceSummary();
@@ -2765,14 +2787,20 @@ void MainWindow::on_radioButton_cps_clicked()
     refreshSpectrumPlot();
 }
 
-void MainWindow::onMeasureStarted()
+void MainWindow::onHardTriggeredSignalReceived()
 {
     // 硬触发模式：收到硬件触发后开始计时
-    const int measureMode = ui->comboBox_measureMode->currentIndex();
     if (m_autoMeasureState == AutoMeasureState::Measuring
-        && (measureMode == 1 || measureMode == 2)
+        && (m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode)
         && !m_autoMeasureDurationTimerStarted) {
         m_autoMeasureDurationTimerStarted = true;
+        resetMeasurementPlotData();
+        spectrumPlotThrottle.invalidate();
+        if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
+            ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+        } else {
+            ui->plotSpec->setXRange(1, 512);
+        }
         startMeasureDurationTimer();
         qInfo() << "收到硬件触发指令，开始测量倒计时:" << measureDurationMs() << "ms";
     }
@@ -2781,7 +2809,7 @@ void MainWindow::onMeasureStarted()
 #include <QRandomGenerator>
 CustomSurface* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title)
 {
-    const int channelCount = 16;
+    const int channelCount = 14;
     const int timePoints = 101;
     const float timeMin = 0.0f, timeMax = 10000.0f;
     const float valMin = 0.0f, valMax = 65536.0f;
@@ -2913,8 +2941,7 @@ CustomSurface* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wige
         const float valMin = 0.0f, valMax = 65536.0f;
 
         QVector<QVector<ChannelProfileEntry>> data;
-        data.resize(channelCount);
-
+        data.resize(16);
         for (int chIdx = 0; chIdx < channelCount; ++chIdx)
         {
             QVector<ChannelProfileEntry> entrys;
@@ -2948,16 +2975,20 @@ void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVec
 {
     const int channelCount = 16;
     const int timePoints = data[0].size();
-    float timeMin = 0.0f, timeMax = 10000.0f;
+    float timeMin = 0.0f, timeMax = 0.0f;
     float valMin = 0.0f, valMax = 0.0f;
 
     QtDataVisualization::QSurfaceDataArray *fullProfileData = new QtDataVisualization::QSurfaceDataArray();
     fullProfileData->reserve(timePoints);
 
+    int i = 0;
     for (int chIdx = 0; chIdx < channelCount; ++chIdx)
     {
+        if (chIdx == 7 || chIdx == 13) // 通道8本地 通道14Am-241
+            continue;
+
         auto &entrys = data[chIdx];//QVector<ChannelProfileEntry>
-        float fixedZ = chIdx * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
+        float fixedZ = i * 1.0f; // Z轴直接用0~15的索引，完全落在Z轴range内，不会被裁剪
         QtDataVisualization::QSurfaceDataRow* timeRow = new QtDataVisualization::QSurfaceDataRow(timePoints);
         for (int tIdx = 0; tIdx < entrys.size(); ++tIdx)
         {
@@ -2968,6 +2999,7 @@ void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVec
             (*timeRow)[tIdx] = QVector3D(timeMs, energy, fixedZ);
         }
 
+        i++;
         fullProfileData->append(timeRow);
     }
 
@@ -2978,4 +3010,107 @@ void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVec
     surface->axisX()->setRange(timeMin, timeMax);
     surface->axisY()->setRange(valMin, valMax*1.2);
     surface->seriesList().first()->dataProxy()->resetArray(fullProfileData);
+
+    m_currentProfileData[detectorIndex-1] = data;
+}
+
+void MainWindow::on_btn_exportProfile_clicked()
+{
+    for (int i=0; i<=1; ++i){
+        QString fileName = QString("%1/Fpga%2_%3_%4_%5_剖面数据.csv")
+            .arg(commandHelper->mSavePath)
+            .arg(i+1)
+            .arg(commandHelper->mShotTag)
+            .arg(commandHelper->mShotTimestamp)
+            .arg(commandHelper->m_detPara.measureTime);
+
+        const int channelCount = 16;
+        QFile file(fileName);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+            continue;
+
+        QTextStream out(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        out.setCodec("UTF-8");
+#endif
+
+        // 取第一个通道的能谱时间戳
+        const int timePoints = m_currentProfileData[i][0].size();
+        QStringList lines;
+        lines.append("channel");
+        for (int k=1; k<=timePoints; ++k){
+            auto &entrys = m_currentProfileData[i][0];
+            float timeMs = entrys[k-1].timeMs;
+            lines.append(QString::number(timeMs) + QStringLiteral("keV"));
+        }
+        out << lines.join(',') << Qt::endl;
+
+        for (int chIdx = 0; chIdx < channelCount; ++chIdx)
+        {
+            lines.clear();
+            lines.append(QString::number(chIdx+1));
+
+            auto &entrys = m_currentProfileData[i][chIdx];
+            for (int tIdx = 0; tIdx < entrys.size(); ++tIdx)
+            {
+                float energy = entrys[tIdx].energy;
+                lines.append(QString::number(energy));
+            }
+            out << lines.join(',') << Qt::endl;
+        }
+
+        file.close();
+    }
+
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("数据导出完成！\n文件存储路径；") + commandHelper->mSavePath);
+}
+
+QVector<QVector<MainWindow::SpectrumEntry>>& MainWindow::getSpectrumByChannel()
+{
+    if (mUsePrimaryPartition.load())
+        return m_spectrumByChannel;
+    else
+        return m_spectrumByChannelBackup;
+}
+
+QVector<QVector<MainWindow::WaveformEntry>>& MainWindow::getWaveformByChannel()
+{
+    if (mUsePrimaryPartition.load())
+        return m_waveformByChannel;
+    else
+        return m_waveformByChannelBackup;
+}
+
+void MainWindow::switchDataStoragePartition()
+{
+    if (mUsePrimaryPartition.load()){
+        std::thread([=]{
+            QElapsedTimer timer;
+            timer.start();
+
+            for (auto &channelSpectra : m_spectrumByChannel)
+                channelSpectra.clear();
+
+            for (auto &channelWaveforms : m_waveformByChannel)
+                channelWaveforms.clear();
+
+            qDebug() << "主分区数据已经清空，耗时" << timer.elapsed() << "ms";
+        }).detach();
+    }
+    else{
+        std::thread([=]{
+            QElapsedTimer timer;
+            timer.start();
+
+            for (auto &channelSpectra : m_spectrumByChannelBackup)
+                channelSpectra.clear();
+
+            for (auto &channelWaveforms : m_waveformByChannelBackup)
+                channelWaveforms.clear();
+
+            qDebug() << "副分区数据已经清空，耗时" << timer.elapsed() << "ms";
+        }).detach();
+    }
+
+    mUsePrimaryPartition.store(!mUsePrimaryPartition.load());
 }

@@ -14,6 +14,8 @@
 #include <QVector>
 #include "tcpclient.h"
 #include "globalsettings.h"
+#include "dataprocessor.h"
+
 struct CommandItem
 {
     QString name;      // 指令名称（中文或英文描述）
@@ -107,7 +109,13 @@ public:
     };
     QVector<energyCalib> m_channelEnergyCalib;
     void loadEnergyCalibration();// 加载能量刻度
-    bool saveChannelBoundaries(const QVector<QVector<quint16>>& channelBoundaries);
+    void saveChannelBoundary(const QVector<QVector<quint16>>&);
+
+    // 记录当前炮号和录像文件时间戳
+    QString mSavePath = "data"; //默认保存路径
+    QString mShotTag;
+    QString mShotTimestamp;
+    DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等
 
 private:
     // 初始化常用指令
@@ -121,6 +129,9 @@ private:
     
     // 读取网络配置，IP和port
     void loadIPConfig();
+
+    // 初始化数据处理器
+    void initDataProcessor();
 
     // 触发阈值
     QByteArray getCmdTriggerThold(quint16 ch1, quint16 ch2);
@@ -145,7 +156,6 @@ signals:
     void sigWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
                          const QVector<quint16>& samples);
 
-signals:
     //更新界面日志
     void sigAppendMsg(const QString &msg, QtMsgType msgType);
     // 继电器状态
@@ -177,7 +187,7 @@ signals:
 
     void sigOTAUpgradeData(quint8, const QByteArray& data); // 上报OTA升级数据
 
-    void sigMeasureStarted();
+    void sigHardTriggeredSignalReceived();
 
 public slots:
     // 继电器数据处理
@@ -191,9 +201,13 @@ public slots:
 
 private:
     TcpClient* client_fpga1_main; // FPGA主板1主网口(控制/能谱)
+    DataProcessor* dataProcessor_fpga1_main;
     TcpClient* client_fpga2_main; // FPGA主板2主网口(控制/能谱)
+    DataProcessor* dataProcessor_fpga2_main;
     TcpClient* client_fpga1_wave; // 副网口，仅接收波形（FPGA主板1）
+    DataProcessor* dataProcessor_fpga1_wave;
     TcpClient* client_fpga2_wave; // 副网口，仅接收波形（FPGA主板2）
+    DataProcessor* dataProcessor_fpga2_wave;
     TcpClient* client_arm1; //ARM设备1
     TcpClient* client_arm2; //ARM设备2
     TcpClient* client_relay; //继电器
@@ -216,13 +230,11 @@ private:
     
     //文件存储格式，.dat(二进制)或者.txt(文本)，默认.dat
     saveFileFormat mfileFormat = Binary;
-    QString mSavePath = "data"; //默认保存路径
     QString mShotNumber; // 当前炮号，用于数据文件命名
     QString mfileNameFpga1Main; // FPGA主板1主网口能谱数据文件名
     QString mfileNameFpga2Main; // FPGA主板2主网口能谱数据文件名
     QString mfileNameFpga1Wave; // FPGA主板1副网口波形数据文件名
     QString mfileNameFpga2Wave; // FPGA主板2副网口波形数据文件名
-    DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等
     QByteArray m_fpga1MainBuffer;
     QByteArray m_fpga2MainBuffer;
     QByteArray m_fpga1WaveBuffer;
@@ -233,11 +245,12 @@ private:
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
 
-    std::atomic_bool mHardTriggered[2] = {false, false};
+    //硬触发信号
+    std::atomic_bool mHardTriggered = false;
 
     bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;
-    quint8 mDetectorIndex = 1;
+    quint8 mCurrentUpgradeDetectorIndex = 1;
 
     QFile m_fpga1MainFile;
     QFile m_fpga2MainFile;
