@@ -1095,7 +1095,7 @@ void MainWindow::clearSpectrumData()
     //     channelSpectra.clear();
     for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
         channelSpectrumCounts.clear();
-    m_spectrumByChannel.fastClear();
+    m_spectrumByChannel.clear();
 
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setValue(0);
@@ -1111,7 +1111,7 @@ void MainWindow::clearWaveformData()
 {
     // for (auto &channelWaveforms : m_waveformByChannel)
     //     channelWaveforms.clear();
-    m_waveformByChannel.fastClear();
+    m_waveformByChannel.clear();
 
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setValue(0);
