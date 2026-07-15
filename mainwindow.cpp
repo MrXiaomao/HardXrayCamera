@@ -289,6 +289,10 @@ MainWindow::MainWindow(QWidget *parent)
             ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1) + QStringLiteral("(Am-241)"));
         else if (i<16)
             ui->cbb_channel->addItem(QStringLiteral("水平CH") + QString::number(i%16 + 1));
+        else if (i==23)
+            ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16 + 1) + QStringLiteral("(本底)"));
+        else if (i==29)
+            ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16 + 1) + QStringLiteral("(Am-241)"));
         else
             ui->cbb_channel->addItem(QStringLiteral("垂直CH") + QString::number(i%16 + 1));
     }
@@ -1101,7 +1105,6 @@ void MainWindow::printSpectrumSequenceSummary() const
 
 void MainWindow::clearSpectrumData()
 {
-
     // for (auto &channelSpectra : m_spectrumByChannel)
     //     channelSpectra.clear();
     // for (auto &channelSpectrumCounts : m_spectrumCountsByChannel)
@@ -1168,8 +1171,9 @@ void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint3
     SpectrumEntry entry;
     entry.detectorIndex = detectorIndex;
     entry.timeMs = timeMs;
-    entry.counts = counts;
-    m_spectrumByChannel[storageChannel - 1].append(entry);
+    //entry.counts = counts;
+    std::copy(counts.cbegin(), counts.cend(), entry.counts);
+    m_spectrumByChannel.append(storageChannel - 1, entry);
 
     SpectrumCountsEntry countsEntry;
     countsEntry.detectorIndex = detectorIndex;
@@ -1177,7 +1181,7 @@ void MainWindow::appendSpectrumData(int detectorIndex, int channelNumber, quint3
     countsEntry.count = 0;
     for (const auto& count: counts)
         countsEntry.count += count;
-    m_spectrumCountsByChannel[storageChannel - 1].append(countsEntry);
+    m_spectrumCountsByChannel.append(storageChannel - 1, countsEntry);
 }
 
 void MainWindow::appendWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -1190,8 +1194,9 @@ void MainWindow::appendWaveformData(int detectorIndex, int channelNumber, quint3
     WaveformEntry entry;
     entry.detectorIndex = detectorIndex;
     entry.timeUnits = timeUnits;
-    entry.samples = samples;
-    m_waveformByChannel[storageChannel - 1].append(entry);
+    //entry.samples = samples;
+    std::copy(samples.cbegin(), samples.cend(), entry.samples);
+    m_waveformByChannel.append(storageChannel - 1, entry);
 }
 
 void MainWindow::ensureSpectrumBinAddresses(int binCount)
@@ -1209,7 +1214,7 @@ void MainWindow::updateSpecIdSpinBoxRange()
 {
     const int channel = ui->cbb_channel->currentIndex() + 1;
     const int specCount = (channel >= 1 && channel <= m_spectrumByChannel.size())
-                              ? m_spectrumByChannel.at(channel - 1).size()
+                              ? m_spectrumByChannel.size(channel - 1)
                               : 0;
     const int maxSpecId = qMax(0, specCount - 1);
 
@@ -1224,7 +1229,7 @@ void MainWindow::updateWaveIdSpinBoxRange()
 {
     const int channel = ui->cbb_channel->currentIndex() + 1;
     const int waveCount = (channel >= 1 && channel <= m_waveformByChannel.size())
-                              ? m_waveformByChannel.at(channel - 1).size()
+                              ? m_waveformByChannel.size(channel - 1)
                               : 0;
     const int maxWaveId = qMax(0, waveCount - 1);
 
@@ -1241,7 +1246,7 @@ void MainWindow::syncSpectrumSpinBoxToLatest()
     if (channel < 1 || channel > m_spectrumByChannel.size())
         return;
 
-    const int maxSpecId = qMax(0, m_spectrumByChannel.at(channel - 1).size() - 1);
+    const int maxSpecId = qMax(0, m_spectrumByChannel.size(channel - 1) - 1);
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setMaximum(maxSpecId);
     ui->spb_specID->setValue(maxSpecId);
@@ -1254,7 +1259,7 @@ void MainWindow::syncWaveformSpinBoxToLatest()
     if (channel < 1 || channel > m_waveformByChannel.size())
         return;
 
-    const int maxWaveId = qMax(0, m_waveformByChannel.at(channel - 1).size() - 1);
+    const int maxWaveId = qMax(0, m_waveformByChannel.size(channel - 1) - 1);
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setMaximum(maxWaveId);
     ui->spb_waveID->setValue(maxWaveId);
@@ -1474,20 +1479,20 @@ void MainWindow::energyToBinRange16(double energyLeft, double energyRight,
         std::swap(binStart, binEnd);
 }
 
-quint64 MainWindow::sumCountsInBinRange(const QVector<quint32> &counts,
+quint64 MainWindow::sumCountsInBinRange(const quint32* counts, qint32 size,//const QVector<quint32> &counts,
                                         int binStart, int binEnd) const
 {
-    if (counts.isEmpty() || binStart < 1 || binEnd < binStart)
+    if (size==0 || binStart < 1 || binEnd < binStart)
         return 0;
 
     const int startIndex = binStart - 1;
-    const int endIndex = qMin(binEnd, counts.size()) - 1;
-    if (startIndex >= counts.size())
+    const int endIndex = qMin(binEnd, size) - 1;
+    if (startIndex >= size)
         return 0;
 
     quint64 total = 0;
     for (int i = startIndex; i <= endIndex; ++i)
-        total += counts.at(i);
+        total += counts[i];
     return total;
 }
 
@@ -1507,8 +1512,8 @@ void MainWindow::generateProfileSnapshots()
     }
 
     int profileCount = 0;
-    for (const QVector<SpectrumEntry> &channelSpectra : m_spectrumByChannel) {
-        profileCount = qMax(profileCount, channelSpectra.size());
+    for (int channelIdx=0; channelIdx<kSpectrumChannelCount; ++channelIdx){
+        profileCount = qMax(profileCount, m_spectrumByChannel.size(channelIdx));
     }
     if (profileCount <= 0) {
         QMessageBox::information(this, tr("提示"), tr("当前没有能谱数据，无法生成剖面分布"));
@@ -1558,7 +1563,7 @@ void MainWindow::generateProfileSnapshots()
             entrys.resize(profileCount);
             for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
                 const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
-                if (profileIndex >= spectra.size()) {
+                if (profileIndex >= m_spectrumByChannel.size(ch)) {
                     if (ch<16)
                         dataHor[ch%16] = entrys;
                     else
@@ -1568,7 +1573,7 @@ void MainWindow::generateProfileSnapshots()
 
                 const SpectrumEntry &entry = spectra.at(profileIndex);
                 entrys[profileIndex].timeMs = entry.timeMs;;
-                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, 512, binStarts.at(ch), binEnds.at(ch));
             }
 
             if (ch<16)
@@ -1590,7 +1595,7 @@ void MainWindow::generateProfileSnapshots()
             entrys.resize(profileCount);
             for (int profileIndex = 0; profileIndex < profileCount; ++profileIndex) {
                 const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(ch);
-                if (profileIndex >= spectra.size()) {
+                if (profileIndex >= m_spectrumByChannel.size(ch)) {
                     if (ch<16)
                         dataHor[ch%16] = entrys;
                     else
@@ -1600,7 +1605,7 @@ void MainWindow::generateProfileSnapshots()
 
                 const SpectrumEntry &entry = spectra.at(profileIndex);
                 entrys[profileIndex].timeMs = entry.timeMs;;
-                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, binStarts.at(ch), binEnds.at(ch));
+                entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, 16, binStarts.at(ch), binEnds.at(ch));
             }
 
             if (ch<16)
@@ -1665,7 +1670,7 @@ void MainWindow::refreshSpectrumPlot()
     }
 
     const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(channel - 1);
-    if (specId < 0 || specId >= spectra.size()) {
+    if (specId < 0 || specId >= m_spectrumByChannel.size(channel - 1)) {
         ui->plotSpec->clearData();
         ui->plotSpec->setTitle(QString("能谱 CH%1 #%2 (无数据)").arg(channel).arg(specId));
         ui->plotSpec->refreshPlot();
@@ -1681,9 +1686,10 @@ void MainWindow::refreshSpectrumPlot()
                                );
 
     const bool hxrMode = ui->cmb_transferMode->currentIndex() == 1;
-    const int displayBinCount = hxrMode
-                                    ? qMin(hxrDisplayBinCount(), entry.counts.size())
-                                    : entry.counts.size();
+    // const int displayBinCount = hxrMode
+    //                                 ? qMin(hxrDisplayBinCount(), 16)
+    //                                 : 512;
+    const int displayBinCount = mdetPara.transferMode == Order::TransferMode::Spectrum16 ? qMin(hxrDisplayBinCount(), 16) : 512;
     if (displayBinCount <= 0) {
         ui->plotSpec->clearData();
         ui->plotSpec->refreshPlot();
@@ -1707,13 +1713,21 @@ void MainWindow::refreshSpectrumPlot()
             }
         }
         ui->plotSpec->setXRange(1, displayBinCount);
+
+        QVector<quint32> counts;
+        counts.resize(displayBinCount);
+        memcpy(counts.data(), entry.counts, sizeof(quint32) * displayBinCount);
         ui->plotSpec->setData(spectrumEneryAddresses.mid(1, displayBinCount),
-                              entry.counts.mid(0, displayBinCount));
+                              counts);
     } else {
         for (const auto& addr : m_spectrumBinAddresses){
             spectrumEneryAddresses.push_back(addr*commandHelper->m_channelEnergyCalib[channel-1].k_calib + commandHelper->m_channelEnergyCalib[channel-1].b_calib);
         }
-        ui->plotSpec->setData(spectrumEneryAddresses, entry.counts);
+
+        QVector<quint32> counts;
+        counts.resize(displayBinCount);
+        memcpy(counts.data(), entry.counts, sizeof(quint32) * displayBinCount);
+        ui->plotSpec->setData(spectrumEneryAddresses, counts);
     }
     ui->plotSpec->refreshPlot();
 }
@@ -1732,15 +1746,17 @@ void MainWindow::refreshWaveformPlot()
     }
 
     const QVector<WaveformEntry> &waveforms = m_waveformByChannel.at(channel - 1);
-    if (waveId < 0 || waveId >= waveforms.size()) {
+    if (waveId < 0 || waveId >= m_waveformByChannel.size(channel - 1)) {
         ui->plotWave->clearData();
         ui->plotWave->setTitle(QString("波形 CH%1 #%2 (无数据)").arg(channel).arg(waveId));
         ui->plotWave->refreshPlot();
         return;
     }
 
-    const WaveformEntry &entry = waveforms.at(waveId);
-    const QVector<quint16> &samples = entry.samples;
+    const WaveformEntry &entry = waveforms.at(waveId);    
+    QVector<quint16> samples;
+    samples.resize(sizeof(entry.samples)/sizeof(quint16));
+    memcpy(samples.data(), entry.samples, sizeof(entry.samples));
     const int n = samples.size();
     const int waveLenNs = ui->spb_waveLen->value();
     const int displayCount =
@@ -1780,7 +1796,7 @@ void MainWindow::refreshSpectrumCountsPlot()
                            );
 
     QVector<double> xs(entry.size()), ys(entry.size());
-    for (int i = 0; i < entry.size(); ++i) {
+    for (int i = 0; i < m_spectrumCountsByChannel.size(channel - 1); ++i) {
         xs[i] = entry[i].timeMs;
         ys[i] = entry[i].count;
     }
@@ -1917,7 +1933,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     m_autoMeasureDurationTimerStarted = false;
 
     // 接收炮号不清空图像，等到接收到硬触发信号之后再清空图像
-    //resetMeasurementPlotData();
+    resetMeasurementPlotData();
     //spectrumPlotThrottle.invalidate();
 
     commandHelper->beginRecording(mdetPara);
@@ -1934,7 +1950,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     m_autoMeasureState = AutoMeasureState::Measuring;
     ui->action_stopMeasure->setEnabled(true);
     updateMeasureParamsGroupEnabled();
-    qInfo() << "炮号" << shotNumber << "触发自动测量，收到首个能谱后开始计时，时长:"
+    qInfo() << "炮号" << shotNumber << "触发自动测量，收到硬触发信号后开始计时，时长:"
             << measureDurationMs() << "ms";
 }
 
@@ -1966,7 +1982,7 @@ void MainWindow::triggerUnattendedMeasureFromShot(const QString &shotNumber)
     commandHelper->setShotNumber(shotNumber);
     m_autoMeasureDurationTimerStarted = false;
 
-    //resetMeasurementPlotData();
+    resetMeasurementPlotData();
     //spectrumPlotThrottle.invalidate();
 
     mdetPara.trigMode = Order::TriggerMode::HardwareTrigger;
@@ -2793,7 +2809,7 @@ void MainWindow::onHardTriggeredSignalReceived()
         && (m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode)
         && !m_autoMeasureDurationTimerStarted) {
         m_autoMeasureDurationTimerStarted = true;
-        resetMeasurementPlotData();
+        //resetMeasurementPlotData();//炮号来的时候就清空，节省时间
         //spectrumPlotThrottle.invalidate();
         if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
             ui->plotSpec->setXRange(1, hxrDisplayBinCount());

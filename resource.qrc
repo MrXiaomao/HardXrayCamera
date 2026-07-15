@@ -16,5 +16,6 @@
         <file>resource/surface.png</file>
         <file>resource/LOGO.ico</file>
         <file>resource/export.png</file>
+        <file>resource/data-upload.png</file>
     </qresource>
 </RCC>
