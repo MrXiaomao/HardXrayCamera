@@ -106,7 +106,7 @@ void DataProcessor::reset()
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
 {
-    if (mIsUpgrading.load() && mDetectorIndex == 1)
+    if (mIsUpgrading.load())
     {
         emit sigOTAUpgradeData(mDetectorIndex, binaryData);
         return;
@@ -125,7 +125,7 @@ void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
 // 处理FPGA主板2主网口能谱数据
 void DataProcessor::handleFpga2MainData(QByteArray &binaryData)
 {
-    if (mIsUpgrading.load() && mDetectorIndex == 2)
+    if (mIsUpgrading.load())
     {
         emit sigOTAUpgradeData(mDetectorIndex, binaryData);
         return;
@@ -142,7 +142,7 @@ void DataProcessor::handleFpga2MainData(QByteArray &binaryData)
 // 处理FPGA主板1副网口波形数据
 void DataProcessor::handleFpga1WaveData(QByteArray &binaryData)
 {
-    if (mIsUpgrading.load() && mDetectorIndex == 3)
+    if (mIsUpgrading.load())
     {
         emit sigOTAUpgradeData(mDetectorIndex, binaryData);
         return;
@@ -155,7 +155,7 @@ void DataProcessor::handleFpga1WaveData(QByteArray &binaryData)
 // 处理FPGA主板2副网口波形数据
 void DataProcessor::handleFpga2WaveData(QByteArray &binaryData)
 {
-    if (mIsUpgrading.load() && mDetectorIndex == 4)
+    if (mIsUpgrading.load())
     {
         emit sigOTAUpgradeData(mDetectorIndex, binaryData);
         return;
@@ -352,6 +352,7 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
             if (buffer.startsWith(hardTriggerCommand)){
                 buffer.remove(0, hardTriggerCommand.size());
 
+                qDebug().nospace() << "探测器#" << detectorIndex << "收到硬触发信号";
                 emit sigHardTriggeredSignalReceived();
                 mHardTriggered.store(true);
             }

@@ -1549,7 +1549,7 @@ void MainWindow::generateProfileSnapshots()
     dataHor.resize(16);
     dataVer.resize(16);
 
-    const bool spectrum512Mode = ui->cmb_transferMode->currentIndex() == 0;
+    const bool spectrum512Mode = mdetPara.transferMode == Order::TransferMode::Spectrum512;// ui->cmb_transferMode->currentIndex() == 0;
     if (spectrum512Mode){
         for (int ch = 0; ch < kProfileChannelCount; ++ch) {
             QVector<int> binStarts(kProfileChannelCount);
@@ -1572,7 +1572,7 @@ void MainWindow::generateProfileSnapshots()
                 }
 
                 const SpectrumEntry &entry = spectra.at(profileIndex);
-                entrys[profileIndex].timeMs = entry.timeMs;;
+                entrys[profileIndex].timeMs = entry.timeMs;
                 entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, 512, binStarts.at(ch), binEnds.at(ch));
             }
 
@@ -1604,7 +1604,7 @@ void MainWindow::generateProfileSnapshots()
                 }
 
                 const SpectrumEntry &entry = spectra.at(profileIndex);
-                entrys[profileIndex].timeMs = entry.timeMs;;
+                entrys[profileIndex].timeMs = entry.timeMs;
                 entrys[profileIndex].energy = sumCountsInBinRange(entry.counts, 16, binStarts.at(ch), binEnds.at(ch));
             }
 
@@ -2768,7 +2768,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 
     //确认是否退出
     int ret = QMessageBox::question(this, tr("系统退出提示"), tr("确定要退出软件系统吗？"),
-                                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                                    QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
     if (ret == QMessageBox::No) {
         event->ignore();
         return;
@@ -2805,6 +2805,7 @@ void MainWindow::on_radioButton_cps_clicked()
 void MainWindow::onHardTriggeredSignalReceived()
 {
     // 硬触发模式：收到硬件触发后开始计时
+    qDebug() << "MainWindow 收到硬触发指令！";
     if (m_autoMeasureState == AutoMeasureState::Measuring
         && (m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode)
         && !m_autoMeasureDurationTimerStarted) {
@@ -2829,12 +2830,23 @@ CustomSurface* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wige
     const float timeMin = 0.0f, timeMax = 10000.0f;
     const float valMin = 0.0f, valMax = 65536.0f;
 
+    // 在创建Q3DSurface实例前，先配置全局Surface格式
+    QSurfaceFormat format;
+    format.setSamples(8); // 开启8x MSAA多重采样抗锯齿
+    format.setDepthBufferSize(24); // 提升深度缓冲位宽
+    format.setStencilBufferSize(8);
+    QSurfaceFormat::setDefaultFormat(format);
+
     // 1. 创建3D曲面视图
     CustomSurface *surface = new CustomSurface();
     surface->setShadowQuality(QtDataVisualization::QAbstract3DGraph::ShadowQualityNone);
     surface->setSelectionMode(QtDataVisualization::QAbstract3DGraph::SelectionNone);
     surface->setHorizontalAspectRatio(1.0f);// 把X/Z平面的纵深比例
     surface->setAspectRatio(1.5f);//全局Y轴高度 / X-Z平面纵深的整体比例
+    // 禁用自动降采样优化，强制高质量渲染
+    surface->setOptimizationHints(QAbstract3DGraph::OptimizationDefault);
+    // 不要开启RenderToTexture模式，该模式会把整个图表渲染到低分辨率纹理，导致所有文本模糊
+    // surface->setRenderingMode(QAbstract3DGraph::RenderToTexture); // 这行代码一定要删掉
 
     // 嵌入到传入的容器控件
     QWidget *container = QWidget::createWindowContainer(surface);
@@ -2937,6 +2949,12 @@ CustomSurface* MainWindow::init3DSurface(const int& detectorIndex, QWidget* wige
 
     profileSeries->dataProxy()->resetArray(fullProfileData);
     surface->addSeries(profileSeries);
+
+    // 自定义场景主题，提升纹理采样质量
+    Q3DTheme *theme = surface->activeTheme();
+    theme->setType(Q3DTheme::ThemeQt);
+    // 关闭远距离自动淡化效果，避免画面整体发灰发虚
+    theme->setBackgroundEnabled(true);
 
     // 4. 优化视角 适合剖面观测
     surface->scene()->activeCamera()->setCameraPosition(
@@ -3078,5 +3096,42 @@ void MainWindow::on_btn_exportProfile_clicked()
     }
 
     QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("数据导出完成！\n文件存储路径；") + commandHelper->mSavePath);
+}
+
+
+#include "hdadataupload.h"
+void MainWindow::on_action_dataUpload_triggered()
+{
+    int ret = QMessageBox::question(this, tr("数据上传"), tr("确定要将数据上传到HDA服务器吗？"),
+                                    QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (ret == QMessageBox::No) {
+        return;
+    }
+
+    HDADataUpload hdaClient;
+    if (!hdaClient.connect()){
+        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("HDA服务器连接失败，数据无法上传！"));
+        return;
+    }
+
+    int recordCount = 0;
+    std::string shotTime = commandHelper->mShotTimestamp.toStdString();
+    for (int channelIdx=0; channelIdx<kSpectrumChannelCount; ++channelIdx){
+        const QVector<SpectrumCountsEntry> &entry = m_spectrumCountsByChannel.at(channelIdx);
+        if (entry.size() > 0){
+            std::vector<double> time/*时间ms*/;
+            std::vector<double> values/*能谱计数率*/;
+            for (int i = 0; i < m_spectrumCountsByChannel.size(channelIdx); ++i) {
+                time.push_back(entry[i].timeMs);
+                values.push_back(entry[i].count);
+                recordCount++;
+            }
+
+            hdaClient.startUploadSpectrumCpsData(m_currentShotNumber.toInt(), shotTime, channelIdx+1, time, values);
+        }
+    }
+
+    hdaClient.disconnect();
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("数据上传完毕，本次上传记录数共%1条！").arg(recordCount));
 }
 

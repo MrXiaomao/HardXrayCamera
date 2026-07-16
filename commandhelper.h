@@ -248,7 +248,7 @@ private:
     //硬触发信号
     std::atomic_bool mHardTriggered = false;
 
-    bool measure_started = false;
+    std::atomic_bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;
     quint8 mCurrentUpgradeDetectorIndex = 1;
 

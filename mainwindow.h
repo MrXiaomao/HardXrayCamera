@@ -344,6 +344,8 @@ private slots:
 
     void on_btn_exportProfile_clicked();
 
+    void on_action_dataUpload_triggered();
+
 private:
     struct EnergyCalibration {
         double k = 1.0;

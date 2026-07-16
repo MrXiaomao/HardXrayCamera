@@ -528,7 +528,7 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
     m_fpga2MainBuffer.clear();
     m_fpga1WaveBuffer.clear();
     m_fpga2WaveBuffer.clear();
-    measure_started = true;
+    measure_started.store(true);
     m_detPara = measurement;
 
     mShotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
@@ -620,7 +620,7 @@ void CommandHelper::stopMeasure()
     sendSpectrumControl(Order::Stop);
 
     QMutexLocker locker(&m_measurementMutex);
-    measure_started = false;
+    measure_started.store(false);
     closeMeasurementFilesLocked();
 
     qDebug() << "测量停止";
@@ -1417,6 +1417,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
+            qDebug() << "CommandHelper 收到#1硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }
@@ -1469,6 +1470,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
+            qDebug() << "CommandHelper 收到#2硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }

@@ -56,11 +56,6 @@ public slots:
 private:
     QThread m_workThread;
 
-    // QByteArray m_fpga1MainBuffer;
-    // QByteArray m_fpga2MainBuffer;
-    // QByteArray m_fpga1WaveBuffer;
-    // QByteArray m_fpga2WaveBuffer;
-
     // 线程退出标识
     std::atomic_bool m_stop = false;
     std::atomic_bool m_hasPendingData = false;

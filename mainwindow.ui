@@ -2155,6 +2155,7 @@
      <string>工具</string>
     </property>
     <addaction name="actionFPGA"/>
+    <addaction name="action_dataUpload"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menu_2"/>
@@ -2371,7 +2372,7 @@
      <normaloff>:/resource/data-upload.png</normaloff>:/resource/data-upload.png</iconset>
    </property>
    <property name="text">
-    <string>数据上传</string>
+    <string>HDA服务器数据上传</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>

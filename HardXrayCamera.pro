@@ -131,3 +131,10 @@ include($$PWD/QGoodWindow/QGoodWindowHelper/QGoodWindowHelper.pri)
 
 # 3D剖面图
 QT += datavisualization 3dextras
+
+# HDA服务器数据上传
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/ -lhda_client
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/ -lhda_client
+
+INCLUDEPATH += $$PWD/.
+DEPENDPATH += $$PWD/.
