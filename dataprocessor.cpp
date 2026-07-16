@@ -48,7 +48,6 @@ double DataProcessor::parseArm2Temperature(quint8 highByte, quint8 lowByte)
 
 void DataProcessor::onProcessLoop()
 {
-    QByteArray pendingData;
     while (!m_stop) {
         {
             QMutexLocker locker(&m_dataMutex);
@@ -59,24 +58,24 @@ void DataProcessor::onProcessLoop()
             if (m_stop) break;
 
             // 取出所有缓存数据一次性处理
-            pendingData.append(m_cacheBuffer);
+            m_pendingData.append(m_cacheBuffer);
             m_cacheBuffer.clear();
             m_hasPendingData = false;
         }
         // 解锁后处理，缩小锁区间提升并发性能
 
-        if (pendingData.size() <= 0)
+        if (m_pendingData.size() <= 0)
             continue;
 
         // 处理数据
         if (mDetectorIndex==1)
-            handleFpga1MainData(pendingData);
+            handleFpga1MainData(m_pendingData);
         else if (mDetectorIndex==2)
-            handleFpga2MainData(pendingData);
+            handleFpga2MainData(m_pendingData);
         else if (mDetectorIndex==3)
-            handleFpga1WaveData(pendingData);
+            handleFpga1WaveData(m_pendingData);
         else if (mDetectorIndex==4)
-            handleFpga2WaveData(pendingData);
+            handleFpga2WaveData(m_pendingData);
     }
 }
 
@@ -102,6 +101,12 @@ void DataProcessor::setTriggerMode(Order::TriggerMode mode)
 void DataProcessor::reset()
 {
     mHardTriggered.store(false);
+    m_pendingData.clear();
+
+    if (mDetectorIndex==3)
+        qDebug() << "1#硬触发信号已重置";
+    else
+        qDebug() << "2#硬触发信号已重置";
 }
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
@@ -349,7 +354,7 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
             const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
 
             // 波形数据来临之前先判断硬触发信号
-            if (buffer.startsWith(hardTriggerCommand)){
+            if (buffer.contains(hardTriggerCommand)){
                 buffer.remove(0, hardTriggerCommand.size());
 
                 qDebug().nospace() << "探测器#" << detectorIndex << "收到硬触发信号";

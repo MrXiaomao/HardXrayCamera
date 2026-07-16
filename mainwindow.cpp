@@ -1079,7 +1079,7 @@ void MainWindow::printWaveformCollectionSummary() const
         for (quint32 missingSequence : missingSequences)
             missingLabels << QString::number(missingSequence);
 
-        qInfo() << QString("通道%1缺失波形序号: %2")
+        qWarning() << QString("通道%1缺失波形序号: %2")
             .arg(channel)
             .arg(missingLabels.join(", "));
     }
@@ -1097,7 +1097,7 @@ void MainWindow::printSpectrumSequenceSummary() const
         for (quint32 missingSequence : missingSequences)
             missingLabels << QString::number(missingSequence);
 
-        qInfo() << QString("通道%1缺失能谱序号: %2")
+        qWarning() << QString("通道%1缺失能谱序号: %2")
             .arg(channel)
             .arg(missingLabels.join(", "));
     }

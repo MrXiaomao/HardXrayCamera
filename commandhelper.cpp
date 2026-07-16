@@ -377,8 +377,6 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
 {
     m_detPara = measurement;
     mHardTriggered.store(false);
-    dataProcessor_fpga1_main->reset();
-    dataProcessor_fpga2_main->reset();
     dataProcessor_fpga1_wave->reset();
     dataProcessor_fpga2_wave->reset();
     dataProcessor_fpga1_main->setTransferMode(measurement.transferMode);
@@ -390,6 +388,7 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
     dataProcessor_fpga2_wave->setTransferMode(measurement.transferMode);
     dataProcessor_fpga2_wave->setTriggerMode(measurement.trigMode);
 
+    qDebug().noquote().nospace() << "测量模式：" << (Order::TriggerMode::HardwareTrigger ? QStringLiteral("硬触发模式") : QStringLiteral("软触发模式"));
     sendCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
                 "传输模式设置",
                 QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),

@@ -56,6 +56,8 @@ public slots:
 private:
     QThread m_workThread;
 
+    QByteArray m_pendingData;
+
     // 线程退出标识
     std::atomic_bool m_stop = false;
     std::atomic_bool m_hasPendingData = false;
