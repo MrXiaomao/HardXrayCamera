@@ -550,25 +550,25 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
 
     mShotTag = mShotNumber.isEmpty() ? QStringLiteral("00000") : mShotNumber;
     mShotTimestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-    mfileNameFpga1Main = QString("%1/Fpga1_%2_%3_%4_spec.%5")
+    mfileNameFpga1Main = QString("%1/水平_%2_%3_%4_spec.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
                              .arg(mfileFormat == Binary ? "dat" : "csv");
-    mfileNameFpga2Main = QString("%1/Fpga2_%2_%3_%4_spec.%5")
+    mfileNameFpga2Main = QString("%1/垂直_%2_%3_%4_spec.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
                              .arg(mfileFormat == Binary ? "dat" : "csv");
-    mfileNameFpga1Wave = QString("%1/Fpga1_%2_%3_%4_wave.%5")
+    mfileNameFpga1Wave = QString("%1/水平_%2_%3_%4_wave.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
                              .arg(m_detPara.measureTime)
                              .arg(mfileFormat == Binary ? "dat" : "csv");
-    mfileNameFpga2Wave = QString("%1/Fpga2_%2_%3_%4_wave.%5")
+    mfileNameFpga2Wave = QString("%1/垂直_%2_%3_%4_wave.%5")
                              .arg(mSavePath)
                              .arg(mShotTag)
                              .arg(mShotTimestamp)
@@ -606,12 +606,13 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
 
 void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
 {
-    sendCommand(client_fpga1_main, Order::controlSpectrum(mode),
-                "能谱测量控制",
-                QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort), triggerModeText(mode)));
+    // 先垂直相机，再水平相机，缩短两机进入硬触发等待的时间差
     sendCommand(client_fpga2_main, Order::controlSpectrum(mode),
                 "能谱测量控制",
                 QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort), triggerModeText(mode)));
+    sendCommand(client_fpga1_main, Order::controlSpectrum(mode),
+                "能谱测量控制",
+                QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort), triggerModeText(mode)));
 }
 
 void CommandHelper::startMeasure(DetParameter detPara)
@@ -698,13 +699,13 @@ void CommandHelper::sendTriggerSignalTimeWidth(quint8 detectorIndex, quint16 tim
     const quint16 timeWidth16ns = (quint32)timeWidth * 16 / 16;
     if (detectorIndex & 0x01){
         sendCommand(client_fpga1_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
-                "板卡#1触发信号宽度",
+                "水平相机触发信号宽度",
                 QString("%1 ns").arg(timeWidth16ns));
     }
 
     if (detectorIndex & 0x10){
         sendCommand(client_fpga2_main, Order::setTriggerSignalTimeWidth(timeWidth16ns),
-                "板卡#2触发信号宽度",
+                "垂直相机触发信号宽度",
                 QString("%1 ns").arg(timeWidth16ns));
     }
 }
@@ -916,7 +917,8 @@ void CommandHelper::processSpec512Data(int detectorIndex, QByteArray& buffer, co
         if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             // 包尾不对，继续寻找下一个包头
             buffer.remove(0, SpectrumHeader.size());
-            qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
+            qWarning() << "Invalid 512-bin spectrum packet tail from"
+                       << (detectorIndex == 1 ? "水平相机" : "垂直相机");
             continue;
         }
 
@@ -981,7 +983,8 @@ void CommandHelper::processSpec16Data(int detectorIndex, QByteArray& buffer, con
         const QByteArray packet = buffer.left(Spectrum16PacketSize);
         if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
             buffer.remove(0, SpectrumHeader.size());
-            qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+            qWarning() << "Invalid 16-bin spectrum packet tail from"
+                       << (detectorIndex == 1 ? "水平相机" : "垂直相机");
             continue;
         }
 
@@ -1001,7 +1004,8 @@ bool CommandHelper::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     const quint32 timeMs = readUInt16BE(packet.constData() + 4);
     const int channelNumber = channelNumberFromMask(channelMask);
     if (channelNumber < 1 || channelNumber > 16) {
-        qWarning() << "Invalid 16-bin spectrum channel from detector" << detectorIndex
+        qWarning() << "Invalid 16-bin spectrum channel from"
+                   << (detectorIndex == 1 ? "水平相机" : "垂直相机")
                    << "raw:" << channelMask;
         return false;
     }
@@ -1091,7 +1095,9 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
             const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
             const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
             const int channelNumber = channelNumberFromMask(channelMask);
-            qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+            qWarning() << "Invalid waveform packet tail from"
+                       << (detectorIndex == 1 ? "水平相机" : "垂直相机")
+                       << "Channel:" << channelNumber << "Time(units):" << timeUnits;
             continue;
         }
 
@@ -1448,7 +1454,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            qDebug() << "CommandHelper 收到#1硬触发指令！";
+            qDebug() << "CommandHelper 水平相机收到硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }
@@ -1501,7 +1507,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            qDebug() << "CommandHelper 收到#2硬触发指令！";
+            qDebug() << "CommandHelper 垂直相机收到硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }

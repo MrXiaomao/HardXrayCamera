@@ -97,7 +97,7 @@ public:
     void startOTAUpgrade(quint8 index);
     bool sendOTAUpgradeData(quint8 index, const QByteArray& data);
     void endOTAUpgrade(quint8 index);
-    // index 1=FPGA1主网口, 2=FPGA2主网口
+    // index 1=水平相机主网口, 2=垂直相机主网口
     bool isDetectorConnected(int index) const;
 
     // 设置触发信号时间宽度
@@ -231,10 +231,10 @@ private:
     //文件存储格式，.dat(二进制)或者.txt(文本)，默认.dat
     saveFileFormat mfileFormat = Binary;
     QString mShotNumber; // 当前炮号，用于数据文件命名
-    QString mfileNameFpga1Main; // FPGA主板1主网口能谱数据文件名
-    QString mfileNameFpga2Main; // FPGA主板2主网口能谱数据文件名
-    QString mfileNameFpga1Wave; // FPGA主板1副网口波形数据文件名
-    QString mfileNameFpga2Wave; // FPGA主板2副网口波形数据文件名
+    QString mfileNameFpga1Main; // 水平相机主网口能谱数据文件名
+    QString mfileNameFpga2Main; // 垂直相机主网口能谱数据文件名
+    QString mfileNameFpga1Wave; // 水平相机副网口波形数据文件名
+    QString mfileNameFpga2Wave; // 垂直相机副网口波形数据文件名
     QByteArray m_fpga1MainBuffer;
     QByteArray m_fpga2MainBuffer;
     QByteArray m_fpga1WaveBuffer;

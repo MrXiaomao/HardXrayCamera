@@ -121,13 +121,13 @@ void DataProcessor::reset()
     }
 
     if (mDetectorIndex == 1)
-        qDebug() << "1#能谱收包缓存已重置";
+        qDebug() << "水平相机能谱收包缓存已重置";
     else if (mDetectorIndex == 2)
-        qDebug() << "2#能谱收包缓存已重置";
+        qDebug() << "垂直相机能谱收包缓存已重置";
     else if (mDetectorIndex == 3)
-        qDebug() << "1#硬触发信号已重置";
+        qDebug() << "水平相机硬触发信号已重置";
     else if (mDetectorIndex == 4)
-        qDebug() << "2#硬触发信号已重置";
+        qDebug() << "垂直相机硬触发信号已重置";
 }
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
@@ -210,7 +210,8 @@ void DataProcessor::processSpec512Data(int detectorIndex, QByteArray& buffer)
 
             // 接着判断包尾
             if (buffer.mid(offset + Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
-                qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
+                qWarning() << "Invalid 512-bin spectrum packet tail from"
+                           << (detectorIndex == 1 ? "水平相机" : "垂直相机");
 
                 offset += static_cast<int>(SpectrumHeader.size());
                 continue;
@@ -248,7 +249,8 @@ void DataProcessor::processSpec512Data(int detectorIndex, QByteArray& buffer)
     //     if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
     //         // 包尾不对，继续寻找下一个包头
     //         buffer.remove(0, SpectrumHeader.size());
-    //         qWarning() << "Invalid 512-bin spectrum packet tail from detector" << detectorIndex;
+    //         qWarning() << "Invalid 512-bin spectrum packet tail from"
+    //                    << (detectorIndex == 1 ? "水平相机" : "垂直相机");
     //         continue;
     //     }
 
@@ -299,7 +301,8 @@ void DataProcessor::processSpec16Data(int detectorIndex, QByteArray& buffer)
 
             // 接着判断包尾
             if (buffer.mid(offset + Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
-                qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+                qWarning() << "Invalid 16-bin spectrum packet tail from"
+                           << (detectorIndex == 1 ? "水平相机" : "垂直相机");
 
                 offset += static_cast<int>(SpectrumHeader.size());
                 continue;
@@ -336,7 +339,8 @@ void DataProcessor::processSpec16Data(int detectorIndex, QByteArray& buffer)
     //     const QByteArray packet = buffer.left(Spectrum16PacketSize);
     //     if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
     //         buffer.remove(0, SpectrumHeader.size());
-    //         qWarning() << "Invalid 16-bin spectrum packet tail from detector" << detectorIndex;
+    //         qWarning() << "Invalid 16-bin spectrum packet tail from"
+    //                    << (detectorIndex == 1 ? "水平相机" : "垂直相机");
     //         continue;
     //     }
 
@@ -351,7 +355,8 @@ bool DataProcessor::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     const quint32 timeMs = readUInt16BE(packet.constData() + 4);
     const int channelNumber = channelNumberFromMask(channelMask);
     if (channelNumber < 1 || channelNumber > 16) {
-        qWarning() << "Invalid 16-bin spectrum channel from detector" << detectorIndex
+        qWarning() << "Invalid 16-bin spectrum channel from"
+                   << (detectorIndex == 1 ? "水平相机" : "垂直相机")
                    << "raw:" << channelMask;
         return false;
     }
@@ -381,7 +386,9 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
             if (idx >= 0) {
                 buffer.remove(0, idx + cmdSize);
 
-                qDebug().nospace() << "探测器#" << detectorIndex << "收到硬触发信号";
+                qDebug().nospace()
+                    << (detectorIndex == 1 ? "水平相机" : "垂直相机")
+                    << "收到硬触发信号";
                 emit sigHardTriggeredSignalReceived();
                 mHardTriggered.store(true);
             } else {
@@ -426,7 +433,9 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
                 const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
                 const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
                 const int channelNumber = channelNumberFromMask(channelMask);
-                //qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+                //qWarning() << "Invalid waveform packet tail from"
+                //           << (detectorIndex == 1 ? "水平相机" : "垂直相机")
+                //           << "Channel:" << channelNumber << "Time(units):" << timeUnits;
 
                 offset += static_cast<int>(WaveformHeader.size());
                 continue;
@@ -480,7 +489,9 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
     //         const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
     //         const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
     //         const int channelNumber = channelNumberFromMask(channelMask);
-    //         qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+    //         qWarning() << "Invalid waveform packet tail from"
+    //                    << (detectorIndex == 1 ? "水平相机" : "垂直相机")
+    //                    << "Channel:" << channelNumber << "Time(units):" << timeUnits;
     //         continue;
     //     }
 

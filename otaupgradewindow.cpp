@@ -165,12 +165,12 @@ void OTAUpgradeWindow::on_pushButton_ok_clicked()
         return;
     }
 
-    // 检测所选 FPGA 主网口是否已连接（det1=FPGA1, det2=FPGA2）
+    // 检测所选主网口是否已连接（det1=水平相机, det2=垂直相机）
     for (const auto index : validIndexes) {
         if (!commHelper->isDetectorConnected(index)) {
-            const QString fpgaName = (index == 1) ? tr("FPGA1主网口") : tr("FPGA2主网口");
+            const QString cameraName = (index == 1) ? tr("水平相机主网口") : tr("垂直相机主网口");
             QMessageBox::warning(this, tr("OTA程序升级提示"),
-                                 tr("%1未连接！请先连接网络后再执行更新。").arg(fpgaName));
+                                 tr("%1未连接！请先连接网络后再执行更新。").arg(cameraName));
             return;
         }
     }

@@ -3053,9 +3053,9 @@ void MainWindow::onShowProfileChart(const int& detectorIndex, const QVector<QVec
 void MainWindow::on_btn_exportProfile_clicked()
 {
     for (int i=0; i<=1; ++i){
-        QString fileName = QString("%1/Fpga%2_%3_%4_%5_剖面数据.csv")
+        QString fileName = QString("%1/%2_%3_%4_%5_剖面数据.csv")
             .arg(commandHelper->mSavePath)
-            .arg(i+1)
+            .arg(i == 0 ? QStringLiteral("水平") : QStringLiteral("垂直"))
             .arg(commandHelper->mShotTag)
             .arg(commandHelper->mShotTimestamp)
             .arg(commandHelper->m_detPara.measureTime);
