@@ -1,5 +1,6 @@
 ﻿#include "dataprocessor.h"
 #include <QDebug>
+#include <cstring>
 
 DataProcessor::DataProcessor(quint8 detectorIndex, QObject *parent)
     : QObject{parent}
@@ -49,6 +50,8 @@ double DataProcessor::parseArm2Temperature(quint8 highByte, quint8 lowByte)
 void DataProcessor::onProcessLoop()
 {
     while (!m_stop) {
+        QByteArray localData;
+        quint64 epoch = 0;
         {
             QMutexLocker locker(&m_dataMutex);
             // 缓存为空则等待新数据
@@ -57,25 +60,33 @@ void DataProcessor::onProcessLoop()
             }
             if (m_stop) break;
 
-            // 取出所有缓存数据一次性处理
+            // 取出所有缓存数据到本地副本后解锁处理，避免与 reset()/inputData 竞态
             m_pendingData.append(m_cacheBuffer);
             m_cacheBuffer.clear();
             m_hasPendingData = false;
+            localData.swap(m_pendingData);
+            epoch = m_resetEpoch.load();
         }
-        // 解锁后处理，缩小锁区间提升并发性能
 
-        if (m_pendingData.size() <= 0)
+        if (localData.isEmpty())
             continue;
 
         // 处理数据
         if (mDetectorIndex==1)
-            handleFpga1MainData(m_pendingData);
+            handleFpga1MainData(localData);
         else if (mDetectorIndex==2)
-            handleFpga2MainData(m_pendingData);
+            handleFpga2MainData(localData);
         else if (mDetectorIndex==3)
-            handleFpga1WaveData(m_pendingData);
+            handleFpga1WaveData(localData);
         else if (mDetectorIndex==4)
-            handleFpga2WaveData(m_pendingData);
+            handleFpga2WaveData(localData);
+
+        // 未凑齐的半包写回；若期间已 reset，则丢弃残留
+        if (!localData.isEmpty()) {
+            QMutexLocker locker(&m_dataMutex);
+            if (epoch == m_resetEpoch.load())
+                m_pendingData.swap(localData);
+        }
     }
 }
 
@@ -101,11 +112,21 @@ void DataProcessor::setTriggerMode(Order::TriggerMode mode)
 void DataProcessor::reset()
 {
     mHardTriggered.store(false);
-    m_pendingData.clear();
+    {
+        QMutexLocker locker(&m_dataMutex);
+        ++m_resetEpoch;
+        m_pendingData.clear();
+        m_cacheBuffer.clear();
+        m_hasPendingData = false;
+    }
 
-    if (mDetectorIndex==3)
+    if (mDetectorIndex == 1)
+        qDebug() << "1#能谱收包缓存已重置";
+    else if (mDetectorIndex == 2)
+        qDebug() << "2#能谱收包缓存已重置";
+    else if (mDetectorIndex == 3)
         qDebug() << "1#硬触发信号已重置";
-    else
+    else if (mDetectorIndex == 4)
         qDebug() << "2#硬触发信号已重置";
 }
 
@@ -351,18 +372,34 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
     if (m_trigMode == Order::TriggerMode::HardwareTrigger){
         if (!mHardTriggered.load())
         {
-            const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+            static const QByteArray hardTriggerCommand =
+                QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+            const int cmdSize = hardTriggerCommand.size();
 
-            // 波形数据来临之前先判断硬触发信号
-            if (buffer.contains(hardTriggerCommand)){
-                buffer.remove(0, hardTriggerCommand.size());
+            // 波形数据来临之前先判断硬触发信号（按实际位置切除，避免 TCP 半包被误清）
+            const int idx = buffer.indexOf(hardTriggerCommand);
+            if (idx >= 0) {
+                buffer.remove(0, idx + cmdSize);
 
                 qDebug().nospace() << "探测器#" << detectorIndex << "收到硬触发信号";
                 emit sigHardTriggeredSignalReceived();
                 mHardTriggered.store(true);
-            }
-            else {
-                buffer.clear();
+            } else {
+                // 保留可能构成指令前缀的尾部，等待后续字节拼完整包；其余噪声丢弃
+                int keep = 0;
+                const int maxKeep = cmdSize - 1;
+                for (int len = qMin(maxKeep, buffer.size()); len >= 1; --len) {
+                    if (memcmp(hardTriggerCommand.constData(),
+                               buffer.constData() + buffer.size() - len,
+                               static_cast<size_t>(len)) == 0) {
+                        keep = len;
+                        break;
+                    }
+                }
+                if (keep > 0)
+                    buffer.remove(0, buffer.size() - keep);
+                else
+                    buffer.clear();
                 return;
             }
         }
@@ -389,7 +426,7 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
                 const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
                 const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
                 const int channelNumber = channelNumberFromMask(channelMask);
-                qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
+                //qWarning() << "Invalid waveform packet tail from detector" << detectorIndex << "Channel:" << channelNumber << "Time(units):" << timeUnits;
 
                 offset += static_cast<int>(WaveformHeader.size());
                 continue;

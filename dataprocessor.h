@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QThread>
 #include <QWaitCondition>
+#include <atomic>
 #include "order.h"
 
 class DataProcessor : public QObject
@@ -61,6 +62,8 @@ private:
     // 线程退出标识
     std::atomic_bool m_stop = false;
     std::atomic_bool m_hasPendingData = false;
+    // reset() 时递增，避免处理线程把残留半包写回已清空的缓冲
+    std::atomic<quint64> m_resetEpoch{0};
     QWaitCondition m_condData;
 
     QByteArray m_cacheBuffer;

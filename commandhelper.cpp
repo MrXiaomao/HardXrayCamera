@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QDir>
 #include <QMutexLocker>
+#include <cstring>
 // #include <algorithm>
 // #include <chrono>
 // #include <random>
@@ -377,8 +378,14 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
 {
     m_detPara = measurement;
     mHardTriggered.store(false);
-    dataProcessor_fpga1_wave->reset();
-    dataProcessor_fpga2_wave->reset();
+    if (dataProcessor_fpga1_main)
+        dataProcessor_fpga1_main->reset();
+    if (dataProcessor_fpga2_main)
+        dataProcessor_fpga2_main->reset();
+    if (dataProcessor_fpga1_wave)
+        dataProcessor_fpga1_wave->reset();
+    if (dataProcessor_fpga2_wave)
+        dataProcessor_fpga2_wave->reset();
     dataProcessor_fpga1_main->setTransferMode(measurement.transferMode);
     dataProcessor_fpga1_main->setTriggerMode(measurement.trigMode);
     dataProcessor_fpga2_main->setTransferMode(measurement.transferMode);
@@ -521,6 +528,17 @@ void CommandHelper::saveChannelBoundary(const QVector<QVector<quint16>>& channel
 
 void CommandHelper::beginRecording(const DetParameter &measurement)
 {
+    // 开录前重置硬触发状态与收包缓存，避免等待炮号期间的残留数据影响本炮
+    mHardTriggered.store(false);
+    if (dataProcessor_fpga1_main)
+        dataProcessor_fpga1_main->reset();
+    if (dataProcessor_fpga2_main)
+        dataProcessor_fpga2_main->reset();
+    if (dataProcessor_fpga1_wave)
+        dataProcessor_fpga1_wave->reset();
+    if (dataProcessor_fpga2_wave)
+        dataProcessor_fpga2_wave->reset();
+
     QMutexLocker locker(&m_measurementMutex);
     closeMeasurementFilesLocked();
     m_fpga1MainBuffer.clear();
@@ -567,10 +585,10 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
     m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
 
     qInfo()<<"数据保存路径:"<<mSavePath;
-    qInfo()<<"水平相机能谱数据文件名:"<<QFileInfo(mfileNameFpga1Main).fileName();;
-    qInfo()<<"垂直相机能谱数据文件名:"<<QFileInfo(mfileNameFpga2Main).fileName();
-    qInfo()<<"水平相机波形数据文件名:"<<QFileInfo(mfileNameFpga1Wave).fileName();
-    qInfo()<<"垂直相机波形数据文件名:"<<QFileInfo(mfileNameFpga2Wave).fileName();
+    qDebug()<<"水平相机能谱数据文件名:"<<QFileInfo(mfileNameFpga1Main).fileName();
+    qDebug()<<"垂直相机能谱数据文件名:"<<QFileInfo(mfileNameFpga2Main).fileName();
+    qDebug()<<"水平相机波形数据文件名:"<<QFileInfo(mfileNameFpga1Wave).fileName();
+    qDebug()<<"垂直相机波形数据文件名:"<<QFileInfo(mfileNameFpga2Wave).fileName();
 
     if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
         qWarning() << "水平相机能谱数据创建失败，文件名：" << mfileNameFpga1Main;
@@ -1019,20 +1037,34 @@ void CommandHelper::processWaveformData(int detectorIndex, QByteArray& buffer, c
     if (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger){
         if (!mHardTriggered.load())
         {
-            const QByteArray hardTriggerCommand = QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+            static const QByteArray hardTriggerCommand =
+                QByteArray::fromHex("12 34 00 AB FF C0 00 00 00 01 AB CD");
+            const int cmdSize = hardTriggerCommand.size();
 
-            // 波形数据来临之前先判断硬触发信号
-            if (buffer.contains(hardTriggerCommand)){
-                buffer.remove(0, hardTriggerCommand.size());
+            // 按实际位置切除硬触发指令；半包时保留前缀，避免误清导致丢触发
+            const int idx = buffer.indexOf(hardTriggerCommand);
+            if (idx >= 0) {
+                buffer.remove(0, idx + cmdSize);
 
-                if (!mHardTriggered){
+                if (!mHardTriggered.load()) {
                     emit sigHardTriggeredSignalReceived();
                 }
-
                 mHardTriggered.store(true);
-            }
-            else {
-                buffer.clear();
+            } else {
+                int keep = 0;
+                const int maxKeep = cmdSize - 1;
+                for (int len = qMin(maxKeep, buffer.size()); len >= 1; --len) {
+                    if (memcmp(hardTriggerCommand.constData(),
+                               buffer.constData() + buffer.size() - len,
+                               static_cast<size_t>(len)) == 0) {
+                        keep = len;
+                        break;
+                    }
+                }
+                if (keep > 0)
+                    buffer.remove(0, buffer.size() - keep);
+                else
+                    buffer.clear();
                 return;
             }
         }
@@ -1439,10 +1471,10 @@ void CommandHelper::initDataProcessor()
                 //     //fpgaWaveFile[detectorIndex-1]->flush();
                 // }
                 if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    static QByteArray m_reusableLineBuffer;
-                    QByteArray& lineBuffer = m_reusableLineBuffer; // 把这个变量作为类成员，全程复用不释放
+                    // 各波形处理线程独立缓冲，避免两路 DirectConnection 并发写同一 static 导致竞态
+                    thread_local QByteArray lineBuffer;
                     lineBuffer.clear();
-                    lineBuffer.reserve(4096); // 预分配固定4K缓冲，足够存下一行582个数字+逗号
+                    lineBuffer.reserve(4096);
 
                     appendNumber(lineBuffer, timeUnits/10);
                     lineBuffer.append(',');
@@ -1492,10 +1524,9 @@ void CommandHelper::initDataProcessor()
                 //     //fpgaWaveFile[detectorIndex-3]->flush();
                 // }
                 if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    static QByteArray m_reusableLineBuffer;
-                    QByteArray& lineBuffer = m_reusableLineBuffer; // 把这个变量作为类成员，全程复用不释放
+                    thread_local QByteArray lineBuffer;
                     lineBuffer.clear();
-                    lineBuffer.reserve(4096); // 预分配固定4K缓冲，足够存下一行582个数字+逗号
+                    lineBuffer.reserve(4096);
 
                     appendNumber(lineBuffer, timeUnits/10);
                     lineBuffer.append(',');

@@ -201,6 +201,7 @@ for chNo = 1:16
     % 绘图：每个通道的序号差分
     if showDiffFigure
         plot(dseq, '-o', 'DisplayName', sprintf('CH%d', chNo));
+        hold on;
     end
 end
 % 正常差分参考线

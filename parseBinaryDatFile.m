@@ -8,7 +8,7 @@ close all;
 %功能：①观测一定数量的波形
 
 %% step1 参数设置[采样点数：分析波形个数]
-sample_deepth=512;  %56 每个波形的采样深度（256个采样点）
+sample_deepth=580;  %56 每个波形的采样深度（256个采样点）
 data_start=3;  % 波形数据在每一帧的第3个16位整数开始（跳过帧头）
 win_10us=625;
 win_100us=6250;
@@ -75,7 +75,7 @@ for i = 1:length(seq)-16
     diff_val = seq(i+16) - seq(i);
 
     % 正常情况下应该等于1
-    if diff_val ~= 100
+    if diff_val ~= 1
 
         lost_idx(end+1) = i;
 

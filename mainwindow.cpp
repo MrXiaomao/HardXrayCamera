@@ -1863,10 +1863,13 @@ void MainWindow::saveShotNumberFile(const QString &shotNumber) const
 
     const QString filePath = dir.filePath(QStringLiteral("ShotNumber.txt"));
     QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append))
         return;
 
-    QByteArray payload = shotNumber.toUtf8();
+    const QString line = QStringLiteral("%1 %2")
+                             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd-hh:mm:ss")),
+                                  shotNumber);
+    QByteArray payload = line.toUtf8();
     payload.append('\n');
     file.write(payload);
 }

@@ -103,6 +103,8 @@ DEFINES += GIT_DATE=\"\\\"$$GIT_DATE\\\"\"
 DEFINES += GIT_HASH=\"\\\"$$GIT_HASH\\\"\"
 DEFINES += GIT_VERSION=\"\\\"$$GIT_VERSION\\\"\"
 DEFINES += APP_VERSION="\\\"V2.0.0\\\""
+# Release 也带上日志上下文，便于业务 qWarning（如丢包汇总）不被 AppMessageHandler 误过滤
+DEFINES += QT_MESSAGELOGCONTEXT
 
 message(GIT_BRANCH":  ""$$GIT_BRANCH")
 message(GIT_TIME":  ""$$GIT_TIME")

@@ -29,8 +29,8 @@ QMutex mutexMsg;
 QtMessageHandler system_default_message_handler = NULL;// 用来保存系统默认的输出接口
 void AppMessageHandler(QtMsgType type, const QMessageLogContext& context, const QString &msg)
 {
-    //Release 版本默认不包含context这些信息:文件名、函数名、行数，需要在.pro项目文件加入以下代码，加入后最好重新构建项目使之生效：
-    //DEFINES += QT_MESSAGELOGCONTEXT
+    // Release 默认无上下文；HardXrayCamera.pro 已定义 QT_MESSAGELOGCONTEXT，业务 qWarning 会带 file/function
+    // 无上下文的系统 Warning 仍会被下方规则过滤
 
     //在.pro文件定义以下的宏，可以屏蔽相应的日志输出
     //DEFINES += QT_NO_WARNING_OUTPUT
@@ -42,7 +42,7 @@ void AppMessageHandler(QtMsgType type, const QMessageLogContext& context, const 
     // 加锁
     QMutexLocker locker(&mutexMsg);
     if (type == QtWarningMsg && context.file == nullptr && context.function == nullptr)
-        return;// 主要用于过滤系统的警告信息
+        return;// 主要用于过滤系统的警告信息（勿扩大到 Info，否则 Release 下界面日志全丢）
 
     if (mw && type != QtDebugMsg)
         emit mw->sigAppendMsg(msg, type);
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
 
     //打印软件版本号
     qInfo().noquote() << QObject::tr("系统启动，软件版本号: %1").arg(APP_VERSION);
-    qInfo().noquote() << QObject::tr("软件运行目录: %1").arg(QCoreApplication::applicationDirPath());
+    qInfo().noquote() << QObject::tr("软件运行路径: %1").arg(QCoreApplication::applicationFilePath());
 
     w.show();
 
