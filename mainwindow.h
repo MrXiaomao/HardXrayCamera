@@ -394,7 +394,7 @@ private:
     static constexpr double kProfileZMin = -8.0;
     static constexpr double kProfileZMax = 8.0;
     static constexpr double kWaveformSampleIntervalNs = 16.0;
-    static constexpr int kWaveformSampleCount = 1024;
+    static constexpr int kWaveformSampleCount = 580;
     static constexpr int kWaveformMaxDisplayNs =
         static_cast<int>(kWaveformSampleCount * kWaveformSampleIntervalNs);
 

@@ -702,7 +702,7 @@ void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
         return;
 
     client->send(command);
-
+    // QThread::msleep(20);  // 指令间隔，避免阻塞 UI（sleep 单位为秒）
     const QString detail = parameter.isEmpty()
         ? name
         : QString("%1：%2").arg(name, parameter);
@@ -1439,7 +1439,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga1_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            qDebug() << "CommandHelper 水平相机收到硬触发指令！";
+            // qDebug() << "CommandHelper 水平相机收到硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }
@@ -1492,7 +1492,7 @@ void CommandHelper::initDataProcessor()
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
         //connect(dataProcessor_fpga2_wave, &DataProcessor::sigOTAUpgradeData, this, &CommandHelper::sigOTAUpgradeData, Qt::DirectConnection);
         connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            qDebug() << "CommandHelper 垂直相机收到硬触发指令！";
+            // qDebug() << "CommandHelper 垂直相机收到硬触发指令！";
             if (!mHardTriggered.load()){
                 emit sigHardTriggeredSignalReceived();
             }

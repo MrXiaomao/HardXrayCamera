@@ -305,8 +305,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::refreshWaveformPlot);
     connect(ui->spb_waveLen, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::refreshWaveformPlot);
-    ui->spb_specID->setMinimum(0);
-    ui->spb_waveID->setMinimum(0);
+    ui->spb_specID->setMinimum(1);
+    ui->spb_waveID->setMinimum(1);
     ui->spb_waveLen->setMinimum(static_cast<int>(kWaveformSampleIntervalNs));
     ui->spb_waveLen->setMaximum(kWaveformMaxDisplayNs);
     ui->spb_waveLen->setSingleStep(static_cast<int>(kWaveformSampleIntervalNs));
@@ -1113,7 +1113,7 @@ void MainWindow::clearSpectrumData()
     m_spectrumCountsByChannel.clear();
 
     ui->spb_specID->blockSignals(true);
-    ui->spb_specID->setValue(0);
+    ui->spb_specID->setValue(1);
     ui->spb_specID->blockSignals(false);
     updateSpecIdSpinBoxRange();
     ui->plotSpec->clearData();
@@ -1129,7 +1129,7 @@ void MainWindow::clearWaveformData()
     m_waveformByChannel.clear();
 
     ui->spb_waveID->blockSignals(true);
-    ui->spb_waveID->setValue(0);
+    ui->spb_waveID->setValue(1);
     ui->spb_waveID->blockSignals(false);
     updateWaveIdSpinBoxRange();
     ui->plotWave->clearData();
@@ -1216,7 +1216,8 @@ void MainWindow::updateSpecIdSpinBoxRange()
     const int specCount = (channel >= 1 && channel <= m_spectrumByChannel.size())
                               ? m_spectrumByChannel.size(channel - 1)
                               : 0;
-    const int maxSpecId = qMax(0, specCount - 1);
+    // 编号从 1 起：有 N 条数据时范围为 1..N，无数据时保持 1
+    const int maxSpecId = qMax(1, specCount);
 
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setMaximum(maxSpecId);
@@ -1231,7 +1232,8 @@ void MainWindow::updateWaveIdSpinBoxRange()
     const int waveCount = (channel >= 1 && channel <= m_waveformByChannel.size())
                               ? m_waveformByChannel.size(channel - 1)
                               : 0;
-    const int maxWaveId = qMax(0, waveCount - 1);
+    // 编号从 1 起：有 N 条数据时范围为 1..N，无数据时保持 1
+    const int maxWaveId = qMax(1, waveCount);
 
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setMaximum(maxWaveId);
@@ -1246,7 +1248,7 @@ void MainWindow::syncSpectrumSpinBoxToLatest()
     if (channel < 1 || channel > m_spectrumByChannel.size())
         return;
 
-    const int maxSpecId = qMax(0, m_spectrumByChannel.size(channel - 1) - 1);
+    const int maxSpecId = qMax(1, m_spectrumByChannel.size(channel - 1));
     ui->spb_specID->blockSignals(true);
     ui->spb_specID->setMaximum(maxSpecId);
     ui->spb_specID->setValue(maxSpecId);
@@ -1259,7 +1261,7 @@ void MainWindow::syncWaveformSpinBoxToLatest()
     if (channel < 1 || channel > m_waveformByChannel.size())
         return;
 
-    const int maxWaveId = qMax(0, m_waveformByChannel.size(channel - 1) - 1);
+    const int maxWaveId = qMax(1, m_waveformByChannel.size(channel - 1));
     ui->spb_waveID->blockSignals(true);
     ui->spb_waveID->setMaximum(maxWaveId);
     ui->spb_waveID->setValue(maxWaveId);
@@ -1327,7 +1329,7 @@ void MainWindow::updateUnattendedControls()
     if (m_measureMode == MeasureMode::AutoMatedMode){
         // 无人值守        
         ui->action_startMeasure->setEnabled(true);
-        ui->checkBox_alarm->setEnabled(false);
+        // ui->checkBox_alarm->setEnabled(false);
         ui->checkBox_alarm->setChecked(true);
         ui->dateTimeEdit_startup->setEnabled(true);
         ui->dateTimeEdit_shutdown->setEnabled(true);
@@ -1662,7 +1664,8 @@ void MainWindow::refreshSpectrumPlot()
         syncSpectrumSpinBoxToLatest();    
 
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    const int specId = ui->spb_specID->value();
+    const int specId = ui->spb_specID->value(); // 1-based
+    const int specIndex = specId - 1;
     if (channel < 1 || channel > m_spectrumByChannel.size()) {
         ui->plotSpec->clearData();
         ui->plotSpec->refreshPlot();
@@ -1670,14 +1673,14 @@ void MainWindow::refreshSpectrumPlot()
     }
 
     const QVector<SpectrumEntry> &spectra = m_spectrumByChannel.at(channel - 1);
-    if (specId < 0 || specId >= m_spectrumByChannel.size(channel - 1)) {
+    if (specIndex < 0 || specIndex >= m_spectrumByChannel.size(channel - 1)) {
         ui->plotSpec->clearData();
         ui->plotSpec->setTitle(QString("能谱 CH%1 #%2 (无数据)").arg(channel).arg(specId));
         ui->plotSpec->refreshPlot();
         return;
     }
 
-    const SpectrumEntry &entry = spectra.at(specId);
+    const SpectrumEntry &entry = spectra.at(specIndex);
     ui->plotSpec->setTitle(QString("能谱 %1 CH%2 #%3 t=%4ms")
                                .arg(entry.detectorIndex==1  ? QStringLiteral("水平") : QStringLiteral("垂直"))
                                .arg((channel-1) % 16 + 1)
@@ -1738,7 +1741,8 @@ void MainWindow::refreshWaveformPlot()
         syncWaveformSpinBoxToLatest();
 
     const int channel = ui->cbb_channel->currentIndex() + 1;
-    const int waveId = ui->spb_waveID->value();
+    const int waveId = ui->spb_waveID->value(); // 1-based
+    const int waveIndex = waveId - 1;
     if (channel < 1 || channel > m_waveformByChannel.size()) {
         ui->plotWave->clearData();
         ui->plotWave->refreshPlot();
@@ -1746,14 +1750,14 @@ void MainWindow::refreshWaveformPlot()
     }
 
     const QVector<WaveformEntry> &waveforms = m_waveformByChannel.at(channel - 1);
-    if (waveId < 0 || waveId >= m_waveformByChannel.size(channel - 1)) {
+    if (waveIndex < 0 || waveIndex >= m_waveformByChannel.size(channel - 1)) {
         ui->plotWave->clearData();
         ui->plotWave->setTitle(QString("波形 CH%1 #%2 (无数据)").arg(channel).arg(waveId));
         ui->plotWave->refreshPlot();
         return;
     }
 
-    const WaveformEntry &entry = waveforms.at(waveId);    
+    const WaveformEntry &entry = waveforms.at(waveIndex);
     QVector<quint16> samples;
     samples.resize(sizeof(entry.samples)/sizeof(quint16));
     memcpy(samples.data(), entry.samples, sizeof(entry.samples));
@@ -2094,33 +2098,9 @@ bool MainWindow::startMeasureInternal()
     commandHelper->setSavePath(QDir::toNativeSeparators(QFileInfo(savePath).absoluteFilePath()));
     commandHelper->setShotNumber(shotNumber);
 
-    // 自动测量
-    if (trigMode == Order::TriggerMode::HardwareTrigger) {
-        m_autoMeasureDurationTimerStarted = false;
-        if (!commandHelper->configureMeasure(detPara))
-            return false;
-
-        if (detPara.transferMode == Order::TransferMode::Spectrum16) {
-            ui->plotSpec->setXRange(1, hxrDisplayBinCount());
-        } else {
-            ui->plotSpec->setXRange(1, 512);
-        }
-
-        m_autoMeasureState = AutoMeasureState::WaitingShot;
-        ui->action_startMeasure->setEnabled(false);
-        ui->action_stopMeasure->setEnabled(true);
-        ui->comboBox_measureMode->setEnabled(false);
-        ui->dateTimeEdit_startup->setEnabled(false);
-        ui->dateTimeEdit_shutdown->setEnabled(false);
-        updateMeasureParamsGroupEnabled();
-        qInfo() << "自动测量已就绪，等待炮号...";
-        return true;
-    }
-
+    // 无人值守：先按开机/关机时刻启动定时器，到点后再走状态机开机并等待炮号
     m_enableAutoMated = (m_measureMode == MeasureMode::AutoMatedMode);
-    if (m_enableAutoMated){
-        // 开启无人值守模式
-        // 1. 定义两个定时器和成员变量
+    if (m_enableAutoMated) {
         if (startTimer == nullptr) {
             startTimer = new QTimer(this);
             startTimer->setSingleShot(true);
@@ -2129,21 +2109,19 @@ bool MainWindow::startMeasureInternal()
             stopTimer = new QTimer(this);
             stopTimer->setSingleShot(true);
         }
-        isTaskRunning = true;
 
-        // 2. 设置时间点A（启动时间），计算时间差后启动启动定时器
-        QDateTime targetA = ui->dateTimeEdit_startup->dateTime();
-        int msecToA = QDateTime::currentDateTime().msecsTo(targetA);
+        const QDateTime targetA = ui->dateTimeEdit_startup->dateTime();
+        const int msecToA = QDateTime::currentDateTime().msecsTo(targetA);
+        const QDateTime targetB = ui->dateTimeEdit_shutdown->dateTime();
+        const int msecToB = QDateTime::currentDateTime().msecsTo(targetB);
 
-        // 3. 设置时间点B（停止时间）
-        QDateTime targetB = ui->dateTimeEdit_shutdown->dateTime();
-        int msecToB = QDateTime::currentDateTime().msecsTo(targetB);
-
-        if (msecToA < 0 || msecToA > msecToB){
+        if (msecToA < 0 || msecToA > msecToB) {
+            m_enableAutoMated = false;
             QMessageBox::information(this, tr("提示"), tr("时间范围设置不对！\n自动开机时刻必须大于系统当前时间，且关机时间也必须大于开机时间。"));
             return false;
         }
 
+        isTaskRunning = true;
         ui->spb_measureTime->setValue(detPara.measureTime);
         ui->action_startMeasure->setEnabled(false);
         ui->action_stopMeasure->setEnabled(true);
@@ -2151,7 +2129,6 @@ bool MainWindow::startMeasureInternal()
         ui->dateTimeEdit_startup->setEnabled(false);
         ui->dateTimeEdit_shutdown->setEnabled(false);
 
-        // 4. 绑定信号槽：时间A到了启动任务
         disconnect(startTimer, nullptr, this, nullptr);
         connect(startTimer, &QTimer::timeout, this, [=]() {
             ui->action_startMeasure->setEnabled(false);
@@ -2162,7 +2139,6 @@ bool MainWindow::startMeasureInternal()
                     << "计划测量时长:" << detPara.measureTime << "ms";
         });
 
-        // 5. 绑定信号槽：时间B到了停止任务
         disconnect(stopTimer, nullptr, this, nullptr);
         connect(stopTimer, &QTimer::timeout, this, [&]() {
             isTaskRunning = false;
@@ -2183,7 +2159,6 @@ bool MainWindow::startMeasureInternal()
             emit ui->action_disconnectMonitor->trigger();
             emit ui->action_relayNetClose->trigger();
 
-            // 停止工作
             m_plotRefreshTimer->stop();
             commandHelper->stopMeasure();
             printWaveformCollectionSummary();
@@ -2207,12 +2182,15 @@ bool MainWindow::startMeasureInternal()
         startTimer->start(msecToA);
         stopTimer->start(msecToB);
         updateMeasureParamsGroupEnabled();
-        qInfo() << "程序已进入无人值守模式，超出用户自定义的监测参数范围，软件将自动切断前端硬件供电。";
+        qInfo() << "程序已进入无人值守模式，温度、电压、电流超出用户自定义的监测参数范围，软件将自动切断前端硬件供电。";
+        return true;
     }
-    else
-    {
-        // 手动测量
-        m_plotRefreshTimer->start(ui->spinBox_refreshTimeLength->value());
+
+    // 自动测量：配置硬件后等待炮号
+    if (m_measureMode == MeasureMode::AutoMode) {
+        m_autoMeasureDurationTimerStarted = false;
+        if (!commandHelper->configureMeasure(detPara))
+            return false;
 
         if (detPara.transferMode == Order::TransferMode::Spectrum16) {
             ui->plotSpec->setXRange(1, hxrDisplayBinCount());
@@ -2220,17 +2198,35 @@ bool MainWindow::startMeasureInternal()
             ui->plotSpec->setXRange(1, 512);
         }
 
-        commandHelper->startMeasure(detPara);
-        startMeasureDurationTimer();
+        m_autoMeasureState = AutoMeasureState::WaitingShot;
         ui->action_startMeasure->setEnabled(false);
         ui->action_stopMeasure->setEnabled(true);
         ui->comboBox_measureMode->setEnabled(false);
         ui->dateTimeEdit_startup->setEnabled(false);
         ui->dateTimeEdit_shutdown->setEnabled(false);
         updateMeasureParamsGroupEnabled();
-        qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << measureDurationMs() << "ms";
+        qInfo() << "自动测量已就绪，等待炮号...";
+        return true;
     }
 
+    // 手动测量
+    m_plotRefreshTimer->start(ui->spinBox_refreshTimeLength->value());
+
+    if (detPara.transferMode == Order::TransferMode::Spectrum16) {
+        ui->plotSpec->setXRange(1, hxrDisplayBinCount());
+    } else {
+        ui->plotSpec->setXRange(1, 512);
+    }
+
+    commandHelper->startMeasure(detPara);
+    startMeasureDurationTimer();
+    ui->action_startMeasure->setEnabled(false);
+    ui->action_stopMeasure->setEnabled(true);
+    ui->comboBox_measureMode->setEnabled(false);
+    ui->dateTimeEdit_startup->setEnabled(false);
+    ui->dateTimeEdit_shutdown->setEnabled(false);
+    updateMeasureParamsGroupEnabled();
+    qInfo() << "测量已开始，炮号:" << shotNumber << "时长:" << measureDurationMs() << "ms";
     return true;
 }
 
@@ -2808,7 +2804,7 @@ void MainWindow::on_radioButton_cps_clicked()
 void MainWindow::onHardTriggeredSignalReceived()
 {
     // 硬触发模式：收到硬件触发后开始计时
-    qDebug() << "MainWindow 收到硬触发指令！";
+    // qDebug() << "MainWindow 收到硬触发指令！";
     if (m_autoMeasureState == AutoMeasureState::Measuring
         && (m_measureMode == MeasureMode::AutoMode || m_measureMode == MeasureMode::AutoMatedMode)
         && !m_autoMeasureDurationTimerStarted) {

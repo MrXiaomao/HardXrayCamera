@@ -120,14 +120,14 @@ void DataProcessor::reset()
         m_hasPendingData = false;
     }
 
-    if (mDetectorIndex == 1)
-        qDebug() << "水平相机能谱收包缓存已重置";
-    else if (mDetectorIndex == 2)
-        qDebug() << "垂直相机能谱收包缓存已重置";
-    else if (mDetectorIndex == 3)
-        qDebug() << "水平相机硬触发信号已重置";
-    else if (mDetectorIndex == 4)
-        qDebug() << "垂直相机硬触发信号已重置";
+    // if (mDetectorIndex == 1)
+    //     qDebug() << "水平相机能谱收包缓存已重置";
+    // else if (mDetectorIndex == 2)
+    //     qDebug() << "垂直相机能谱收包缓存已重置";
+    // else if (mDetectorIndex == 3)
+    //     qDebug() << "水平相机硬触发信号已重置";
+    // else if (mDetectorIndex == 4)
+    //     qDebug() << "垂直相机硬触发信号已重置";
 }
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
@@ -429,14 +429,6 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
             const char* p = buffer.constData() + offset;
             // 接着判断包尾
             if (buffer.mid(offset + WaveformPacketSize - WaveformTail.size(), WaveformTail.size()) != WaveformTail) {
-                //打印通道号和时间戳
-                const quint32 channelMask = readUInt16BE(p + WaveformHeader.size());
-                const quint32 timeUnits = readUInt16BE(p + WaveformHeader.size() + 2); // 时间单位，10ms
-                const int channelNumber = channelNumberFromMask(channelMask);
-                //qWarning() << "Invalid waveform packet tail from"
-                //           << (detectorIndex == 1 ? "水平相机" : "垂直相机")
-                //           << "Channel:" << channelNumber << "Time(units):" << timeUnits;
-
                 offset += static_cast<int>(WaveformHeader.size());
                 continue;
             }

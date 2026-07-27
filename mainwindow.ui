@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>硬X射线相机软件</string>
+   <string>高能电子阵列探测器配套软件</string>
   </property>
   <property name="windowIcon">
    <iconset resource="resource.qrc">
@@ -34,7 +34,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget_2">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
@@ -1050,7 +1050,7 @@
                      <item row="2" column="0">
                       <widget class="QGroupBox" name="groupBox_4">
                        <property name="title">
-                        <string>电源机箱报警阈值</string>
+                        <string>相机机芯报警阈值</string>
                        </property>
                        <property name="alignment">
                         <set>Qt::AlignCenter</set>
@@ -1111,7 +1111,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1146,7 +1146,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1181,7 +1181,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1216,7 +1216,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1251,7 +1251,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1286,7 +1286,7 @@
                               </size>
                              </property>
                              <property name="maximum">
-                              <double>90.000000000000000</double>
+                              <double>65536.000000000000000</double>
                              </property>
                              <property name="value">
                               <double>65.000000000000000</double>
@@ -1681,7 +1681,7 @@
               <item>
                <widget class="QGroupBox" name="groupBox_arm2">
                 <property name="title">
-                 <string>电源机箱</string>
+                 <string>相机机芯</string>
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout_8">
                  <property name="spacing">
