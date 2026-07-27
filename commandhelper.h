@@ -120,12 +120,6 @@ public:
 private:
     // 初始化常用指令
     void initCommand(); 
-
-    // FPGA主板1主网口初始化指令
-    void initFPGA1Commands();
-
-    // FPGA主板2主网口初始化指令
-    void initFPGA2Commands();
     
     // 读取网络配置，IP和port
     void loadIPConfig();

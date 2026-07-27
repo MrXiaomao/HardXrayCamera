@@ -140,3 +140,5 @@ else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/ -lhda_client
 
 INCLUDEPATH += $$PWD/.
 DEPENDPATH += $$PWD/.
+
+DEFINES += QT_MESSAGELOGCONTEXT #定义之后Release版qWarning()输出的消息才能够捕获到

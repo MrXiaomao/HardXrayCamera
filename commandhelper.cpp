@@ -359,21 +359,6 @@ void CommandHelper::initCommand()
     cmdPool.append(CommandItem("软件触发", cmdSoftTrigger));
 }
 
-// FPGA主板1主网口初始化指令
-void CommandHelper::initFPGA1Commands()
-{
-    //传输模式设置指令
-    QByteArray cmdSetTransferMode = Order::setTransferMode(Order::TransferMode::Spectrum512);
-    sendCommand(client_fpga1_main, cmdSetTransferMode, "传输模式设置",
-                QString("%1 512道能谱").arg(QString::fromUtf8(kFpga1MainPort)));
-}
-
-void CommandHelper::initFPGA2Commands()
-{
-    // FPGA主板2主网口初始化指令
-    // 这里可以添加更多针对FPGA主板2主网口的常用指令
-}
-
 bool CommandHelper::configureMeasure(const DetParameter &measurement)
 {
     m_detPara = measurement;
@@ -517,7 +502,7 @@ void CommandHelper::saveChannelBoundary(const QVector<QVector<quint16>>& channel
             if(col < channelBoundaries[ch].size()) {
                 out << channelBoundaries[ch][col];
             }
-            if(ch != channelBoundaries.size()-1) out << ",";
+            if(ch != maxColumnCount-1) out << ",";
         }
         out << "\n";
     }

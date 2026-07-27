@@ -43,6 +43,7 @@ void TcpClientThread::tearDownSocket()
 {
     if (!m_socket)
         return;
+
     QObject::disconnect(m_socket, nullptr, this, nullptr);
     m_socket->abort();
     delete m_socket;
@@ -75,6 +76,11 @@ void TcpClientThread::sendData(const QByteArray& data)
 
         // 发送分块并检查结果
          qint64 written = m_socket->write(chunk);
+        if (written < 0) {
+            qWarning() << "Send failed, abort current transmission";
+            break;
+        }
+
         m_socket->flush(); //本项目的指令发送都比较小，且需要尽快到达，发送后立即 flush。对于大数据传输不可用该方法。
 
         // 偏移增加，处理下一块
@@ -84,10 +90,14 @@ void TcpClientThread::sendData(const QByteArray& data)
 
 void TcpClientThread::connectToHost()
 {
+    m_reconnectAttempts = 0;
     tearDownSocket();
 
     m_socket = new QTcpSocket(this);
     m_socket->setProxy(QNetworkProxy::NoProxy); //无代理
+    // 禁用 Nagle 算法，减少小包合并，降低发送延迟。
+    // Nagle 算法:小包先攒一攒,再一起发
+    m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
 
     const int bufferSize = 4 * 1024 * 1024;
     m_socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, bufferSize);
@@ -108,9 +118,6 @@ void TcpClientThread::connectToHost()
 
 void TcpClientThread::onConnected()
 {
-    // 禁用 Nagle 算法，减少小包合并，降低发送延迟。
-    // Nagle 算法:小包先攒一攒,再一起发
-    m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     m_reconnectAttempts = 0;
     emit connectionStatusChanged(true);
 }
