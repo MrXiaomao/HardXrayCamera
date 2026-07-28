@@ -262,6 +262,9 @@ MainWindow::MainWindow(QWidget *parent)
         &MainWindow::onWaveformDataReceived, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigHardTriggeredSignalReceived, this,
             &MainWindow::onHardTriggeredSignalReceived, Qt::QueuedConnection);
+    connect(commandHelper, &CommandHelper::sigMeasureTimerStarted, this, [=]{
+        startMeasureDurationTimer();
+    }, Qt::QueuedConnection);
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
     m_spectrumSequenceNumbersByChannel.resize(kSpectrumChannelCount);
@@ -2219,7 +2222,7 @@ bool MainWindow::startMeasureInternal()
     }
 
     commandHelper->startMeasure(detPara);
-    startMeasureDurationTimer();
+    //startMeasureDurationTimer(); // 收到测试开始之后再计时
     ui->action_startMeasure->setEnabled(false);
     ui->action_stopMeasure->setEnabled(true);
     ui->comboBox_measureMode->setEnabled(false);

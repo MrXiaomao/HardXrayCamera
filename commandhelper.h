@@ -118,9 +118,6 @@ public:
     DetParameter m_detPara; //测量参数，包含触发模式、传输模式、测量时长等
 
 private:
-    // 初始化常用指令
-    void initCommand(); 
-    
     // 读取网络配置，IP和port
     void loadIPConfig();
 
@@ -133,6 +130,9 @@ private:
     // 发送指令并打印十六进制、指令名称和参数
     void sendCommand(TcpClient* client, const QByteArray& command,
                      const QString& name, const QString& parameter = QString());
+    void queueCommand(TcpClient* client, const QByteArray& command,
+                     const QString& name, const QString& parameter = QString());
+    void dequeueCommand(TcpClient* client);
 
     void processSpec512Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
     void processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
@@ -182,6 +182,7 @@ signals:
     void sigOTAUpgradeData(quint8, const QByteArray& data); // 上报OTA升级数据
 
     void sigHardTriggeredSignalReceived();
+    void sigMeasureTimerStarted();
 
 public slots:
     // 继电器数据处理
@@ -192,6 +193,8 @@ public slots:
     void handleFpga2WaveData(const QByteArray &binaryData);
     void handleARM1Data(const QByteArray &binaryData);
     void handleARM2Data(const QByteArray &binaryData);
+    void handleFpga1NextCommand();
+    void handleFpga2NextCommand();
 
 private:
     TcpClient* client_fpga1_main; // FPGA主板1主网口(控制/能谱)
@@ -237,7 +240,7 @@ private:
     QByteArray m_arm2Buffer;
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
-    QVector<CommandItem> cmdPool; //常用指令池，可以根据需要添加更多指令
+    QVector<CommandItem> cmdPool[2]; //常用指令池，可以根据需要添加更多指令
 
     //硬触发信号
     std::atomic_bool mHardTriggered = false;
@@ -245,6 +248,9 @@ private:
     std::atomic_bool measure_started = false;
     std::atomic_bool mIsUpgrading = false;
     quint8 mCurrentUpgradeDetectorIndex = 1;
+
+    std::atomic_bool mSendCommandBusying[2] = {false, false};
+    QMutex m_commandQueueMutex[2];
 
     QFile m_fpga1MainFile;
     QFile m_fpga2MainFile;

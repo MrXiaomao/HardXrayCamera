@@ -32,6 +32,8 @@ public:
     void setTransferMode(Order::TransferMode mode);
     void setTriggerMode(Order::TriggerMode mode);
     void reset();
+    void prepareStartMeasure();
+    void prepareStopMeasure();
 
 signals:
     // 波形数据: timeUnits 单位为 500us, samples 为 1024 个采样点
@@ -42,9 +44,11 @@ signals:
     void sigSpectrumData(int detectorIndex, int channelNumber, quint32 timeMs,
                          const QVector<quint32>& counts);
 
-    void sigOTAUpgradeData(quint8, const QByteArray& data); // 上报OTA升级数据
-
     void sigHardTriggeredSignalReceived();
+
+    void sigSendNextCommand();
+    void sigMessureStarted();
+    void sigMessureStoped();
 
 public slots:
     // 继电器数据处理
@@ -70,7 +74,6 @@ private:
     Order::TransferMode m_transferMode;
     Order::TriggerMode m_trigMode;
 
-    std::atomic_bool mIsUpgrading = false;
     // std::atomic_bool measure_started = false;
     quint8 mDetectorIndex = 1;
     //mutable QMutex m_measurementMutex;
@@ -79,6 +82,8 @@ private:
     std::atomic_bool mHardTriggered = false;
 
     QVector<quint16> m_samples;
+    std::atomic_bool m_measureStarted = false;// 测量准备-开始
+    std::atomic_bool m_measureStopPrepared = false;// 测量准备-停止
 
     quint16 readUInt16BE(const char* data);
     int channelNumberFromMask(quint32 channelMask);
