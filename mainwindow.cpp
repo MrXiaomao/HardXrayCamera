@@ -487,8 +487,17 @@ void MainWindow::onMeasureTimerTimeout()
         ui->action_stopMeasure->setEnabled(false);
         qInfo().nospace() << "炮号["<< m_currentShotNumber << "]自动测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
 
-        // 自动进入下一次自动测量阶段，直到手动点击停止按钮为止
-        startMeasureInternal();
+        // 稍候再进入下一轮配置，给停止应答/指令队列排空留出时间，降低竞态闪退概率
+        m_pendingAutoRestart = true;
+        QTimer::singleShot(200, this, [this]() {
+            if (!m_pendingAutoRestart)
+                return;
+            m_pendingAutoRestart = false;
+            if (m_measureMode != MeasureMode::AutoMode)
+                return;
+            startMeasureInternal();
+            updateMeasureParamsGroupEnabled();
+        });
         updateMeasureParamsGroupEnabled();
         return;
     }
@@ -504,7 +513,17 @@ void MainWindow::onMeasureTimerTimeout()
 
         qInfo().nospace() << "无人值守炮号[" << m_currentShotNumber
                           << "]测量时长已到，测量已停止，时长:" << measureDurationMs() << "ms";
-        enterUnattendedWaitingShot();
+        m_pendingAutoRestart = true;
+        QTimer::singleShot(200, this, [this]() {
+            if (!m_pendingAutoRestart)
+                return;
+            m_pendingAutoRestart = false;
+            if (!isTaskRunning || !m_enableAutoMated)
+                return;
+            if (m_measureMode != MeasureMode::AutoMatedMode)
+                return;
+            enterUnattendedWaitingShot();
+        });
         return;
     }
 
@@ -1997,7 +2016,8 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     resetMeasurementPlotData();
     //spectrumPlotThrottle.invalidate();
 
-    //commandHelper->beginRecording(mdetPara);// configureMeasure 中提前创建文件，避免漏掉反馈指令
+    // 炮号已到再创建数据文件，保证文件名带正确炮号
+    commandHelper->beginRecording(mdetPara);
     commandHelper->sendSpectrumControl(Order::HardwareTrigger);
 
     // if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
@@ -2076,6 +2096,8 @@ void MainWindow::stopAutoMeasureSession()
     const AutoMeasureState stateBeforeStop = m_autoMeasureState;
     if (stateBeforeStop == AutoMeasureState::Idle)
         return;
+
+    m_pendingAutoRestart = false;
 
     // 先退出等待/测量状态，防止已排队的炮号消息在停止过程中再次启动测量。
     m_autoMeasureState = AutoMeasureState::Idle;
@@ -2634,6 +2656,8 @@ void MainWindow::on_action_startMeasure_triggered()
 
 void MainWindow::on_action_stopMeasure_triggered()
 {
+    m_pendingAutoRestart = false;
+
     if (isTaskRunning){
         if (startTimer->isActive())
             startTimer->stop();

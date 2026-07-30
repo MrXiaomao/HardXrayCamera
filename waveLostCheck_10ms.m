@@ -15,7 +15,8 @@ close all;
 % ==============================
 % 参数设置
 % ==============================
-basePath = 'C:\Users\12074\Desktop\temp\硬X射线测试数据';   % 你的基准文件夹路径
+% basePath = 'C:\Users\12074\Desktop\temp\硬X射线测试数据';   % 你的基准文件夹路径
+basePath = 'C:\Users\12074\Desktop\QT_software\build_HardXrayCamera\测试数据';
 % 如果基准路径不存在，则退回到桌面路径
 if ~exist(basePath, 'dir')
     basePath = fullfile(getenv('USERPROFILE'), 'Desktop');

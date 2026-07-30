@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QtNetwork>
+#include <atomic>
 
 // 工作线程内的 TCP 收发（与 GUI 线程分离，避免阻塞导致 ARM 数据流中断）
 class TcpClientThread : public QObject {
@@ -61,7 +62,7 @@ public:
     void disconnectFromHost();
     void send(const QByteArray& data);
 
-    bool isConnected() const { return m_connected; }
+    bool isConnected() const { return m_connected.load(); }
 
 signals:
     void startSignal();
@@ -76,7 +77,7 @@ private:
     QThread* m_thread;
     TcpClientThread* m_worker;
     bool m_shuttingDown = false;
-    bool m_connected = false;
+    std::atomic_bool m_connected{false};
     bool m_heartbeat = false;
     bool m_autoReconnect = false;
 };

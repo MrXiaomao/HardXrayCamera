@@ -102,8 +102,7 @@ void DataProcessor::onProcessLoop()
         if ((mDetectorIndex==1 || mDetectorIndex==2) && !m_measureStarted){
             // 测量开始以前对返回指令进行解析
             int pos = 0;
-            bool isQueryCmd = false;
-            while (localData.size() - pos >= baseCommandLength){                
+            while (localData.size() - pos >= baseCommandLength){
                 //SPE选通指令
                 if (hasTargerAt(localData, pos, kspecSPESelectChannelAckHead)){
                     qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "SPE选通指令 " << detName << "]";
@@ -117,7 +116,7 @@ void DataProcessor::onProcessLoop()
                 if (hasTargerAt(localData, pos, kspecOTASelectChannelAckHead)){
                     qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "OTA选通指令 " << detName << "]";
                     pos += baseCommandLength;
-                    m_lastCommandIsQueryVersion = true;
+                    m_lastCommandIsQueryVersion.store(true);
 
                     emit sigSendNextCommand();
                     continue;
@@ -162,7 +161,7 @@ void DataProcessor::onProcessLoop()
                         quint16 v = readUInt16BE(localData.constData() + pos + 8);
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱刷新时间" << detName << v << " ms]";
 
-                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthHead))
+                        if (m_isQueryMode.load() && hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthHead))
                             emit sigSpectrumRefreshTimelengthAck(v);
 
                         pos += baseCommandLength;
@@ -179,10 +178,10 @@ void DataProcessor::onProcessLoop()
                 //能谱触发阈值
                 if (hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead) || hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdQueryHead)){
                     if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint16 v = readUInt16BE(localData.constData() + 8);
+                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱触发阈值 " << detName << v << " LSB]";
 
-                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead))
+                        if (m_isQueryMode.load() && hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead))
                             emit sigSpecSpectrumTriggerThresholdAck(v);
 
                         pos += baseCommandLength;
@@ -203,7 +202,7 @@ void DataProcessor::onProcessLoop()
                         quint16 v = readUInt16BE(localData.constData() + pos + 8);
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱死时间 " << detName << v*16 << " ns]";
 
-                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumDieTimelengthHead))
+                        if (m_isQueryMode.load() && hasTargerAt(localData, pos, kspecSpectrumDieTimelengthHead))
                             emit sigSpecSpectrumDieTimelengthAck(v);
 
                         pos += baseCommandLength;
@@ -224,7 +223,7 @@ void DataProcessor::onProcessLoop()
 
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "触发信号时钟宽度 " << detName << v << "ns]";
 
-                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthHead))
+                        if (m_isQueryMode.load() && hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthHead))
                             emit sigSpecTriggerSignalTimeWidthAck(v);
 
                         pos += baseCommandLength;
@@ -247,7 +246,7 @@ void DataProcessor::onProcessLoop()
                         quint8 channel = no / 9 + 1;
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "分时能谱能窗" << detName << "逻辑CH" << channel << " 序号" << QString("0x%1").arg(no, 2, 16, QChar('0')) << " 能量" << e2 << "," << e1 << "]";
 
-                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumTimeWindowHead))
+                        if (m_isQueryMode.load() && hasTargerAt(localData, pos, kspecSpectrumTimeWindowHead))
                             emit sigSpecSpectrumTimeWindowAck(no, e2, e1);
 
                         pos += baseCommandLength;
@@ -262,36 +261,31 @@ void DataProcessor::onProcessLoop()
                 }
 
 
-                if (m_measureStopPrepared && !localData.isEmpty()){
-                    //能谱测量控制-停止
-                    if (localData.contains(kspecMeasureStopHead)){
-                        m_measureStopPrepared.store(false);
-                        qDebug().nospace().noquote() << "Recv HEX: " << kspecMeasureStopHead.toHex(' ') << "[能谱测量控制"<< detName << "停止]";
-                        localData.clear();
-
-                        emit sigSendNextCommand();
-                        emit sigMessureStoped();
-                        break;
-                    }
-                }
-
-                //能谱测量控制-开始
+                //能谱测量控制：末字节 0=停止，1=软触发开始，2=硬触发开始（共用指令头）
                 if (hasTargerAt(localData, pos, kspecMeasureStartHead)){
                     if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint8 cmd = static_cast<quint8>(localData.at(pos + 9));
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱测量控制 " << detName << (cmd==1 ? "软件触发" : "硬件触发") << "]";
-
-                        m_measureStarted.store(true);
+                        const quint8 cmd = static_cast<quint8>(localData.at(pos + 9));
+                        const QByteArray ack = localData.mid(pos, 12);
                         pos += baseCommandLength;
 
+                        if (cmd == 0) {
+                            qDebug().nospace().noquote() << "Recv HEX: " << ack.toHex(' ')
+                                                         << "[能谱测量控制" << detName << "停止]";
+                            handleMeasureStopAck(detName);
+                            break;
+                        }
+
+                        qDebug().nospace().noquote() << "Recv HEX: " << ack.toHex(' ')
+                                                     << "[" << "能谱测量控制 " << detName
+                                                     << (cmd == 1 ? "软件触发" : "硬件触发") << "]";
+                        m_measureStarted.store(true);
                         emit sigSendNextCommand();
                         emit sigMessureStarted();
                         break;
                     }
                     else{
-                        qDebug() << "指令反馈：分时能谱能窗指令尾部数据无效";
+                        qDebug() << "指令反馈：能谱测量控制指令尾部数据无效";
                         pos += kspecMeasureStartHead.size();
-
                         continue;
                     }
                 }
@@ -317,7 +311,7 @@ void DataProcessor::onProcessLoop()
                     handleFpga2WaveData(localData);
             }
             else{
-                if (m_isQueryMode && m_lastCommandIsQueryVersion){
+                if (m_isQueryMode.load() && m_lastCommandIsQueryVersion.load()){
                     emit sigOTAVersionAck(localData.at(0));
 
                     localData.clear();
@@ -325,14 +319,13 @@ void DataProcessor::onProcessLoop()
             }
         }
 
-        if (m_measureStopPrepared && !localData.isEmpty()){
-            //能谱测量控制-停止
+        if (m_measureStopPrepared.load() && !localData.isEmpty()){
+            // 测量进行中收到停止应答（完整 Stop 帧）
             if (localData.contains(kspecMeasureStopHead)){
-                m_measureStopPrepared.store(false);
-                qDebug().nospace().noquote() << "Recv HEX: " << kspecMeasureStopHead.toHex(' ') << "[能谱测量控制"<< detName << "停止]";
+                qDebug().nospace().noquote() << "Recv HEX: " << kspecMeasureStopHead.toHex(' ')
+                                             << "[能谱测量控制" << detName << "停止]";
                 localData.clear();
-
-                emit sigSendNextCommand();
+                handleMeasureStopAck(detName);
             }
         }
 
@@ -343,6 +336,15 @@ void DataProcessor::onProcessLoop()
                 m_pendingData.swap(localData);
         }
     }
+}
+
+void DataProcessor::handleMeasureStopAck(const QString& detName)
+{
+    m_measureStopPrepared.store(false);
+    m_measureStarted.store(false);
+    qDebug().noquote() << QStringLiteral("收到%1停止测量应答").arg(detName.trimmed());
+    emit sigSendNextCommand();
+    emit sigMessureStoped();
 }
 
 void DataProcessor::inputData(const QByteArray& data)
@@ -356,11 +358,13 @@ void DataProcessor::inputData(const QByteArray& data)
 
 void DataProcessor::setTransferMode(Order::TransferMode mode)
 {
+    QMutexLocker locker(&m_dataMutex);
     m_transferMode = mode;
 }
 
 void DataProcessor::setTriggerMode(Order::TriggerMode mode)
 {
+    QMutexLocker locker(&m_dataMutex);
     m_trigMode = mode;
 }
 
@@ -375,20 +379,11 @@ void DataProcessor::reset()
         m_cacheBuffer.clear();
         m_hasPendingData = false;
     }
-
-    // if (mDetectorIndex == 1)
-    //     qDebug() << "水平相机能谱收包缓存已重置";
-    // else if (mDetectorIndex == 2)
-    //     qDebug() << "垂直相机能谱收包缓存已重置";
-    // else if (mDetectorIndex == 3)
-    //     qDebug() << "水平相机硬触发信号已重置";
-    // else if (mDetectorIndex == 4)
-    //     qDebug() << "垂直相机硬触发信号已重置";
 }
 
 void DataProcessor::prepareStartMeasure()
 {
-    m_lastCommandIsQueryVersion = false;
+    m_lastCommandIsQueryVersion.store(false);
     m_measureStarted.store(false);
     m_measureStopPrepared.store(false);
 
@@ -403,25 +398,28 @@ void DataProcessor::prepareStopMeasure()
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
 {
+    Order::TransferMode mode;
     {
-        // 处理水平相机主网口能谱数据，根据当前传输模式选择解析器
-        if (m_transferMode == Order::TransferMode::Spectrum16) {
-            processSpec16Data(1, binaryData);
-        } else {
-            processSpec512Data(1, binaryData);
-        }
+        QMutexLocker locker(&m_dataMutex);
+        mode = m_transferMode;
     }
+    if (mode == Order::TransferMode::Spectrum16)
+        processSpec16Data(1, binaryData);
+    else
+        processSpec512Data(1, binaryData);
 }
 
-// 处理FPGA主板2主网口能谱数据
 void DataProcessor::handleFpga2MainData(QByteArray &binaryData)
 {
-    // 处理垂直相机主网口能谱数据，根据当前传输模式选择解析器
-    if (m_transferMode == Order::TransferMode::Spectrum16) {
-        processSpec16Data(2, binaryData);
-    } else {
-        processSpec512Data(2, binaryData);
+    Order::TransferMode mode;
+    {
+        QMutexLocker locker(&m_dataMutex);
+        mode = m_transferMode;
     }
+    if (mode == Order::TransferMode::Spectrum16)
+        processSpec16Data(2, binaryData);
+    else
+        processSpec512Data(2, binaryData);
 }
 
 // 处理FPGA主板1副网口波形数据
@@ -621,7 +619,13 @@ bool DataProcessor::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
 
 void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
 {
-    if (m_trigMode == Order::TriggerMode::HardwareTrigger){
+    Order::TriggerMode trigMode;
+    {
+        QMutexLocker locker(&m_dataMutex);
+        trigMode = m_trigMode;
+    }
+
+    if (trigMode == Order::TriggerMode::HardwareTrigger){
         if (!mHardTriggered.load())
         {
             static const QByteArray hardTriggerCommand =
@@ -758,10 +762,10 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
 
 void DataProcessor::enterQueryMode()
 {
-    m_isQueryMode = true;
+    m_isQueryMode.store(true);
 }
 
 void DataProcessor::leaveQueryMode()
 {
-    m_isQueryMode = false;
+    m_isQueryMode.store(false);
 }

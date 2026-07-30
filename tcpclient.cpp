@@ -174,7 +174,7 @@ TcpClient::TcpClient(QObject *parent)
     connect(this, &TcpClient::sendDataSignal, m_worker, &TcpClientThread::sendData, Qt::QueuedConnection);
     connect(m_worker, &TcpClientThread::dataReceived, this, &TcpClient::dataReceived, Qt::DirectConnection);
     connect(m_worker, &TcpClientThread::connectionStatusChanged, this, [this](bool c) {
-        m_connected = c;
+        m_connected.store(c);
         emit sigconnectStatusChanged(c);
     });
     connect(m_worker, &TcpClientThread::sigErrorOccurred, this,

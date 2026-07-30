@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QDir>
 #include <QMutexLocker>
+#include <QDateTime>
 #include <cstring>
 // #include <algorithm>
 // #include <chrono>
@@ -220,13 +221,14 @@ CommandHelper::CommandHelper(QObject *parent)
         }
     });
 
-    connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData);
-    connect(client_fpga1_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1MainData, Qt::DirectConnection);
-    connect(client_fpga2_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2MainData, Qt::DirectConnection);
-    connect(client_fpga1_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1WaveData, Qt::DirectConnection);
-    connect(client_fpga2_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2WaveData, Qt::DirectConnection);
-    connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::DirectConnection);
-    connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::DirectConnection);
+    connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData, Qt::QueuedConnection);
+    // FPGA 原始流写盘走主线程；解析走 DataProcessor（inputData 仅做加锁入队，可 Direct）
+    connect(client_fpga1_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1MainData, Qt::QueuedConnection);
+    connect(client_fpga2_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2MainData, Qt::QueuedConnection);
+    connect(client_fpga1_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1WaveData, Qt::QueuedConnection);
+    connect(client_fpga2_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2WaveData, Qt::QueuedConnection);
+    connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::QueuedConnection);
+    connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::QueuedConnection);
 
     connect(client_relay, &TcpClient::sigconnectError, this,
             [=](QAbstractSocket::SocketError error, const QString& host, quint16 port,
@@ -377,20 +379,11 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
     dataProcessor_fpga2_wave->prepareStartMeasure();
     mSendCommandBusying[0].store(false);
     mSendCommandBusying[1].store(false);
-    if (cmdPool[0].size() > 0){
-        qDebug() << "水平相机冗余指令列表：";
-        for (int i=0; i<cmdPool[0].size(); ++i)
-            qDebug() << cmdPool[0].at(i).name << cmdPool[0].at(i).data.toHex(' ');
-    }
-    cmdPool[0].clear();
-    if (cmdPool[1].size() > 0){
-        qDebug() << "垂直相机冗余指令列表：";
-        for (int i=0; i<cmdPool[1].size(); ++i)
-            qDebug() << cmdPool[1].at(i).name << cmdPool[1].at(i).data.toHex(' ');
-    }
-    cmdPool[1].clear();
+    clearCommandPool(0);
+    clearCommandPool(1);
 
-    beginRecording(measurement);// 提前创建文件，避免漏掉反馈指令
+    // 不在此处建文件：自动/无人值守等炮号阶段只做参数配置；
+    // 文件在炮号到达后由 beginRecording / startMeasure 创建。
 
     qDebug().noquote().nospace() << "测量模式：" << (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger ? QStringLiteral("硬触发模式") : QStringLiteral("软触发模式"));
 
@@ -620,7 +613,7 @@ void CommandHelper::startMeasure(DetParameter detPara)
     if (!configureMeasure(measurement))
         return;
 
-    //beginRecording(measurement);
+    beginRecording(measurement);
     sendSpectrumControl(measurement.trigMode);
 
     qInfo().noquote() << QStringLiteral("测量已开始，参数：时长 %1 ms，传输模式：%2，能谱刷新间隔：%3 ms，能谱触发阈值：%4，能谱死时间：%5 ns，触发模式：%6")
@@ -642,8 +635,7 @@ void CommandHelper::stopMeasure()
     measure_started.store(false);
     closeMeasurementFilesLocked();
 
-
-    qDebug() << "测量停止";
+    qInfo() << "已下发停止测量指令，等待相机应答";
 }
 
 void CommandHelper::closeMeasurementFiles()
@@ -662,6 +654,20 @@ void CommandHelper::closeMeasurementFilesLocked()
         m_fpga1WaveFile.close();
     if (m_fpga2WaveFile.isOpen())
         m_fpga2WaveFile.close();
+}
+
+void CommandHelper::clearCommandPool(int index)
+{
+    if (index < 0 || index > 1)
+        return;
+
+    QMutexLocker locker(&m_commandQueueMutex[index]);
+    if (!cmdPool[index].isEmpty()) {
+        qDebug() << (index == 0 ? "水平相机冗余指令列表：" : "垂直相机冗余指令列表：");
+        for (int i = 0; i < cmdPool[index].size(); ++i)
+            qDebug() << cmdPool[index].at(i).name << cmdPool[index].at(i).data.toHex(' ');
+        cmdPool[index].clear();
+    }
 }
 
 CommandHelper::~CommandHelper()
@@ -718,13 +724,13 @@ void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
     if (!client)
         return;
 
-    if (client == client_fpga1_main){
-        mLastSendCommandTimer[0].restart();
-        mSendCommandBusying[0].store(true);
-    }
-    else if (client == client_fpga2_main){
-        mLastSendCommandTimer[1].restart();
-        mSendCommandBusying[1].store(true);
+    const int index = (client == client_fpga1_main) ? 0
+                     : (client == client_fpga2_main) ? 1
+                     : -1;
+    if (index >= 0) {
+        QMutexLocker locker(&m_commandQueueMutex[index]);
+        mLastSendCommandMs[index] = QDateTime::currentMSecsSinceEpoch();
+        mSendCommandBusying[index].store(true);
     }
 
     client->send(command);
@@ -739,37 +745,40 @@ void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
 void CommandHelper::queueCommand(TcpClient* client, const QByteArray& command,
                   const QString& name, const QString& parameter)
 {
-    int index = (client == client_fpga1_main) ? 0 : 1;    
-    if (mLastSendCommandTimer[index].isValid() && mLastSendCommandTimer[index].elapsed() >= 5000){
-        if (mSendCommandBusying[index]){
-            qWarning().noquote() << (index==0 ? "水平相机" : "垂直相机")  << "指令反馈出现异常";
-            if (!cmdPool[index].isEmpty()){
-                qDebug().noquote() << (index==0 ? "水平相机" : "垂直相机") << "冗余指令列表：";
-                for (int i=0; i<cmdPool[index].size(); ++i)
-                    qDebug() << cmdPool[index].at(i).name << cmdPool[index].at(i).data.toHex(' ');
-                cmdPool[index].clear();
-            }
-            mSendCommandBusying[index].store(false);
-        }
-    }
-
+    int index = (client == client_fpga1_main) ? 0 : 1;
     {
         QMutexLocker locker(&m_commandQueueMutex[index]);
+        if (mLastSendCommandMs[index] > 0
+            && (QDateTime::currentMSecsSinceEpoch() - mLastSendCommandMs[index]) >= 5000) {
+            if (mSendCommandBusying[index].load()) {
+                qWarning().noquote() << (index==0 ? "水平相机" : "垂直相机")  << "指令反馈出现异常";
+                if (!cmdPool[index].isEmpty()){
+                    qDebug().noquote() << (index==0 ? "水平相机" : "垂直相机") << "冗余指令列表：";
+                    for (int i=0; i<cmdPool[index].size(); ++i)
+                        qDebug() << cmdPool[index].at(i).name << cmdPool[index].at(i).data.toHex(' ');
+                    cmdPool[index].clear();
+                }
+                mSendCommandBusying[index].store(false);
+            }
+        }
         cmdPool[index].append(CommandItem(name + parameter, command));
     }
 
-    if (!mSendCommandBusying[index])
+    if (!mSendCommandBusying[index].load())
         dequeueCommand(client);
 }
 
 void CommandHelper::dequeueCommand(TcpClient* client)
 {
     int index = (client == client_fpga1_main) ? 0 : 1;
-    QMutexLocker locker(&m_commandQueueMutex[index]);
-    if (cmdPool[index].size() > 0){
-        m_lastCommandItem = cmdPool[index].takeFirst();
-        sendCommand(client, m_lastCommandItem.data, m_lastCommandItem.name);
+    CommandItem item;
+    {
+        QMutexLocker locker(&m_commandQueueMutex[index]);
+        if (cmdPool[index].isEmpty())
+            return;
+        item = cmdPool[index].takeFirst();
     }
+    sendCommand(client, item.data, item.name);
 }
 
 void CommandHelper::directSendCommand(TcpClient* client, const QByteArray& command,
@@ -841,33 +850,15 @@ void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
         return;
     }
 
-    {
-        {
-            QMutexLocker locker(&m_measurementMutex);
-            if (!measure_started){
-                // 测量未开始不应该进入到这里，可能是上次未点击停止测量
-                return ;
-            }
-        }
+    QMutexLocker locker(&m_measurementMutex);
+    if (!measure_started.load())
+        return;
 
-        //存储数据到mfileNameFpga1Main文件中。
-        if (mfileFormat == Binary){
-            if (m_fpga1MainFile.isOpen()) {
-                m_fpga1MainFile.write(binaryData);
-                m_fpga1MainFile.flush();
-            }
-        }
-
-        // 处理水平相机主网口能谱数据，根据当前传输模式选择解析器
-        // if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
-        //     processSpec16Data(1, m_fpga1MainBuffer, binaryData);
-        // } else {
-        //     processSpec512Data(1, m_fpga1MainBuffer, binaryData);
-        // }
+    if (mfileFormat == Binary && m_fpga1MainFile.isOpen()) {
+        m_fpga1MainFile.write(binaryData);
     }
 }
 
-// 处理FPGA主板2主网口能谱数据
 void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
 {
     if (mIsUpgrading.load() && mCurrentUpgradeDetectorIndex == 2)
@@ -876,84 +867,41 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
         return;
     }
 
-    {
-        QMutexLocker locker(&m_measurementMutex);
-        if (!measure_started){
-            // 测量未开始不应该进入到这里，可能是上次未点击停止测量
-            return ;
-        }
-    }
+    QMutexLocker locker(&m_measurementMutex);
+    if (!measure_started.load())
+        return;
 
-    //存储数据到mfileNameFpga2Main文件中。
-    if (mfileFormat == Binary){
-        if (m_fpga2MainFile.isOpen()) {
-            m_fpga2MainFile.write(binaryData);
-            m_fpga2MainFile.flush();
-        }
+    if (mfileFormat == Binary && m_fpga2MainFile.isOpen()) {
+        m_fpga2MainFile.write(binaryData);
     }
-
-    // 处理垂直相机主网口能谱数据，根据当前传输模式选择解析器
-    // if (m_detPara.transferMode == Order::TransferMode::Spectrum16) {
-    //     processSpec16Data(2, m_fpga2MainBuffer, binaryData);
-    // } else {
-    //     processSpec512Data(2, m_fpga2MainBuffer, binaryData);
-    // }
 }
 
-// 处理FPGA主板1副网口波形数据
 void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
 {
     if (mIsUpgrading.load())
-    {
         return;
-    }
 
-    {
-        QMutexLocker locker(&m_measurementMutex);
-        if (!measure_started){
-            // 测量未开始不应该进入到这里，可能是上次未点击停止测量
-            return ;
-        }
-    }
+    QMutexLocker locker(&m_measurementMutex);
+    if (!measure_started.load())
+        return;
 
-    //存储数据到mfileNameFpga1Wave文件中。
-    if (mfileFormat == Binary){
-        if (m_fpga1WaveFile.isOpen()) {
-            m_fpga1WaveFile.write(binaryData);
-            m_fpga1WaveFile.flush();
-        }
+    if (mfileFormat == Binary && m_fpga1WaveFile.isOpen()) {
+        m_fpga1WaveFile.write(binaryData);
     }
-
-    // 处理水平相机副网口波形数据
-    // processWaveformData(1, m_fpga1WaveBuffer, binaryData);
 }
 
-// 处理FPGA主板2副网口波形数据
 void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
 {
     if (mIsUpgrading.load())
-    {
         return;
-    }
 
-    {
-        QMutexLocker locker(&m_measurementMutex);
-        if (!measure_started){
-            // 测量未开始不应该进入到这里，可能是上次未点击停止测量
-            return ;
-        }
-    }
+    QMutexLocker locker(&m_measurementMutex);
+    if (!measure_started.load())
+        return;
 
-    //存储数据到mfileNameFpga2Wave文件中。
-    if (mfileFormat == Binary){
-        if (m_fpga2WaveFile.isOpen()) {
-            m_fpga2WaveFile.write(binaryData);
-            m_fpga2WaveFile.flush();
-        }
+    if (mfileFormat == Binary && m_fpga2WaveFile.isOpen()) {
+        m_fpga2WaveFile.write(binaryData);
     }
-
-    // 处理垂直相机副网口波形数据
-    // processWaveformData(2, m_fpga2WaveBuffer, binaryData);
 }
 
 // 处理512道能谱数据，按照协议解析出时间戳、通道号和计数，并通过信号发送给界面更新
@@ -1458,6 +1406,62 @@ static inline void appendNumber(QByteArray& buf, quint16 num) {
     } while(num);
     buf.append(p);
 }
+
+void CommandHelper::writeSpectrumTextFile(int detectorIndex, quint32 timeMs, int channelNumber,
+                                          const QVector<quint32>& counts)
+{
+    if (detectorIndex < 1 || detectorIndex > 2)
+        return;
+
+    QMutexLocker locker(&m_measurementMutex);
+    if (mfileFormat != Text || !measure_started.load())
+        return;
+
+    QFile* file = (detectorIndex == 1) ? &m_fpga1MainFile : &m_fpga2MainFile;
+    if (!file->isOpen())
+        return;
+
+    QByteArray line;
+    line.reserve(64 + counts.size() * 8);
+    line.append(QByteArray::number(timeMs));
+    line.append(',');
+    line.append(QByteArray::number(channelNumber));
+    for (quint32 count : counts) {
+        line.append(',');
+        line.append(QByteArray::number(count));
+    }
+    line.append('\n');
+    file->write(line);
+}
+
+void CommandHelper::writeWaveformTextFile(int detectorIndex, quint32 timeUnits, int channelNumber,
+                                          const QVector<quint16>& samples)
+{
+    if (detectorIndex < 1 || detectorIndex > 2)
+        return;
+
+    QMutexLocker locker(&m_measurementMutex);
+    if (mfileFormat != Text || !measure_started.load())
+        return;
+
+    QFile* file = (detectorIndex == 1) ? &m_fpga1WaveFile : &m_fpga2WaveFile;
+    if (!file->isOpen())
+        return;
+
+    QByteArray line;
+    line.reserve(4096);
+    appendNumber(line, static_cast<quint16>(timeUnits / 10));
+    line.append(',');
+    appendNumber(line, static_cast<quint16>(channelNumber));
+    const int n = qMin(580, samples.size());
+    for (int i = 0; i < n; ++i) {
+        line.append(',');
+        appendNumber(line, samples.at(i));
+    }
+    line.append('\n');
+    file->write(line);
+}
+
 void CommandHelper::initDataProcessor()
 {
     // FPGA主板1主网口(控制/能谱)
@@ -1465,26 +1469,13 @@ void CommandHelper::initDataProcessor()
         dataProcessor_fpga1_main = new DataProcessor(1);
         connect(client_fpga1_main, &TcpClient::dataReceived, dataProcessor_fpga1_main, &DataProcessor::inputData/*handleFpga1MainData*/, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga1NextCommand, Qt::DirectConnection);
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::DirectConnection);
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this, [=](int detectorIndex, int channelNumber, quint32 timeMs,
-                                                                                     const QVector<quint32>& counts){
-            if (mfileFormat == Text){
-                QStringList strCounts;
-                strCounts << QString::number(timeMs) << QString::number(channelNumber);
-                for (int i = 0; i < Spectrum16BinCount; ++i) {
-                    strCounts << QString::number(counts[i]);
-                }
-
-                QFile* fpgaMainFile[] = {&m_fpga1MainFile, &m_fpga2MainFile};
-                if (fpgaMainFile[detectorIndex-1]->isOpen()) {
-                    fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                    fpgaMainFile[detectorIndex-1]->write("\n");
-                    //fpgaMainFile[detectorIndex-1]->flush();
-                }
-            }
-        }, Qt::DirectConnection);
+        connect(dataProcessor_fpga1_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga1NextCommand, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this,
+                [this](int detectorIndex, int channelNumber, quint32 timeMs, const QVector<quint32>& counts) {
+                    writeSpectrumTextFile(detectorIndex, timeMs, channelNumber, counts);
+                }, Qt::QueuedConnection);
     }
 
     // FPGA主板2主网口(控制/能谱)
@@ -1492,26 +1483,13 @@ void CommandHelper::initDataProcessor()
         dataProcessor_fpga2_main = new DataProcessor(2);
         connect(client_fpga2_main, &TcpClient::dataReceived, dataProcessor_fpga2_main, &DataProcessor::inputData/*handleFpga2MainData*/, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga2NextCommand, Qt::DirectConnection);
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::DirectConnection);
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::DirectConnection);
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this, [=](int detectorIndex, int channelNumber, quint32 timeMs,
-                                                                                     const QVector<quint32>& counts){
-            if (mfileFormat == Text){
-                QStringList strCounts;
-                strCounts << QString::number(timeMs) << QString::number(channelNumber);
-                for (int i = 0; i < Spectrum16BinCount; ++i) {
-                    strCounts << QString::number(counts[i]);
-                }
-
-                QFile* fpgaMainFile[] = {&m_fpga1MainFile, &m_fpga2MainFile};
-                if (fpgaMainFile[detectorIndex-1]->isOpen()) {
-                    fpgaMainFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                    fpgaMainFile[detectorIndex-1]->write("\n");
-                    //fpgaMainFile[detectorIndex-1]->flush();
-                }
-            }
-        }, Qt::DirectConnection);
+        connect(dataProcessor_fpga2_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga2NextCommand, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this,
+                [this](int detectorIndex, int channelNumber, quint32 timeMs, const QVector<quint32>& counts) {
+                    writeSpectrumTextFile(detectorIndex, timeMs, channelNumber, counts);
+                }, Qt::QueuedConnection);
     }
 
     // 副网口，仅接收波形（FPGA主板1）
@@ -1519,100 +1497,33 @@ void CommandHelper::initDataProcessor()
         dataProcessor_fpga1_wave = new DataProcessor(3);
         connect(client_fpga1_wave, &TcpClient::dataReceived, dataProcessor_fpga1_wave, &DataProcessor::inputData/*handleFpga1WaveData*/, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::DirectConnection);
-        connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            // qDebug() << "CommandHelper 水平相机收到硬触发指令！";
-            if (!mHardTriggered.load()){
+        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [this] {
+            bool expected = false;
+            if (mHardTriggered.compare_exchange_strong(expected, true))
                 emit sigHardTriggeredSignalReceived();
-            }
-
-            mHardTriggered.store(true);
-        }, Qt::DirectConnection);
-        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this, [=](int detectorIndex, int channelNumber, quint32 timeUnits,
-                                                                                     const QVector<quint16>& samples){
-            if (mfileFormat == Text){
-                // QStringList strCounts;
-                // strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
-                // for (int i = 0; i < 580; ++i) {
-                //     strCounts << QString::number(samples[i]);
-                // }
-
-                QFile* fpgaWaveFile[] = {&m_fpga1WaveFile, &m_fpga2WaveFile};
-                // if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                //     fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                //     fpgaWaveFile[detectorIndex-1]->write("\n");
-                //     //fpgaWaveFile[detectorIndex-1]->flush();
-                // }
-                if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    // 各波形处理线程独立缓冲，避免两路 DirectConnection 并发写同一 static 导致竞态
-                    thread_local QByteArray lineBuffer;
-                    lineBuffer.clear();
-                    lineBuffer.reserve(4096);
-
-                    appendNumber(lineBuffer, timeUnits/10);
-                    lineBuffer.append(',');
-                    appendNumber(lineBuffer, channelNumber);
-
-                    for (int i = 0; i < 580; ++i) {
-                        lineBuffer.append(',');
-                        appendNumber(lineBuffer, samples[i]);
-                    }
-                    lineBuffer.append('\n');
-
-                    fpgaWaveFile[detectorIndex-1]->write(lineBuffer);
-                }
-            }
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this,
+                [this](int detectorIndex, int channelNumber, quint32 timeUnits, const QVector<quint16>& samples) {
+                    writeWaveformTextFile(detectorIndex, timeUnits, channelNumber, samples);
+                }, Qt::QueuedConnection);
     }
 
-    client_fpga2_wave = new TcpClient(this); // 副网口，仅接收波形（FPGA主板2）
+    // 副网口，仅接收波形（FPGA主板2）——复用构造时已创建的 client_fpga2_wave
     {
         dataProcessor_fpga2_wave = new DataProcessor(4);
-        connect(client_fpga2_wave, &TcpClient::dataReceived, dataProcessor_fpga2_wave, &DataProcessor::inputData/*handleFpga2WaveData*/, Qt::DirectConnection);
+        connect(client_fpga2_wave, &TcpClient::dataReceived, dataProcessor_fpga2_wave, &DataProcessor::inputData, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::DirectConnection);
-        connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [=]{
-            // qDebug() << "CommandHelper 垂直相机收到硬触发指令！";
-            if (!mHardTriggered.load()){
+        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [this] {
+            bool expected = false;
+            if (mHardTriggered.compare_exchange_strong(expected, true))
                 emit sigHardTriggeredSignalReceived();
-            }
-
-            mHardTriggered.store(true);
-        }, Qt::DirectConnection);
-        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this, [=](int detectorIndex, int channelNumber, quint32 timeUnits,
-                                                                                     const QVector<quint16>& samples){
-            if (mfileFormat == Text){
-                // QStringList strCounts;
-                // strCounts << QString::number(timeUnits/10) << QString::number(channelNumber);
-                // for (int i = 0; i < 580; ++i) {
-                //     strCounts << QString::number(samples[i]);
-                // }
-
-                QFile* fpgaWaveFile[] = {&m_fpga1WaveFile, &m_fpga2WaveFile};
-                // if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                //     fpgaWaveFile[detectorIndex-1]->write(strCounts.join(',').toLatin1());
-                //     fpgaWaveFile[detectorIndex-1]->write("\n");
-                //     //fpgaWaveFile[detectorIndex-3]->flush();
-                // }
-                if (fpgaWaveFile[detectorIndex-1]->isOpen()) {
-                    thread_local QByteArray lineBuffer;
-                    lineBuffer.clear();
-                    lineBuffer.reserve(4096);
-
-                    appendNumber(lineBuffer, timeUnits/10);
-                    lineBuffer.append(',');
-                    appendNumber(lineBuffer, channelNumber);
-
-                    for (int i = 0; i < 580; ++i) {
-                        lineBuffer.append(',');
-                        appendNumber(lineBuffer, samples[i]);
-                    }
-                    lineBuffer.append('\n');
-
-                    fpgaWaveFile[detectorIndex-1]->write(lineBuffer);
-                }
-            }
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this,
+                [this](int detectorIndex, int channelNumber, quint32 timeUnits, const QVector<quint16>& samples) {
+                    writeWaveformTextFile(detectorIndex, timeUnits, channelNumber, samples);
+                }, Qt::QueuedConnection);
     }
 
     // 参数查询
@@ -1621,22 +1532,22 @@ void CommandHelper::initDataProcessor()
         DataProcessor* processor = dataProcessors[i-1];
         connect(processor, &DataProcessor::sigSpectrumRefreshTimelengthAck, this, [=](quint16 v){
             emit sigSpectrumRefreshTimelengthAck(i, v);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
         connect(processor, &DataProcessor::sigSpecSpectrumTriggerThresholdAck, this, [=](quint16 v){
             emit sigSpecSpectrumTriggerThresholdAck(i, v);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
         connect(processor, &DataProcessor::sigSpecSpectrumDieTimelengthAck, this, [=](quint16 v){
             emit sigSpecSpectrumDieTimelengthAck(i, v);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
         connect(processor, &DataProcessor::sigSpecTriggerSignalTimeWidthAck, this, [=](quint16 v){
             emit sigSpecTriggerSignalTimeWidthAck(i, v);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
         connect(processor, &DataProcessor::sigSpecSpectrumTimeWindowAck, this, [=](quint8 no, quint16 e1, quint16 e2){
             emit sigSpecSpectrumTimeWindowAck(i, no, e1, e2);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
         connect(processor, &DataProcessor::sigOTAVersionAck, this, [=](quint8 v){
             emit sigOTAVersionAck(i, v);
-        }, Qt::DirectConnection);
+        }, Qt::QueuedConnection);
 
     }
 }
@@ -1662,8 +1573,8 @@ void CommandHelper::queryStart()
     dataProcessor_fpga2_main->prepareStartMeasure();
     mSendCommandBusying[0].store(false);
     mSendCommandBusying[1].store(false);
-    cmdPool[0].clear();
-    cmdPool[1].clear();
+    clearCommandPool(0);
+    clearCommandPool(1);
 
     TcpClient* clients[2] = {client_fpga1_main, client_fpga2_main};
     for (int i=0; i<2; ++i){

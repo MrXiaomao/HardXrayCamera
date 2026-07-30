@@ -28,7 +28,6 @@ public:
     explicit DataProcessor(quint8 detectorIndex, QObject *parent = nullptr);
     ~DataProcessor();
 
-    void inputData(const QByteArray&);
     void setTransferMode(Order::TransferMode mode);
     void setTriggerMode(Order::TriggerMode mode);
     void reset();
@@ -62,7 +61,7 @@ signals:
     void sigOTAVersionAck(quint8);
 
 public slots:
-    // 继电器数据处理
+    void inputData(const QByteArray& data);
     void handleFpga1MainData(QByteArray &binaryData);
     void handleFpga2MainData(QByteArray &binaryData);
     void handleFpga1WaveData(QByteArray &binaryData);
@@ -70,6 +69,7 @@ public slots:
     void onProcessLoop();
 
 private:
+    void handleMeasureStopAck(const QString& detName);
     QThread m_workThread;
 
     QByteArray m_pendingData;
@@ -82,22 +82,20 @@ private:
     QWaitCondition m_condData;
 
     QByteArray m_cacheBuffer;
-    Order::TransferMode m_transferMode;
-    Order::TriggerMode m_trigMode;
+    // 与 onProcessLoop 并发时由 m_dataMutex 保护
+    Order::TransferMode m_transferMode = Order::Spectrum512;
+    Order::TriggerMode m_trigMode = Order::SoftwareTrigger;
 
-    // std::atomic_bool measure_started = false;
     quint8 mDetectorIndex = 1;
-    //mutable QMutex m_measurementMutex;
     mutable QMutex m_dataMutex;
-    //硬触发信号
     std::atomic_bool mHardTriggered = false;
 
     QVector<quint16> m_samples;
     std::atomic_bool m_measureStarted = false;// 测量准备-开始
     std::atomic_bool m_measureStopPrepared = false;// 测量准备-停止
 
-    bool m_lastCommandIsQueryVersion = false;
-    bool m_isQueryMode = false;
+    std::atomic_bool m_lastCommandIsQueryVersion = false;
+    std::atomic_bool m_isQueryMode = false;
 
     quint16 readUInt16BE(const char* data);
     int channelNumberFromMask(quint32 channelMask);

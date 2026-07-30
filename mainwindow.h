@@ -508,6 +508,7 @@ private:
     enum class AutoMeasureState { Idle, WaitingShot, Measuring };
     AutoMeasureState m_autoMeasureState = AutoMeasureState::Idle;
     bool m_autoMeasureDurationTimerStarted = false;
+    bool m_pendingAutoRestart = false; // 自动测量到时后延迟重配，用户停止时可取消
 
     // 3D剖面图
     CustomSurface *m_hor3DSurface = nullptr;

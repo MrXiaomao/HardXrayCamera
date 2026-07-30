@@ -255,7 +255,6 @@ private:
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool[2]; //常用指令池，可以根据需要添加更多指令
-    CommandItem m_lastCommandItem;
 
     //硬触发信号
     std::atomic_bool mHardTriggered = false;
@@ -266,7 +265,7 @@ private:
 
     std::atomic_bool mSendCommandBusying[2] = {false, false};
     QMutex m_commandQueueMutex[2];
-    QElapsedTimer mLastSendCommandTimer[2];// 指令上次执行时间
+    qint64 mLastSendCommandMs[2] = {0, 0};// 指令上次发送的单调时钟(ms)
 
     QFile m_fpga1MainFile;
     QFile m_fpga2MainFile;
@@ -275,7 +274,12 @@ private:
 
     mutable QMutex m_measurementMutex;
 
-    void closeMeasurementFilesLocked();    
+    void closeMeasurementFilesLocked();
+    void clearCommandPool(int index);
+    void writeSpectrumTextFile(int detectorIndex, quint32 timeMs, int channelNumber,
+                               const QVector<quint32>& counts);
+    void writeWaveformTextFile(int detectorIndex, quint32 timeUnits, int channelNumber,
+                               const QVector<quint16>& samples);
 };
 
 #endif // COMMANDHELPER_H
