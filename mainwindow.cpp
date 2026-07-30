@@ -1078,10 +1078,35 @@ void MainWindow::printWaveformCollectionSummary() const
         if (missingSequences.isEmpty())
             continue;
 
-        QStringList missingLabels;
-        missingLabels.reserve(missingSequences.size());
+        // 【新增连续序号合并逻辑】
+        QList<quint32> lostSeqList;
         for (quint32 missingSequence : missingSequences)
-            missingLabels << QString::number(missingSequence);
+            lostSeqList << missingSequence;
+
+        QStringList missingLabels;
+        int i = 0;
+        int totalLost = lostSeqList.size();
+        while (i < totalLost) {
+            quint32 start = lostSeqList[i];
+            quint32 end = start;
+            // 向后查找连续的序号
+            while (i+1 < totalLost && lostSeqList[i+1] == end + 1) {
+                end++;
+                i++;
+            }
+            // 单序号不合并，连续多号用~
+            if (start == end) {
+                missingLabels << QString::number(start);
+            } else {
+                missingLabels << QStringLiteral("%1~%2").arg(start).arg(end);
+            }
+            i++;
+        }
+
+        // QStringList missingLabels;
+        // missingLabels.reserve(missingSequences.size());
+        // for (quint32 missingSequence : missingSequences)
+        //     missingLabels << QString::number(missingSequence);
 
         qWarning() << QString("通道%1缺失波形序号: %2")
             .arg(channel)
