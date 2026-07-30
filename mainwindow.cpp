@@ -263,7 +263,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigHardTriggeredSignalReceived, this,
             &MainWindow::onHardTriggeredSignalReceived, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigMeasureTimerStarted, this, [=]{
-        startMeasureDurationTimer();
+        if (m_measureMode == MeasureMode::ManualMode)
+            startMeasureDurationTimer();
     }, Qt::QueuedConnection);
 
     m_spectrumByChannel.resize(kSpectrumChannelCount);
@@ -1095,10 +1096,35 @@ void MainWindow::printSpectrumSequenceSummary() const
         if (missingSequences.isEmpty())
             continue;
 
-        QStringList missingLabels;
-        missingLabels.reserve(missingSequences.size());
+        // 【新增连续序号合并逻辑】
+        QList<quint32> lostSeqList;
         for (quint32 missingSequence : missingSequences)
-            missingLabels << QString::number(missingSequence);
+            lostSeqList << missingSequence;
+
+        QStringList missingLabels;
+        int i = 0;
+        int totalLost = lostSeqList.size();
+        while (i < totalLost) {
+            quint32 start = lostSeqList[i];
+            quint32 end = start;
+            // 向后查找连续的序号
+            while (i+1 < totalLost && lostSeqList[i+1] == end + 1) {
+                end++;
+                i++;
+            }
+            // 单序号不合并，连续多号用~
+            if (start == end) {
+                missingLabels << QString::number(start);
+            } else {
+                missingLabels << QStringLiteral("%1~%2").arg(start).arg(end);
+            }
+            i++;
+        }
+
+        // QStringList missingLabels;
+        // missingLabels.reserve(missingSequences.size());
+        // for (quint32 missingSequence : missingSequences)
+        //     missingLabels << QString::number(missingSequence);
 
         qWarning() << QString("通道%1缺失能谱序号: %2")
             .arg(channel)
@@ -1946,7 +1972,7 @@ void MainWindow::triggerAutoMeasureFromShot(const QString &shotNumber)
     resetMeasurementPlotData();
     //spectrumPlotThrottle.invalidate();
 
-    commandHelper->beginRecording(mdetPara);
+    //commandHelper->beginRecording(mdetPara);// configureMeasure 中提前创建文件，避免漏掉反馈指令
     commandHelper->sendSpectrumControl(Order::HardwareTrigger);
 
     // if (mdetPara.transferMode == Order::TransferMode::Spectrum16) {
@@ -3135,5 +3161,16 @@ void MainWindow::on_action_dataUpload_triggered()
 
     hdaClient.disconnect();
     QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("数据上传完毕，本次上传记录数共%1条！").arg(recordCount));
+}
+
+
+void MainWindow::on_action_parameterQuery_triggered()
+{
+    if (nullptr == parameterQueryDialog){
+        parameterQueryDialog = new ParameterQueryDialog();
+        parameterQueryDialog->setWindowFlags(parameterQueryDialog->windowFlags() | Qt::WindowStaysOnTopHint);
+    }
+
+    parameterQueryDialog->show();
 }
 

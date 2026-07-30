@@ -2201,6 +2201,8 @@
     </property>
     <addaction name="actionFPGA"/>
     <addaction name="action_dataUpload"/>
+    <addaction name="separator"/>
+    <addaction name="action_parameterQuery"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menu_2"/>
@@ -2418,6 +2420,14 @@
    </property>
    <property name="text">
     <string>HDA服务器数据上传</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_parameterQuery">
+   <property name="text">
+    <string>配置参数查询</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>

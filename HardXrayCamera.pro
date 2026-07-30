@@ -16,6 +16,7 @@ SOURCES += \
     dataprocessor.cpp \
     hdadataupload.cpp \
     otaupgradewindow.cpp \
+    parameterquerydialog.cpp \
     signalwidthsetting.cpp \
     udpshotreceiver.cpp \
     detectorsetting.cpp \
@@ -35,6 +36,7 @@ HEADERS += \
     dataprocessor.h \
     hdadataupload.h \
     otaupgradewindow.h \
+    parameterquerydialog.h \
     signalwidthsetting.h \
     udpshotreceiver.h \
     detectorsetting.h \
@@ -53,6 +55,7 @@ FORMS += \
     mainwindow.ui \
     offlinewindow.ui \
     otaupgradewindow.ui \
+    parameterquerydialog.ui \
     signalwidthsetting.ui
 
 # Default rules for deployment.

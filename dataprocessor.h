@@ -35,6 +35,9 @@ public:
     void prepareStartMeasure();
     void prepareStopMeasure();
 
+    void enterQueryMode();
+    void leaveQueryMode();
+
 signals:
     // 波形数据: timeUnits 单位为 500us, samples 为 1024 个采样点
     void sigWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
@@ -49,6 +52,14 @@ signals:
     void sigSendNextCommand();
     void sigMessureStarted();
     void sigMessureStoped();
+
+    // 参数查询
+    void sigSpectrumRefreshTimelengthAck(quint16);
+    void sigSpecSpectrumTriggerThresholdAck(quint16);
+    void sigSpecSpectrumDieTimelengthAck(quint16);
+    void sigSpecTriggerSignalTimeWidthAck(quint16);
+    void sigSpecSpectrumTimeWindowAck(quint8, quint16, quint16);
+    void sigOTAVersionAck(quint8);
 
 public slots:
     // 继电器数据处理
@@ -84,6 +95,9 @@ private:
     QVector<quint16> m_samples;
     std::atomic_bool m_measureStarted = false;// 测量准备-开始
     std::atomic_bool m_measureStopPrepared = false;// 测量准备-停止
+
+    bool m_lastCommandIsQueryVersion = false;
+    bool m_isQueryMode = false;
 
     quint16 readUInt16BE(const char* data);
     int channelNumberFromMask(quint32 channelMask);

@@ -111,6 +111,10 @@ public:
     void loadEnergyCalibration();// 加载能量刻度
     void saveChannelBoundary(const QVector<QVector<quint16>>&);
 
+    // 新增指令查询
+    void queryStart();
+    void queryEnd();
+
     // 记录当前炮号和录像文件时间戳
     QString mSavePath = "data"; //默认保存路径
     QString mShotTag;
@@ -133,6 +137,8 @@ private:
     void queueCommand(TcpClient* client, const QByteArray& command,
                      const QString& name, const QString& parameter = QString());
     void dequeueCommand(TcpClient* client);
+    void directSendCommand(TcpClient* client, const QByteArray& command,
+                           const QString& name, const QString& parameter = QString());
 
     void processSpec512Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
     void processSpec16Data(int detectorIndex, QByteArray& buffer, const QByteArray& data);
@@ -183,6 +189,14 @@ signals:
 
     void sigHardTriggeredSignalReceived();
     void sigMeasureTimerStarted();
+
+    // 参数查询
+    void sigSpectrumRefreshTimelengthAck(quint8, quint16);
+    void sigSpecSpectrumTriggerThresholdAck(quint8, quint16);
+    void sigSpecSpectrumDieTimelengthAck(quint8, quint16);
+    void sigSpecTriggerSignalTimeWidthAck(quint8, quint16);
+    void sigSpecSpectrumTimeWindowAck(quint8, quint8, quint16, quint16);
+    void sigOTAVersionAck(quint8, quint8);
 
 public slots:
     // 继电器数据处理
@@ -241,6 +255,7 @@ private:
 
     QByteArray cmdSoftTrigger;//软件触发模式，开始测量
     QVector<CommandItem> cmdPool[2]; //常用指令池，可以根据需要添加更多指令
+    CommandItem m_lastCommandItem;
 
     //硬触发信号
     std::atomic_bool mHardTriggered = false;
@@ -251,6 +266,7 @@ private:
 
     std::atomic_bool mSendCommandBusying[2] = {false, false};
     QMutex m_commandQueueMutex[2];
+    QElapsedTimer mLastSendCommandTimer[2];// 指令上次执行时间
 
     QFile m_fpga1MainFile;
     QFile m_fpga2MainFile;

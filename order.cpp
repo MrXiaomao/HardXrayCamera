@@ -5,6 +5,7 @@ constexpr quint8 Header0 = 0x12;
 constexpr quint8 Header1 = 0x34;
 constexpr quint8 Header2 = 0x00;
 constexpr quint8 Header3 = 0x0F;
+constexpr quint8 Header3_2 = 0xFB;// 查询指令
 constexpr quint8 Tail0 = 0xAB;
 constexpr quint8 Tail1 = 0xCD;
 

@@ -383,15 +383,17 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
             qDebug() << cmdPool[0].at(i).name << cmdPool[0].at(i).data.toHex(' ');
     }
     cmdPool[0].clear();
-    if (cmdPool[0].size() > 0){
+    if (cmdPool[1].size() > 0){
         qDebug() << "垂直相机冗余指令列表：";
         for (int i=0; i<cmdPool[1].size(); ++i)
             qDebug() << cmdPool[1].at(i).name << cmdPool[1].at(i).data.toHex(' ');
     }
     cmdPool[1].clear();
 
+    beginRecording(measurement);// 提前创建文件，避免漏掉反馈指令
+
     qDebug().noquote().nospace() << "测量模式：" << (m_detPara.trigMode == Order::TriggerMode::HardwareTrigger ? QStringLiteral("硬触发模式") : QStringLiteral("软触发模式"));
-    sendTriggerSignalTimeWidth();
+
     queueCommand(client_fpga1_main, Order::setTransferMode(measurement.transferMode),
                 "传输模式设置",
                 QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort),
@@ -400,6 +402,7 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
                 "传输模式设置",
                 QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort),
                                      transferModeText(measurement.transferMode)));
+    sendTriggerSignalTimeWidth();
     queueCommand(client_fpga1_main, Order::setSpectrumRefreshTime(measurement.spectrumRefreshInterval),
                 "能谱刷新时间",
                 QString("%1 %2 ms").arg(QString::fromUtf8(kFpga1MainPort))
@@ -603,12 +606,12 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
 void CommandHelper::sendSpectrumControl(Order::TriggerMode mode)
 {
     // 先垂直相机，再水平相机，缩短两机进入硬触发等待的时间差
+    queueCommand(client_fpga1_main, Order::controlSpectrum(mode),
+                 "能谱测量控制",
+                 QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort), triggerModeText(mode)));
     queueCommand(client_fpga2_main, Order::controlSpectrum(mode),
                 "能谱测量控制",
                 QString("%1 %2").arg(QString::fromUtf8(kFpga2MainPort), triggerModeText(mode)));
-    queueCommand(client_fpga1_main, Order::controlSpectrum(mode),
-                "能谱测量控制",
-                QString("%1 %2").arg(QString::fromUtf8(kFpga1MainPort), triggerModeText(mode)));
 }
 
 void CommandHelper::startMeasure(DetParameter detPara)
@@ -617,7 +620,7 @@ void CommandHelper::startMeasure(DetParameter detPara)
     if (!configureMeasure(measurement))
         return;
 
-    beginRecording(measurement);
+    //beginRecording(measurement);
     sendSpectrumControl(measurement.trigMode);
 
     qInfo().noquote() << QStringLiteral("测量已开始，参数：时长 %1 ms，传输模式：%2，能谱刷新间隔：%3 ms，能谱触发阈值：%4，能谱死时间：%5 ns，触发模式：%6")
@@ -715,10 +718,14 @@ void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
     if (!client)
         return;
 
-    if (client == client_fpga1_main)
+    if (client == client_fpga1_main){
+        mLastSendCommandTimer[0].restart();
         mSendCommandBusying[0].store(true);
-    else if (client == client_fpga2_main)
+    }
+    else if (client == client_fpga2_main){
+        mLastSendCommandTimer[1].restart();
         mSendCommandBusying[1].store(true);
+    }
 
     client->send(command);
     const QString detail = parameter.isEmpty()
@@ -732,7 +739,20 @@ void CommandHelper::sendCommand(TcpClient* client, const QByteArray& command,
 void CommandHelper::queueCommand(TcpClient* client, const QByteArray& command,
                   const QString& name, const QString& parameter)
 {
-    int index = (client == client_fpga1_main) ? 0 : 1;
+    int index = (client == client_fpga1_main) ? 0 : 1;    
+    if (mLastSendCommandTimer[index].isValid() && mLastSendCommandTimer[index].elapsed() >= 5000){
+        if (mSendCommandBusying[index]){
+            qWarning().noquote() << (index==0 ? "水平相机" : "垂直相机")  << "指令反馈出现异常";
+            if (!cmdPool[index].isEmpty()){
+                qDebug().noquote() << (index==0 ? "水平相机" : "垂直相机") << "冗余指令列表：";
+                for (int i=0; i<cmdPool[index].size(); ++i)
+                    qDebug() << cmdPool[index].at(i).name << cmdPool[index].at(i).data.toHex(' ');
+                cmdPool[index].clear();
+            }
+            mSendCommandBusying[index].store(false);
+        }
+    }
+
     {
         QMutexLocker locker(&m_commandQueueMutex[index]);
         cmdPool[index].append(CommandItem(name + parameter, command));
@@ -747,9 +767,24 @@ void CommandHelper::dequeueCommand(TcpClient* client)
     int index = (client == client_fpga1_main) ? 0 : 1;
     QMutexLocker locker(&m_commandQueueMutex[index]);
     if (cmdPool[index].size() > 0){
-        CommandItem cmdItem = cmdPool[index].takeFirst();
-        sendCommand(client, cmdItem.data, cmdItem.name);
+        m_lastCommandItem = cmdPool[index].takeFirst();
+        sendCommand(client, m_lastCommandItem.data, m_lastCommandItem.name);
     }
+}
+
+void CommandHelper::directSendCommand(TcpClient* client, const QByteArray& command,
+                                 const QString& name, const QString& parameter)
+{
+    if (!client)
+        return;
+
+    client->send(command);
+    const QString detail = parameter.isEmpty()
+                               ? name
+                               : QString("%1：%2").arg(name, parameter);
+    qDebug().noquote() << QString("Send HEX: %1[%2]")
+                              .arg(QString(command.toHex(' ')))
+                              .arg(detail);
 }
 
 // 读取网络配置，IP和port
@@ -1579,6 +1614,31 @@ void CommandHelper::initDataProcessor()
             }
         }, Qt::DirectConnection);
     }
+
+    // 参数查询
+    DataProcessor* dataProcessors[2] = {dataProcessor_fpga1_main, dataProcessor_fpga2_main};
+    for (int i=1; i<=2; ++i){
+        DataProcessor* processor = dataProcessors[i-1];
+        connect(processor, &DataProcessor::sigSpectrumRefreshTimelengthAck, this, [=](quint16 v){
+            emit sigSpectrumRefreshTimelengthAck(i, v);
+        }, Qt::DirectConnection);
+        connect(processor, &DataProcessor::sigSpecSpectrumTriggerThresholdAck, this, [=](quint16 v){
+            emit sigSpecSpectrumTriggerThresholdAck(i, v);
+        }, Qt::DirectConnection);
+        connect(processor, &DataProcessor::sigSpecSpectrumDieTimelengthAck, this, [=](quint16 v){
+            emit sigSpecSpectrumDieTimelengthAck(i, v);
+        }, Qt::DirectConnection);
+        connect(processor, &DataProcessor::sigSpecTriggerSignalTimeWidthAck, this, [=](quint16 v){
+            emit sigSpecTriggerSignalTimeWidthAck(i, v);
+        }, Qt::DirectConnection);
+        connect(processor, &DataProcessor::sigSpecSpectrumTimeWindowAck, this, [=](quint8 no, quint16 e1, quint16 e2){
+            emit sigSpecSpectrumTimeWindowAck(i, no, e1, e2);
+        }, Qt::DirectConnection);
+        connect(processor, &DataProcessor::sigOTAVersionAck, this, [=](quint8 v){
+            emit sigOTAVersionAck(i, v);
+        }, Qt::DirectConnection);
+
+    }
 }
 
 void CommandHelper::handleFpga1NextCommand()
@@ -1591,4 +1651,66 @@ void CommandHelper::handleFpga2NextCommand()
 {
     mSendCommandBusying[1].store(false);
     dequeueCommand(client_fpga2_main);
+}
+
+// 新增指令查询
+void CommandHelper::queryStart()
+{
+    dataProcessor_fpga1_main->enterQueryMode();
+    dataProcessor_fpga2_main->enterQueryMode();
+    dataProcessor_fpga1_main->prepareStartMeasure();
+    dataProcessor_fpga2_main->prepareStartMeasure();
+    mSendCommandBusying[0].store(false);
+    mSendCommandBusying[1].store(false);
+    cmdPool[0].clear();
+    cmdPool[1].clear();
+
+    TcpClient* clients[2] = {client_fpga1_main, client_fpga2_main};
+    for (int i=0; i<2; ++i){
+        TcpClient* client = clients[i];
+        const QString name = (i == 0) ? QStringLiteral("水平相机") : QStringLiteral("垂直相机");
+
+        // 查询分时能谱
+        //queueCommand(client, QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 02 AB CD"), QStringLiteral("水平相机 切换到能谱模式"));
+        //queueCommand(client, QByteArray::fromHex("12 34 00 AB FA 13 00 00 00 00 AB CD"), QStringLiteral("水平相机 切换模式 分时能谱"));
+
+        // 查询HXR能量道
+        // 如果从OTA切换到能谱，没有反馈，如果已经是能谱，再次发送则有返回
+        directSendCommand(client, QByteArray::fromHex("12 34 00 0F D0 02 00 00 00 00 AB CD"), QStringLiteral("%1 切换到SPE选通").arg(name));
+
+        queueCommand(client, QByteArray::fromHex("12 34 00 0F FA 13 00 00 00 07 AB CD"), QStringLiteral("%1 切换指令反馈选通").arg(name));
+
+        // 共有参数
+        queueCommand(client, Order::setTriggerSignalTimeWidth(0).replace(3, 1, "\xAB", 1), QStringLiteral("%1 查询触发信号宽度").arg(name));
+        queueCommand(client, Order::setSpectrumRefreshTime(0).replace(3, 1, "\xAB", 1), QStringLiteral("%1 查询能谱刷新时间").arg(name));
+        queueCommand(client, Order::setSpectrumTriggerThreshold(0).replace(3, 1, "\xAB", 1), QStringLiteral("%1 查询能谱触发阈值").arg(name));
+        queueCommand(client, Order::setSpectrumDeadTime(0).replace(3, 1, "\xAB", 1), QStringLiteral("%1 查询能谱死时间").arg(name));
+
+        // HXR私有参数
+        for (quint8 channel = 0; channel < 16; ++channel) {
+            for (int cmd = 0; cmd < 9; ++cmd) {
+                const quint8 commandIndex = static_cast<quint8>(channel * 9 + cmd);
+                queueCommand(client, QByteArray::fromHex("12 34 00 AB FB 00 00 00 00 00 AB CD").replace(5, 1, (const char*)&commandIndex, 1),
+                             QStringLiteral("%1 查询分时能谱能窗 逻辑CH%2 序号0x%3")
+                                 .arg(name)
+                                 .arg(channel + 1)
+                                 .arg(commandIndex, 2, 16, QChar('0'))
+                                 );
+            }
+        }
+
+        // 固件版本
+        queueCommand(client, QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 00 AB CD"), QStringLiteral("%1 切换到OTA选通").arg(name));// 有返回
+        queueCommand(client, QByteArray::fromHex("55 03 01 00 00 00 00 f0"), QStringLiteral("%1 查询程序版本号").arg(name));// 返回0x81 0x81 0x81
+    }
+}
+
+void CommandHelper::queryEnd()
+{
+    // 恢复到SPE选通
+    directSendCommand(client_fpga1_main, QByteArray::fromHex("12 34 00 0F D0 02 00 00 00 00 AB CD"), QStringLiteral("%1 切换到SPE选通").arg(QString::fromUtf8(kFpga1MainPort)));
+    directSendCommand(client_fpga2_main, QByteArray::fromHex("12 34 00 0F D0 02 00 00 00 00 AB CD"), QStringLiteral("%1 切换到SPE选通").arg(QString::fromUtf8(kFpga2MainPort)));
+
+    dataProcessor_fpga1_main->leaveQueryMode();
+    dataProcessor_fpga2_main->leaveQueryMode();
 }

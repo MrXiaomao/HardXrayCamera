@@ -50,17 +50,24 @@ double DataProcessor::parseArm2Temperature(quint8 highByte, quint8 lowByte)
 void DataProcessor::onProcessLoop()
 {
     const QByteArray kspecCtrlHead = QByteArray::fromHex("12 34 00 0F FA");// 控制指令
-    const QByteArray kspecQueryHead = QByteArray::fromHex("12 34 00 AB FA");// 查询指令
     const QByteArray kspecTail = QByteArray::fromHex("ab cd");// 指令
     const QByteArray kspecSpectrumRefreshTimelengthHead = QByteArray::fromHex("12 34 00 0f fa 11");//能谱刷新时间
+    const QByteArray kspecSpectrumRefreshTimelengthQueryHead = QByteArray::fromHex("12 34 00 ab fa 11");//能谱刷新时间-查询
     const QByteArray kspecSpectrumTriggerThresholdHead = QByteArray::fromHex("12 34 00 0f fa 12");//能谱触发阈值
+    const QByteArray kspecSpectrumTriggerThresholdQueryHead = QByteArray::fromHex("12 34 00 ab fa 12");//能谱触发阈值-查询
     const QByteArray kspecTransferModeHead = QByteArray::fromHex("12 34 00 0f fa 13");// 传输模式设置
+    const QByteArray kspecTransferModeQueryHead = QByteArray::fromHex("12 34 00 ab fa 13");// 传输模式设置-查询
     const QByteArray kspecSpectrumDieTimelengthHead = QByteArray::fromHex("12 34 00 0f fa 14");//能谱死时间
+    const QByteArray kspecSpectrumDieTimelengthQueryHead = QByteArray::fromHex("12 34 00 ab fa 14");//能谱死时间-查询
     const QByteArray kspecSpectrumResetHead = QByteArray::fromHex("12 34 00 0f fa a0 00 00 00 01");//复位
     const QByteArray kspecSpectrumTimeWindowHead = QByteArray::fromHex("12 34 00 0f fb");//分时能谱能窗
+    const QByteArray kspecSpectrumTimeWindowQueryHead = QByteArray::fromHex("12 34 00 ab fb");//分时能谱能窗-查询
     const QByteArray kspecTriggerSignalTimeWidthHead = QByteArray::fromHex("12 34 00 0f ff b0");//触发信号宽度
+    const QByteArray kspecTriggerSignalTimeWidthQueryHead = QByteArray::fromHex("12 34 00 ab ff b0");//触发信号宽度-查询
     const QByteArray kspecMeasureStartHead = QByteArray::fromHex("12 34 00 0f ff a0 00 00 00");//能谱测量控制-软件触发开始
     const QByteArray kspecMeasureStopHead = QByteArray::fromHex("12 34 00 0f ff a0 00 00 00 00 ab cd");//能谱测量控制-停止
+    const QByteArray kspecSPESelectChannelAckHead = QByteArray::fromHex("12 34 00 0F D0 02 00 00 00 00 AB CD");//SPE选通指令
+    const QByteArray kspecOTASelectChannelAckHead = QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 00 AB CD");//OTA选通指令
 
     const QString detName = (mDetectorIndex==1) ? QStringLiteral("水平相机 ") : QStringLiteral("垂直相机 ");
 
@@ -96,52 +103,23 @@ void DataProcessor::onProcessLoop()
             // 测量开始以前对返回指令进行解析
             int pos = 0;
             bool isQueryCmd = false;
-            while (localData.size() - pos >= baseCommandLength){
-                // 查询指令
-                if (hasTargerAt(localData, pos, kspecQueryHead)){
-                    if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        isQueryCmd = true;
-                        pos += baseCommandLength;
-                    }
-                    else{
-                        qDebug() << "指令反馈：查询指令尾部数据无效";
-                        pos += kspecQueryHead.size();
-                    }
+            while (localData.size() - pos >= baseCommandLength){                
+                //SPE选通指令
+                if (hasTargerAt(localData, pos, kspecSPESelectChannelAckHead)){
+                    qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "SPE选通指令 " << detName << "]";
+                    pos += baseCommandLength;
 
+                    emit sigSendNextCommand();
                     continue;
                 }
 
-                //能谱刷新时间
-                if (hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthHead)){
-                    if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱刷新时间" << detName << v << " ms]";
-                        pos += baseCommandLength;
+                //OTA选通指令
+                if (hasTargerAt(localData, pos, kspecOTASelectChannelAckHead)){
+                    qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "OTA选通指令 " << detName << "]";
+                    pos += baseCommandLength;
+                    m_lastCommandIsQueryVersion = true;
 
-                        emit sigSendNextCommand();
-                    }
-                    else{
-                        qDebug() << "指令反馈：能谱刷新时间指令尾部数据无效";
-                        pos += kspecSpectrumRefreshTimelengthHead.size();
-                    }
-
-                    continue;
-                }
-
-                //能谱触发阈值
-                if (hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead)){
-                    if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint16 v = readUInt16BE(localData.constData() + 8);
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱触发阈值 " << detName << v << " LSB]";
-                        pos += baseCommandLength;
-
-                        emit sigSendNextCommand();
-                    }
-                    else{
-                        qDebug() << "指令反馈：能谱触发阈值指令尾部数据无效";
-                        pos += kspecSpectrumTriggerThresholdHead.size();
-                    }
-
+                    emit sigSendNextCommand();
                     continue;
                 }
 
@@ -149,7 +127,7 @@ void DataProcessor::onProcessLoop()
                 if (hasTargerAt(localData, pos, kspecTransferModeHead)){
                     if (hasTargerAt(localData, pos + 10, kspecTail)){
                         quint8 v = static_cast<quint8>(localData.at(pos + 9));
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "传输模式设置 " << detName << ((v==0) ? "512道能谱" : ((v==3) ? "HXR能量道" : "波形")) << "]";
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "传输模式设置 " << detName << ((v==0) ? "512道能谱" : ((v==3) ? "HXR能量道" : "指令查询")) << "]";
                         pos += baseCommandLength;
 
                         emit sigSendNextCommand();
@@ -157,23 +135,6 @@ void DataProcessor::onProcessLoop()
                     else{
                         qDebug() << "指令反馈：传输模式设置指令尾部数据无效";
                         pos += kspecTransferModeHead.size();
-                    }
-
-                    continue;
-                }
-
-                //能谱死时间
-                if (hasTargerAt(localData, pos, kspecSpectrumDieTimelengthHead)){
-                    if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱死时间 " << detName << v*16 << " ns]";
-                        pos += baseCommandLength;
-
-                        emit sigSendNextCommand();
-                    }
-                    else{
-                        qDebug() << "指令反馈：能谱死时间指令尾部数据无效";
-                        pos += kspecSpectrumDieTimelengthHead.size();
                     }
 
                     continue;
@@ -195,16 +156,101 @@ void DataProcessor::onProcessLoop()
                     continue;
                 }
 
+                //能谱刷新时间
+                if (hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthHead) || hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthQueryHead)){
+                    if (hasTargerAt(localData, pos + 10, kspecTail)){
+                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱刷新时间" << detName << v << " ms]";
+
+                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumRefreshTimelengthHead))
+                            emit sigSpectrumRefreshTimelengthAck(v);
+
+                        pos += baseCommandLength;
+                        emit sigSendNextCommand();
+                    }
+                    else{
+                        qDebug() << "指令反馈：能谱刷新时间指令尾部数据无效";
+                        pos += kspecSpectrumRefreshTimelengthHead.size();
+                    }
+
+                    continue;
+                }
+
+                //能谱触发阈值
+                if (hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead) || hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdQueryHead)){
+                    if (hasTargerAt(localData, pos + 10, kspecTail)){
+                        quint16 v = readUInt16BE(localData.constData() + 8);
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱触发阈值 " << detName << v << " LSB]";
+
+                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumTriggerThresholdHead))
+                            emit sigSpecSpectrumTriggerThresholdAck(v);
+
+                        pos += baseCommandLength;
+                        emit sigSendNextCommand();
+                    }
+                    else{
+                        qDebug() << "指令反馈：能谱触发阈值指令尾部数据无效";
+                        pos += kspecSpectrumTriggerThresholdHead.size();
+                    }
+
+                    continue;
+                }
+
+
+                //能谱死时间
+                if (hasTargerAt(localData, pos, kspecSpectrumDieTimelengthHead) || hasTargerAt(localData, pos, kspecSpectrumDieTimelengthQueryHead)){
+                    if (hasTargerAt(localData, pos + 10, kspecTail)){
+                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "能谱死时间 " << detName << v*16 << " ns]";
+
+                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumDieTimelengthHead))
+                            emit sigSpecSpectrumDieTimelengthAck(v);
+
+                        pos += baseCommandLength;
+                        emit sigSendNextCommand();
+                    }
+                    else{
+                        qDebug() << "指令反馈：能谱死时间指令尾部数据无效";
+                        pos += kspecSpectrumDieTimelengthHead.size();
+                    }
+
+                    continue;
+                }
+
+                //触发信号时钟宽度
+                if (hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthHead) || hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthQueryHead)){
+                    if (hasTargerAt(localData, pos + 10, kspecTail)){
+                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
+
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "触发信号时钟宽度 " << detName << v << "ns]";
+
+                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthHead))
+                            emit sigSpecTriggerSignalTimeWidthAck(v);
+
+                        pos += baseCommandLength;
+                        emit sigSendNextCommand();
+                    }
+                    else{
+                        qDebug() << "指令反馈：触发信号时钟宽度指令尾部数据无效";
+                        pos += kspecTriggerSignalTimeWidthHead.size();
+                    }
+
+                    continue;
+                }
+
                 //分时能谱能窗
-                if (hasTargerAt(localData, pos, kspecSpectrumTimeWindowHead)){
+                if (hasTargerAt(localData, pos, kspecSpectrumTimeWindowHead) || hasTargerAt(localData, pos, kspecSpectrumTimeWindowQueryHead)){
                     if (hasTargerAt(localData, pos + 10, kspecTail)){
                         quint8 no = static_cast<quint8>(localData.at(pos + 5));
                         quint16 e1 = readUInt16BE(localData.constData() + pos + 6);
                         quint16 e2 = readUInt16BE(localData.constData() + pos + 8);
+                        quint8 channel = no / 9 + 1;
+                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "分时能谱能窗" << detName << "逻辑CH" << channel << " 序号" << QString("0x%1").arg(no, 2, 16, QChar('0')) << " 能量" << e2 << "," << e1 << "]";
 
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "分时能谱能窗" << detName << "序号" << QString("0x%1").arg(no, 2, 16, QChar('0')) << " 能量" << e2 << "," << e1 << "]";
+                        if (m_isQueryMode && hasTargerAt(localData, pos, kspecSpectrumTimeWindowHead))
+                            emit sigSpecSpectrumTimeWindowAck(no, e2, e1);
+
                         pos += baseCommandLength;
-
                         emit sigSendNextCommand();
                     }
                     else{
@@ -215,23 +261,6 @@ void DataProcessor::onProcessLoop()
                     continue;
                 }
 
-                //触发信号时钟宽度
-                if (hasTargerAt(localData, pos, kspecTriggerSignalTimeWidthHead)){
-                    if (hasTargerAt(localData, pos + 10, kspecTail)){
-                        quint16 v = readUInt16BE(localData.constData() + pos + 8);
-
-                        qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "触发信号时钟宽度 " << detName << v << "ns]";
-                        pos += baseCommandLength;
-
-                        emit sigSendNextCommand();
-                    }
-                    else{
-                        qDebug() << "指令反馈：触发信号时钟宽度指令尾部数据无效";
-                        pos += kspecTriggerSignalTimeWidthHead.size();
-                    }
-
-                    continue;
-                }
 
                 if (m_measureStopPrepared && !localData.isEmpty()){
                     //能谱测量控制-停止
@@ -262,8 +291,12 @@ void DataProcessor::onProcessLoop()
                     else{
                         qDebug() << "指令反馈：分时能谱能窗指令尾部数据无效";
                         pos += kspecMeasureStartHead.size();
+
+                        continue;
                     }
                 }
+
+                pos++;
             }
 
             if (pos > 0){
@@ -271,16 +304,25 @@ void DataProcessor::onProcessLoop()
             }
         }
 
-        if (!localData.isEmpty() && m_measureStarted){
-            // 处理数据
-            if (mDetectorIndex==1)
-                handleFpga1MainData(localData);
-            else if (mDetectorIndex==2)
-                handleFpga2MainData(localData);
-            else if (mDetectorIndex==3)
-                handleFpga1WaveData(localData);
-            else if (mDetectorIndex==4)
-                handleFpga2WaveData(localData);
+        if (!localData.isEmpty()){
+            if (m_measureStarted){
+                // 处理数据
+                if (mDetectorIndex==1)
+                    handleFpga1MainData(localData);
+                else if (mDetectorIndex==2)
+                    handleFpga2MainData(localData);
+                else if (mDetectorIndex==3)
+                    handleFpga1WaveData(localData);
+                else if (mDetectorIndex==4)
+                    handleFpga2WaveData(localData);
+            }
+            else{
+                if (m_isQueryMode && m_lastCommandIsQueryVersion){
+                    emit sigOTAVersionAck(localData.at(0));
+
+                    localData.clear();
+                }
+            }
         }
 
         if (m_measureStopPrepared && !localData.isEmpty()){
@@ -346,6 +388,7 @@ void DataProcessor::reset()
 
 void DataProcessor::prepareStartMeasure()
 {
+    m_lastCommandIsQueryVersion = false;
     m_measureStarted.store(false);
     m_measureStopPrepared.store(false);
 
@@ -711,4 +754,14 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
     //     emit sigWaveformData(detectorIndex, channelNumber, timeUnits, samples);
     //     buffer.remove(0, WaveformPacketSize);
     // }
+}
+
+void DataProcessor::enterQueryMode()
+{
+    m_isQueryMode = true;
+}
+
+void DataProcessor::leaveQueryMode()
+{
+    m_isQueryMode = false;
 }

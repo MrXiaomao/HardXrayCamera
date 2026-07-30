@@ -14,6 +14,7 @@
 #include <QVector>
 #include <QStateMachine>
 #include "globalsettings.h"
+#include "parameterquerydialog.h"
 class CommandHelper;
 class UdpShotReceiver;
 
@@ -346,6 +347,8 @@ private slots:
 
     void on_action_dataUpload_triggered();
 
+    void on_action_parameterQuery_triggered();
+
 private:
     struct EnergyCalibration {
         double k = 1.0;
@@ -458,6 +461,7 @@ private:
     CustomSurface* init3DSurface(const int& detectorIndex, QWidget* wigetContainer, const QString& title);//3D剖面图
 
     Ui::MainWindow *ui;
+    ParameterQueryDialog* parameterQueryDialog = nullptr;
     CommandHelper *commandHelper = nullptr;//探测器网络
     UdpShotReceiver *m_udpShotReceiver = nullptr;
     QString m_currentShotNumber;
