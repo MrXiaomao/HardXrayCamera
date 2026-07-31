@@ -145,6 +145,7 @@ void DataProcessor::onProcessLoop()
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "复位" << detName << "]";
                         pos += baseCommandLength;
 
+                        QThread::msleep(40);
                         emit sigSendNextCommand();
                     }
                     else{
