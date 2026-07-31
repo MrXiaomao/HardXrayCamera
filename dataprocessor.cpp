@@ -1,15 +1,27 @@
 ﻿#include "dataprocessor.h"
 #include <QDebug>
+#include <QMetaObject>
 #include <cstring>
+#include <utility>
 
 DataProcessor::DataProcessor(quint8 detectorIndex, QObject *parent)
     : QObject{parent}
     , mDetectorIndex(detectorIndex)
 {
+    static const int waveFrameMeta = qRegisterMetaType<WaveformFrame>("WaveformFrame");
+    static const int waveBatchMeta = qRegisterMetaType<QVector<WaveformFrame>>("QVector<WaveformFrame>");
+    static const int specFrameMeta = qRegisterMetaType<SpectrumFrame>("SpectrumFrame");
+    static const int specBatchMeta = qRegisterMetaType<QVector<SpectrumFrame>>("QVector<SpectrumFrame>");
+    Q_UNUSED(waveFrameMeta);
+    Q_UNUSED(waveBatchMeta);
+    Q_UNUSED(specFrameMeta);
+    Q_UNUSED(specBatchMeta);
+
     m_samples.resize(580);
+    m_waveBatch.reserve(WaveformBatchFlushSize);
+    m_specBatch.reserve(SpectrumBatchFlushFast);
     m_workThread.start();
     moveToThread(&m_workThread);
-    // 启动处理循环
     QMetaObject::invokeMethod(this, &DataProcessor::onProcessLoop, Qt::QueuedConnection);
 }
 
@@ -69,7 +81,7 @@ void DataProcessor::onProcessLoop()
     const QByteArray kspecSPESelectChannelAckHead = QByteArray::fromHex("12 34 00 0F D0 02 00 00 00 00 AB CD");//SPE选通指令
     const QByteArray kspecOTASelectChannelAckHead = QByteArray::fromHex("12 34 00 0F D0 00 00 00 00 00 AB CD");//OTA选通指令
 
-    const QString detName = (mDetectorIndex==1) ? QStringLiteral("水平相机 ") : QStringLiteral("垂直相机 ");
+    const QString detName = (mDetectorIndex==1) ? QStringLiteral("水平相机") : QStringLiteral("垂直相机");
 
     const int baseCommandLength = 12;
     auto hasTargerAt = [&](const QByteArray& srcBuffer, int at, const QByteArray& dstBuffer) -> bool {
@@ -145,7 +157,7 @@ void DataProcessor::onProcessLoop()
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "复位" << detName << "]";
                         pos += baseCommandLength;
 
-                        QThread::msleep(40);
+                        QThread::msleep(50); //FPGA复位需要一定时间
                         emit sigSendNextCommand();
                     }
                     else{
@@ -369,6 +381,13 @@ void DataProcessor::setTriggerMode(Order::TriggerMode mode)
     m_trigMode = mode;
 }
 
+void DataProcessor::setSpectrumBatchSize(int size)
+{
+    if (size < 1)
+        size = SpectrumBatchFlushFast;
+    m_spectrumBatchFlushSize.store(size);
+}
+
 void DataProcessor::reset()
 {
     mHardTriggered.store(false);
@@ -380,6 +399,51 @@ void DataProcessor::reset()
         m_cacheBuffer.clear();
         m_hasPendingData = false;
     }
+    QMetaObject::invokeMethod(this, "clearWaveformBatch", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this, "clearSpectrumBatch", Qt::QueuedConnection);
+}
+
+void DataProcessor::clearWaveformBatch()
+{
+    m_waveBatch.clear();
+}
+
+void DataProcessor::clearSpectrumBatch()
+{
+    m_specBatch.clear();
+}
+
+void DataProcessor::flushWaveformBatch()
+{
+    if (m_waveBatch.isEmpty())
+        return;
+    QVector<WaveformFrame> batch;
+    batch.swap(m_waveBatch);
+    m_waveBatch.reserve(WaveformBatchFlushSize);
+    emit sigWaveformBatch(batch);
+}
+
+void DataProcessor::flushSpectrumBatch()
+{
+    if (m_specBatch.isEmpty())
+        return;
+    QVector<SpectrumFrame> batch;
+    batch.swap(m_specBatch);
+    m_specBatch.reserve(m_spectrumBatchFlushSize.load());
+    emit sigSpectrumBatch(batch);
+}
+
+void DataProcessor::enqueueSpectrumFrame(int detectorIndex, int channelNumber, quint32 timeMs,
+                                         QVector<quint32> &&counts)
+{
+    SpectrumFrame frame;
+    frame.detectorIndex = detectorIndex;
+    frame.channelNumber = channelNumber;
+    frame.timeMs = timeMs;
+    frame.counts = std::move(counts);
+    m_specBatch.push_back(std::move(frame));
+    if (m_specBatch.size() >= m_spectrumBatchFlushSize.load())
+        flushSpectrumBatch();
 }
 
 void DataProcessor::prepareStartMeasure()
@@ -395,6 +459,11 @@ void DataProcessor::prepareStartMeasure()
 void DataProcessor::prepareStopMeasure()
 {
     m_measureStopPrepared.store(true);
+    // 停测时把未满批次的尾帧尽快投递出去
+    QMetaObject::invokeMethod(this, [this]() {
+        flushSpectrumBatch();
+        flushWaveformBatch();
+    }, Qt::QueuedConnection);
 }
 
 void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
@@ -478,31 +547,7 @@ void DataProcessor::processSpec512Data(int detectorIndex, QByteArray& buffer)
     if (offset > 0)
         buffer.remove(0, offset);
 
-    // while (buffer.size() >= SpectrumHeader.size()) {
-    //     const int headerIndex = buffer.indexOf(SpectrumHeader);
-    //     if (headerIndex < 0) {
-    //         buffer.clear();
-    //         return;
-    //     }
-
-    //     if (headerIndex > 0)
-    //         buffer.remove(0, headerIndex);
-
-    //     if (buffer.size() < Spectrum512PacketSize)
-    //         return;
-
-    //     const QByteArray packet = buffer.left(Spectrum512PacketSize);
-    //     if (packet.mid(Spectrum512PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
-    //         // 包尾不对，继续寻找下一个包头
-    //         buffer.remove(0, SpectrumHeader.size());
-    //         qWarning() << "Invalid 512-bin spectrum packet tail from"
-    //                    << (detectorIndex == 1 ? "水平相机" : "垂直相机");
-    //         continue;
-    //     }
-
-    //     parseSpectrum512Packet(detectorIndex, packet);
-    //     buffer.remove(0, Spectrum512PacketSize);
-    // }
+    flushSpectrumBatch();
 }
 
 bool DataProcessor::parseSpectrum512Packet(int detectorIndex, const QByteArray& packet)
@@ -521,10 +566,10 @@ bool DataProcessor::parseSpectrum512Packet(int detectorIndex, const QByteArray& 
 
     const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum512BinCount; ++i) {
-        counts.append(readUInt16BE(spectrumData + i * 2));        
+        counts.append(readUInt16BE(spectrumData + i * 2));
     }
 
-    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+    enqueueSpectrumFrame(detectorIndex, channelNumber, timeMs, std::move(counts));
     return true;
 }
 
@@ -569,30 +614,7 @@ void DataProcessor::processSpec16Data(int detectorIndex, QByteArray& buffer)
     if (offset > 0)
         buffer.remove(0, offset);
 
-    // while (buffer.size() >= SpectrumHeader.size()) {
-    //     const int headerIndex = buffer.indexOf(SpectrumHeader);
-    //     if (headerIndex < 0) {
-    //         buffer.clear();
-    //         return;
-    //     }
-
-    //     if (headerIndex > 0)
-    //         buffer.remove(0, headerIndex);
-
-    //     if (buffer.size() < Spectrum16PacketSize)
-    //         return;
-
-    //     const QByteArray packet = buffer.left(Spectrum16PacketSize);
-    //     if (packet.mid(Spectrum16PacketSize - SpectrumTail.size(), SpectrumTail.size()) != SpectrumTail) {
-    //         buffer.remove(0, SpectrumHeader.size());
-    //         qWarning() << "Invalid 16-bin spectrum packet tail from"
-    //                    << (detectorIndex == 1 ? "水平相机" : "垂直相机");
-    //         continue;
-    //     }
-
-    //     parseSpectrum16Packet(detectorIndex, packet);
-    //     buffer.remove(0, Spectrum16PacketSize);
-    // }
+    flushSpectrumBatch();
 }
 
 bool DataProcessor::parseSpectrum16Packet(int detectorIndex, const QByteArray& packet)
@@ -611,10 +633,10 @@ bool DataProcessor::parseSpectrum16Packet(int detectorIndex, const QByteArray& p
     counts.reserve(Spectrum16BinCount);
     const char* spectrumData = packet.constData() + 6;
     for (int i = 0; i < Spectrum16BinCount; ++i) {
-        counts.append(readUInt16BE(spectrumData + i * 2));        
+        counts.append(readUInt16BE(spectrumData + i * 2));
     }
 
-    emit sigSpectrumData(detectorIndex, channelNumber, timeMs, counts);
+    enqueueSpectrumFrame(detectorIndex, channelNumber, timeMs, std::move(counts));
     return true;
 }
 
@@ -699,7 +721,15 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
                 m_samples[i] = readUInt16BE(sampleData + i * 2);
             }
 
-            emit sigWaveformData(detectorIndex, channelNumber, timeUnits, m_samples);
+            WaveformFrame frame;
+            frame.detectorIndex = detectorIndex;
+            frame.channelNumber = channelNumber;
+            frame.timeUnits = timeUnits;
+            frame.samples = m_samples;
+            m_waveBatch.push_back(std::move(frame));
+            if (m_waveBatch.size() >= WaveformBatchFlushSize)
+                flushWaveformBatch();
+
             offset += static_cast<int>(WaveformPacketSize);
 
         } else {
@@ -711,6 +741,9 @@ void DataProcessor::processWaveformData(int detectorIndex, QByteArray& buffer)
 
     if (offset > 0)
         buffer.remove(0, offset);
+
+    // 本轮解析结束：把剩余帧一次投递，减少跨线程排队
+    flushWaveformBatch();
 
     // while (buffer.size() >= WaveformHeader.size()) {
     //     const int headerIndex = buffer.indexOf(WaveformHeader);

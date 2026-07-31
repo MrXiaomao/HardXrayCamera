@@ -14,6 +14,7 @@ CONFIG += c++17
 SOURCES += \
     commandhelper.cpp \
     dataprocessor.cpp \
+    measurementbinarywriter.cpp \
     hdadataupload.cpp \
     otaupgradewindow.cpp \
     parameterquerydialog.cpp \
@@ -34,6 +35,7 @@ SOURCES += \
 HEADERS += \
     commandhelper.h \
     dataprocessor.h \
+    measurementbinarywriter.h \
     hdadataupload.h \
     otaupgradewindow.h \
     parameterquerydialog.h \

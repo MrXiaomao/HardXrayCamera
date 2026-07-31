@@ -12,9 +12,11 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QVector>
+#include <QThread>
 #include "tcpclient.h"
 #include "globalsettings.h"
 #include "dataprocessor.h"
+#include "measurementbinarywriter.h"
 
 struct CommandItem
 {
@@ -115,6 +117,11 @@ public:
     void queryStart();
     void queryEnd();
 
+    DataProcessor *waveProcessor1() const { return dataProcessor_fpga1_wave; }
+    DataProcessor *waveProcessor2() const { return dataProcessor_fpga2_wave; }
+    DataProcessor *spectrumProcessor1() const { return dataProcessor_fpga1_main; }
+    DataProcessor *spectrumProcessor2() const { return dataProcessor_fpga2_main; }
+
     // 记录当前炮号和录像文件时间戳
     QString mSavePath = "data"; //默认保存路径
     QString mShotTag;
@@ -209,6 +216,8 @@ public slots:
     void handleARM2Data(const QByteArray &binaryData);
     void handleFpga1NextCommand();
     void handleFpga2NextCommand();
+    void writeWaveformBatchTextFile(const QVector<WaveformFrame>& frames);
+    void writeSpectrumBatchTextFile(const QVector<SpectrumFrame>& frames);
 
 private:
     TcpClient* client_fpga1_main; // FPGA主板1主网口(控制/能谱)
@@ -271,6 +280,9 @@ private:
     QFile m_fpga2MainFile;
     QFile m_fpga1WaveFile;
     QFile m_fpga2WaveFile;
+
+    MeasurementBinaryWriter *m_binaryWriter = nullptr;
+    QThread *m_binaryWriterThread = nullptr;
 
     mutable QMutex m_measurementMutex;
 

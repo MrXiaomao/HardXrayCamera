@@ -11,8 +11,10 @@
 #include "detectorsetting.h"
 #include <QFile>
 #include <QDir>
+#include <QFileInfo>
 #include <QMutexLocker>
 #include <QDateTime>
+#include <QMetaObject>
 #include <cstring>
 // #include <algorithm>
 // #include <chrono>
@@ -136,6 +138,13 @@ CommandHelper::CommandHelper(QObject *parent)
     client_relay = new TcpClient(this); //继电器
     client_arm1->setAutoReconnect(true);
     client_arm2->setAutoReconnect(true);
+
+    m_binaryWriterThread = new QThread(this);
+    m_binaryWriter = new MeasurementBinaryWriter;
+    m_binaryWriter->moveToThread(m_binaryWriterThread);
+    connect(m_binaryWriterThread, &QThread::finished, m_binaryWriter, &QObject::deleteLater);
+    m_binaryWriterThread->start();
+
     initDataProcessor();
 
     // 温度检测定时器
@@ -222,11 +231,13 @@ CommandHelper::CommandHelper(QObject *parent)
     });
 
     connect(client_relay, &TcpClient::dataReceived, this, &CommandHelper::handleRelayData, Qt::QueuedConnection);
-    // FPGA 原始流写盘走主线程；解析走 DataProcessor（inputData 仅做加锁入队，可 Direct）
+    // FPGA 原始流写盘走独立写盘线程；解析走 DataProcessor（inputData 仅做加锁入队，可 Direct）
     connect(client_fpga1_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1MainData, Qt::QueuedConnection);
     connect(client_fpga2_main, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2MainData, Qt::QueuedConnection);
-    connect(client_fpga1_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga1WaveData, Qt::QueuedConnection);
-    connect(client_fpga2_wave, &TcpClient::dataReceived, this, &CommandHelper::handleFpga2WaveData, Qt::QueuedConnection);
+    connect(client_fpga1_main, &TcpClient::dataReceived, m_binaryWriter, &MeasurementBinaryWriter::writeFpga1Main, Qt::QueuedConnection);
+    connect(client_fpga2_main, &TcpClient::dataReceived, m_binaryWriter, &MeasurementBinaryWriter::writeFpga2Main, Qt::QueuedConnection);
+    connect(client_fpga1_wave, &TcpClient::dataReceived, m_binaryWriter, &MeasurementBinaryWriter::writeFpga1Wave, Qt::QueuedConnection);
+    connect(client_fpga2_wave, &TcpClient::dataReceived, m_binaryWriter, &MeasurementBinaryWriter::writeFpga2Wave, Qt::QueuedConnection);
     connect(client_arm1, &TcpClient::dataReceived, this, &CommandHelper::handleARM1Data, Qt::QueuedConnection);
     connect(client_arm2, &TcpClient::dataReceived, this, &CommandHelper::handleARM2Data, Qt::QueuedConnection);
 
@@ -373,6 +384,12 @@ bool CommandHelper::configureMeasure(const DetParameter &measurement)
     dataProcessor_fpga1_wave->setTriggerMode(measurement.trigMode);
     dataProcessor_fpga2_wave->setTransferMode(measurement.transferMode);
     dataProcessor_fpga2_wave->setTriggerMode(measurement.trigMode);
+    // 积分时长 >=1s：每 16 帧上报；否则（如 1ms）：每 160 帧上报
+    const int specBatchSize = (measurement.spectrumRefreshInterval >= 1000)
+                                  ? DataProcessor::SpectrumBatchFlushSlow
+                                  : DataProcessor::SpectrumBatchFlushFast;
+    dataProcessor_fpga1_main->setSpectrumBatchSize(specBatchSize);
+    dataProcessor_fpga2_main->setSpectrumBatchSize(specBatchSize);
     dataProcessor_fpga1_main->prepareStartMeasure();
     dataProcessor_fpga2_main->prepareStartMeasure();
     dataProcessor_fpga1_wave->prepareStartMeasure();
@@ -571,28 +588,49 @@ void CommandHelper::beginRecording(const DetParameter &measurement)
     if (!dir.exists())
         dir.mkpath(".");
 
-    m_fpga1MainFile.setFileName(mfileNameFpga1Main);
-    m_fpga2MainFile.setFileName(mfileNameFpga2Main);
-    m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
-    m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
-
     qInfo()<<"数据保存路径:"<<mSavePath;
     qDebug()<<"水平相机能谱数据文件名:"<<QFileInfo(mfileNameFpga1Main).fileName();
     qDebug()<<"垂直相机能谱数据文件名:"<<QFileInfo(mfileNameFpga2Main).fileName();
     qDebug()<<"水平相机波形数据文件名:"<<QFileInfo(mfileNameFpga1Wave).fileName();
     qDebug()<<"垂直相机波形数据文件名:"<<QFileInfo(mfileNameFpga2Wave).fileName();
 
-    if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "水平相机能谱数据创建失败，文件名：" << mfileNameFpga1Main;
-    }
-    if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "垂直相机能谱数据创建失败，文件名：" << mfileNameFpga2Main;
-    }
-    if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "水平相机波形数据创建失败，文件名：" << mfileNameFpga1Wave;
-    }
-    if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qWarning() << "垂直相机波形数据创建失败，文件名：" << mfileNameFpga2Wave;
+    if (mfileFormat == Binary) {
+        const QString p1 = mfileNameFpga1Main;
+        const QString p2 = mfileNameFpga2Main;
+        const QString p3 = mfileNameFpga1Wave;
+        const QString p4 = mfileNameFpga2Wave;
+        locker.unlock();
+        if (m_binaryWriter) {
+            QMetaObject::invokeMethod(m_binaryWriter, "closeFiles", Qt::BlockingQueuedConnection);
+            QMetaObject::invokeMethod(m_binaryWriter, "openFiles", Qt::BlockingQueuedConnection,
+                                      Q_ARG(QString, p1),
+                                      Q_ARG(QString, p2),
+                                      Q_ARG(QString, p3),
+                                      Q_ARG(QString, p4));
+        }
+    } else {
+        locker.unlock();
+        if (m_binaryWriter)
+            QMetaObject::invokeMethod(m_binaryWriter, "closeFiles", Qt::BlockingQueuedConnection);
+
+        QMutexLocker textLocker(&m_measurementMutex);
+        m_fpga1MainFile.setFileName(mfileNameFpga1Main);
+        m_fpga2MainFile.setFileName(mfileNameFpga2Main);
+        m_fpga1WaveFile.setFileName(mfileNameFpga1Wave);
+        m_fpga2WaveFile.setFileName(mfileNameFpga2Wave);
+
+        if (!m_fpga1MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "水平相机能谱数据创建失败，文件名：" << mfileNameFpga1Main;
+        }
+        if (!m_fpga2MainFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "垂直相机能谱数据创建失败，文件名：" << mfileNameFpga2Main;
+        }
+        if (!m_fpga1WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "水平相机波形数据创建失败，文件名：" << mfileNameFpga1Wave;
+        }
+        if (!m_fpga2WaveFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            qWarning() << "垂直相机波形数据创建失败，文件名：" << mfileNameFpga2Wave;
+        }
     }
 }
 
@@ -631,9 +669,13 @@ void CommandHelper::stopMeasure()
     dataProcessor_fpga2_main->prepareStopMeasure();
     sendSpectrumControl(Order::Stop);
 
-    QMutexLocker locker(&m_measurementMutex);
-    measure_started.store(false);
-    closeMeasurementFilesLocked();
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        measure_started.store(false);
+        closeMeasurementFilesLocked();
+    }
+    if (m_binaryWriter)
+        QMetaObject::invokeMethod(m_binaryWriter, "closeFiles", Qt::BlockingQueuedConnection);
 
     qInfo() << "已下发停止测量指令，等待相机应答";
 }
@@ -642,6 +684,9 @@ void CommandHelper::closeMeasurementFiles()
 {
     QMutexLocker locker(&m_measurementMutex);
     closeMeasurementFilesLocked();
+    locker.unlock();
+    if (m_binaryWriter)
+        QMetaObject::invokeMethod(m_binaryWriter, "closeFiles", Qt::BlockingQueuedConnection);
 }
 
 void CommandHelper::closeMeasurementFilesLocked()
@@ -673,6 +718,10 @@ void CommandHelper::clearCommandPool(int index)
 CommandHelper::~CommandHelper()
 {
     closeMeasurementFiles();
+    if (m_binaryWriterThread) {
+        m_binaryWriterThread->quit();
+        m_binaryWriterThread->wait(5000);
+    }
 }
 
 void CommandHelper::send16SpecEnergyWindowCommands(TcpClient* client, const QString& fpgaLabel,
@@ -849,14 +898,7 @@ void CommandHelper::handleFpga1MainData(const QByteArray &binaryData)
         emit sigOTAUpgradeData(mCurrentUpgradeDetectorIndex, binaryData);
         return;
     }
-
-    QMutexLocker locker(&m_measurementMutex);
-    if (!measure_started.load())
-        return;
-
-    if (mfileFormat == Binary && m_fpga1MainFile.isOpen()) {
-        m_fpga1MainFile.write(binaryData);
-    }
+    // 二进制写盘已改到 MeasurementBinaryWriter 线程
 }
 
 void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
@@ -866,42 +908,15 @@ void CommandHelper::handleFpga2MainData(const QByteArray &binaryData)
         emit sigOTAUpgradeData(mCurrentUpgradeDetectorIndex, binaryData);
         return;
     }
-
-    QMutexLocker locker(&m_measurementMutex);
-    if (!measure_started.load())
-        return;
-
-    if (mfileFormat == Binary && m_fpga2MainFile.isOpen()) {
-        m_fpga2MainFile.write(binaryData);
-    }
 }
 
-void CommandHelper::handleFpga1WaveData(const QByteArray &binaryData)
+void CommandHelper::handleFpga1WaveData(const QByteArray &/*binaryData*/)
 {
-    if (mIsUpgrading.load())
-        return;
-
-    QMutexLocker locker(&m_measurementMutex);
-    if (!measure_started.load())
-        return;
-
-    if (mfileFormat == Binary && m_fpga1WaveFile.isOpen()) {
-        m_fpga1WaveFile.write(binaryData);
-    }
+    // 波形二进制写盘已改到 MeasurementBinaryWriter；解析走 DataProcessor
 }
 
-void CommandHelper::handleFpga2WaveData(const QByteArray &binaryData)
+void CommandHelper::handleFpga2WaveData(const QByteArray &/*binaryData*/)
 {
-    if (mIsUpgrading.load())
-        return;
-
-    QMutexLocker locker(&m_measurementMutex);
-    if (!measure_started.load())
-        return;
-
-    if (mfileFormat == Binary && m_fpga2WaveFile.isOpen()) {
-        m_fpga2WaveFile.write(binaryData);
-    }
 }
 
 // 处理512道能谱数据，按照协议解析出时间戳、通道号和计数，并通过信号发送给界面更新
@@ -1288,6 +1303,9 @@ void CommandHelper::startOTAUpgrade(quint8 index)
 {
     mCurrentUpgradeDetectorIndex = index;
     mIsUpgrading = true;
+    if (m_binaryWriter)
+        QMetaObject::invokeMethod(m_binaryWriter, "setUpgradeActive", Qt::QueuedConnection,
+                                  Q_ARG(bool, true));
 
     dataProcessor_fpga1_main->blockSignals(true);
     dataProcessor_fpga2_main->blockSignals(true);
@@ -1298,6 +1316,9 @@ void CommandHelper::startOTAUpgrade(quint8 index)
 void CommandHelper::endOTAUpgrade(quint8 /*index*/)
 {
     mIsUpgrading = false;
+    if (m_binaryWriter)
+        QMetaObject::invokeMethod(m_binaryWriter, "setUpgradeActive", Qt::QueuedConnection,
+                                  Q_ARG(bool, false));
 
     dataProcessor_fpga1_main->blockSignals(false);
     dataProcessor_fpga2_main->blockSignals(false);
@@ -1462,6 +1483,36 @@ void CommandHelper::writeWaveformTextFile(int detectorIndex, quint32 timeUnits, 
     file->write(line);
 }
 
+void CommandHelper::writeWaveformBatchTextFile(const QVector<WaveformFrame>& frames)
+{
+    if (frames.isEmpty())
+        return;
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        if (mfileFormat != Text || !measure_started.load())
+            return;
+    }
+    for (const WaveformFrame &frame : frames) {
+        writeWaveformTextFile(frame.detectorIndex, frame.timeUnits,
+                              frame.channelNumber, frame.samples);
+    }
+}
+
+void CommandHelper::writeSpectrumBatchTextFile(const QVector<SpectrumFrame>& frames)
+{
+    if (frames.isEmpty())
+        return;
+    {
+        QMutexLocker locker(&m_measurementMutex);
+        if (mfileFormat != Text || !measure_started.load())
+            return;
+    }
+    for (const SpectrumFrame &frame : frames) {
+        writeSpectrumTextFile(frame.detectorIndex, frame.timeMs,
+                              frame.channelNumber, frame.counts);
+    }
+}
+
 void CommandHelper::initDataProcessor()
 {
     // FPGA主板1主网口(控制/能谱)
@@ -1470,12 +1521,9 @@ void CommandHelper::initDataProcessor()
         connect(client_fpga1_main, &TcpClient::dataReceived, dataProcessor_fpga1_main, &DataProcessor::inputData/*handleFpga1MainData*/, Qt::DirectConnection);
 
         connect(dataProcessor_fpga1_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga1NextCommand, Qt::QueuedConnection);
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::QueuedConnection);
         connect(dataProcessor_fpga1_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::QueuedConnection);
-        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumData, this,
-                [this](int detectorIndex, int channelNumber, quint32 timeMs, const QVector<quint32>& counts) {
-                    writeSpectrumTextFile(detectorIndex, timeMs, channelNumber, counts);
-                }, Qt::QueuedConnection);
+        connect(dataProcessor_fpga1_main, &DataProcessor::sigSpectrumBatch, this,
+                &CommandHelper::writeSpectrumBatchTextFile, Qt::QueuedConnection);
     }
 
     // FPGA主板2主网口(控制/能谱)
@@ -1484,12 +1532,9 @@ void CommandHelper::initDataProcessor()
         connect(client_fpga2_main, &TcpClient::dataReceived, dataProcessor_fpga2_main, &DataProcessor::inputData/*handleFpga2MainData*/, Qt::DirectConnection);
 
         connect(dataProcessor_fpga2_main, &DataProcessor::sigSendNextCommand, this, &CommandHelper::handleFpga2NextCommand, Qt::QueuedConnection);
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this, &CommandHelper::sigSpectrumData, Qt::QueuedConnection);
         connect(dataProcessor_fpga2_main, &DataProcessor::sigMessureStarted, this, &CommandHelper::sigMeasureTimerStarted, Qt::QueuedConnection);
-        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumData, this,
-                [this](int detectorIndex, int channelNumber, quint32 timeMs, const QVector<quint32>& counts) {
-                    writeSpectrumTextFile(detectorIndex, timeMs, channelNumber, counts);
-                }, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_main, &DataProcessor::sigSpectrumBatch, this,
+                &CommandHelper::writeSpectrumBatchTextFile, Qt::QueuedConnection);
     }
 
     // 副网口，仅接收波形（FPGA主板1）
@@ -1497,16 +1542,14 @@ void CommandHelper::initDataProcessor()
         dataProcessor_fpga1_wave = new DataProcessor(3);
         connect(client_fpga1_wave, &TcpClient::dataReceived, dataProcessor_fpga1_wave, &DataProcessor::inputData/*handleFpga1WaveData*/, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::QueuedConnection);
         connect(dataProcessor_fpga1_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [this] {
             bool expected = false;
             if (mHardTriggered.compare_exchange_strong(expected, true))
                 emit sigHardTriggeredSignalReceived();
         }, Qt::QueuedConnection);
-        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformData, this,
-                [this](int detectorIndex, int channelNumber, quint32 timeUnits, const QVector<quint16>& samples) {
-                    writeWaveformTextFile(detectorIndex, timeUnits, channelNumber, samples);
-                }, Qt::QueuedConnection);
+        // 文本存盘仍由 CommandHelper 处理；UI 由 MainWindow 直连 sigWaveformBatch
+        connect(dataProcessor_fpga1_wave, &DataProcessor::sigWaveformBatch, this,
+                &CommandHelper::writeWaveformBatchTextFile, Qt::QueuedConnection);
     }
 
     // 副网口，仅接收波形（FPGA主板2）——复用构造时已创建的 client_fpga2_wave
@@ -1514,16 +1557,13 @@ void CommandHelper::initDataProcessor()
         dataProcessor_fpga2_wave = new DataProcessor(4);
         connect(client_fpga2_wave, &TcpClient::dataReceived, dataProcessor_fpga2_wave, &DataProcessor::inputData, Qt::DirectConnection);
 
-        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this, &CommandHelper::sigWaveformData, Qt::QueuedConnection);
         connect(dataProcessor_fpga2_wave, &DataProcessor::sigHardTriggeredSignalReceived, this, [this] {
             bool expected = false;
             if (mHardTriggered.compare_exchange_strong(expected, true))
                 emit sigHardTriggeredSignalReceived();
         }, Qt::QueuedConnection);
-        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformData, this,
-                [this](int detectorIndex, int channelNumber, quint32 timeUnits, const QVector<quint16>& samples) {
-                    writeWaveformTextFile(detectorIndex, timeUnits, channelNumber, samples);
-                }, Qt::QueuedConnection);
+        connect(dataProcessor_fpga2_wave, &DataProcessor::sigWaveformBatch, this,
+                &CommandHelper::writeWaveformBatchTextFile, Qt::QueuedConnection);
     }
 
     // 参数查询

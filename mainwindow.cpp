@@ -255,11 +255,23 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commandHelper, &CommandHelper::sigARM2Status, this, &MainWindow::onArm2StatusChanged);
     connect(commandHelper, &CommandHelper::sigArm1SensorData, this, &MainWindow::onArm1SensorData, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigArm2SensorData, this, &MainWindow::onArm2SensorData, Qt::QueuedConnection);
-    // 能谱/波形数据由工作线程发出，排队到主线程处理
-    connect(commandHelper, &CommandHelper::sigSpectrumData, this,
-        &MainWindow::onSpectrumDataReceived, Qt::QueuedConnection);
-    connect(commandHelper, &CommandHelper::sigWaveformData, this,
-        &MainWindow::onWaveformDataReceived, Qt::QueuedConnection);
+    // 能谱/波形由 DataProcessor 批量直连主窗口
+    if (DataProcessor *spec1 = commandHelper->spectrumProcessor1()) {
+        connect(spec1, &DataProcessor::sigSpectrumBatch, this,
+                &MainWindow::onSpectrumBatchReceived, Qt::QueuedConnection);
+    }
+    if (DataProcessor *spec2 = commandHelper->spectrumProcessor2()) {
+        connect(spec2, &DataProcessor::sigSpectrumBatch, this,
+                &MainWindow::onSpectrumBatchReceived, Qt::QueuedConnection);
+    }
+    if (DataProcessor *wave1 = commandHelper->waveProcessor1()) {
+        connect(wave1, &DataProcessor::sigWaveformBatch, this,
+                &MainWindow::onWaveformBatchReceived, Qt::QueuedConnection);
+    }
+    if (DataProcessor *wave2 = commandHelper->waveProcessor2()) {
+        connect(wave2, &DataProcessor::sigWaveformBatch, this,
+                &MainWindow::onWaveformBatchReceived, Qt::QueuedConnection);
+    }
     connect(commandHelper, &CommandHelper::sigHardTriggeredSignalReceived, this,
             &MainWindow::onHardTriggeredSignalReceived, Qt::QueuedConnection);
     connect(commandHelper, &CommandHelper::sigMeasureTimerStarted, this, [=]{
@@ -980,6 +992,14 @@ void MainWindow::onSpectrumDataReceived(int detectorIndex, int channelNumber, qu
     // refreshSpectrumPlot();
 }
 
+void MainWindow::onSpectrumBatchReceived(const QVector<SpectrumFrame> &frames)
+{
+    for (const SpectrumFrame &frame : frames) {
+        onSpectrumDataReceived(frame.detectorIndex, frame.channelNumber,
+                               frame.timeMs, frame.counts);
+    }
+}
+
 void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
                                         const QVector<quint16> &samples)
 {
@@ -1008,6 +1028,14 @@ void MainWindow::onWaveformDataReceived(int detectorIndex, int channelNumber, qu
     const int currentChannel = ui->cbb_channel->currentIndex() + 1;
     if (logicalChannel != currentChannel)
         return;
+}
+
+void MainWindow::onWaveformBatchReceived(const QVector<WaveformFrame> &frames)
+{
+    for (const WaveformFrame &frame : frames) {
+        onWaveformDataReceived(frame.detectorIndex, frame.channelNumber,
+                               frame.timeUnits, frame.samples);
+    }
 }
 
 void MainWindow::onChannelSpinBoxChanged(int /*value*/)

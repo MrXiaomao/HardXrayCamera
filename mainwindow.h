@@ -17,6 +17,8 @@
 #include "parameterquerydialog.h"
 class CommandHelper;
 class UdpShotReceiver;
+struct WaveformFrame;
+struct SpectrumFrame;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -151,23 +153,19 @@ public:
     void append(int channelIdx, const T& entry) {
         assert(channelIdx >= 0 && channelIdx < m_channelCount);
         auto& vec = m_data[channelIdx];
-        if (vec.size() <= m_dataSize[channelIdx]) {
-            vec.reserve(vec.size() * 2);
-            vec.resize(m_dataSize[channelIdx] + 1);
+        // 保持 QVector::size() == m_dataSize；有预留容量时 push_back，禁止每帧 resize(+1)
+        if (vec.size() == vec.capacity()) {
+            const int grown = qMax(1, vec.capacity() * 2);
+            vec.reserve(qMax(m_perChannelCapacity, grown));
         }
-        vec[m_dataSize[channelIdx]++] = entry;
+        vec.push_back(entry);
+        ++m_dataSize[channelIdx];
     }
 
     void clear() {
         for (int channelIdx = 0; channelIdx < m_channelCount; channelIdx++) {
-            // 获取当前通道的有效写入长度
-            const qint32 validSize = m_dataSize[channelIdx];
-            if (validSize > 0) {
-                // 直接操作QVector底层连续内存，将已写入的元素全部清零
-                T* dataPtr = m_data[channelIdx].data();
-                std::fill(dataPtr, dataPtr + validSize, T{});
-            }
-
+            // resize(0) 保持 capacity，使 size 与逻辑长度一致，at() 不再暴露脏尾部
+            m_data[channelIdx].resize(0);
             m_dataSize[channelIdx] = 0;
         }
     }
@@ -188,34 +186,29 @@ public:
     ConstChannelIterator cbegin() const noexcept { return m_data; }
     ConstChannelIterator cend() const noexcept { return m_data + m_channelCount; }
 
-    // 类内static常驻空对象，生命周期和实例无关
-    static inline QVector<T> s_emptyVec{};
-
+    // at()/[] 返回的 QVector 长度即为逻辑长度 [0, m_dataSize)
     QVector<T>& at(int channelIdx) {
         if (channelIdx < 0 || channelIdx >= m_channelCount) {
             qFatal("访问通道索引 %d 越界，合法范围0~%d", channelIdx, m_channelCount - 1);
         }
-
-        return size(channelIdx) >0 ? m_data[channelIdx] : s_emptyVec;
+        return m_data[channelIdx];
     }
-
 
     const QVector<T>& at(int channelIdx) const {
         if (channelIdx < 0 || channelIdx >= m_channelCount) {
             qFatal("访问通道索引 %d 越界，合法范围0~%d", channelIdx, m_channelCount - 1);
         }
-
-        return size(channelIdx) >0 ? m_data[channelIdx] : s_emptyVec;
+        return m_data[channelIdx];
     }
 
     QVector<T>& operator[](int channelIdx) {
         assert(channelIdx >= 0 && channelIdx < m_channelCount);
-        return size(channelIdx) >0 ? m_data[channelIdx] : s_emptyVec;
+        return m_data[channelIdx];
     }
 
     const QVector<T>& operator[](int channelIdx) const {
         assert(channelIdx >= 0 && channelIdx < m_channelCount);
-        return size(channelIdx) >0 ? m_data[channelIdx] : s_emptyVec;
+        return m_data[channelIdx];
     }
 
 private:
@@ -275,8 +268,10 @@ private slots:
     void onArm2SensorData(const QVector<double>&/*温度*/, const QVector<double>&/*电压*/, const QVector<double>&/*电流*/);
     void onSpectrumDataReceived(int detectorIndex, int channelNumber, quint32 timeMs,
                                 const QVector<quint32> &counts);
+    void onSpectrumBatchReceived(const QVector<SpectrumFrame> &frames);
     void onWaveformDataReceived(int detectorIndex, int channelNumber, quint32 timeUnits,
                                 const QVector<quint16> &samples);
+    void onWaveformBatchReceived(const QVector<WaveformFrame> &frames);
 
     void onHardTriggeredSignalReceived();
 
