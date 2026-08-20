@@ -34,7 +34,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget_2">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
@@ -1092,7 +1092,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>1-水平相机温度/°C</string>
+                              <string>1-垂直相机温度/°C</string>
                              </property>
                             </widget>
                            </item>
@@ -1127,7 +1127,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>2-水平相机温度/°C</string>
+                              <string>2-垂直相机温度/°C</string>
                              </property>
                             </widget>
                            </item>
@@ -1162,7 +1162,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>3-水平相机温度/°C</string>
+                              <string>3-垂直相机温度/°C</string>
                              </property>
                             </widget>
                            </item>
@@ -1197,7 +1197,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>4-垂直相机温度/°C</string>
+                              <string>4-水平相机温度/°C</string>
                              </property>
                             </widget>
                            </item>
@@ -1232,7 +1232,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>5-垂直相机温度/°C</string>
+                              <string>5-水平相机温度/°C</string>
                              </property>
                             </widget>
                            </item>
@@ -1267,7 +1267,7 @@
                               </sizepolicy>
                              </property>
                              <property name="text">
-                              <string>6-垂直相机温度/°C</string>
+                              <string>6-水平相机温度/°C</string>
                              </property>
                             </widget>
                            </item>

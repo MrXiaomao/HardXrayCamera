@@ -134,13 +134,9 @@ void TrendPlotWidget::appendPoint(double x, double y, int graphIndex)
     Q_UNUSED(x);
 
     const double now = QDateTime::currentDateTime().toSecsSinceEpoch();
-    // m_xData.append(now);
-    // m_yData.append(y);
     m_plot->graph(graphIndex)->addData(now, y);
     m_plot->graph(graphIndex)->data()->removeBefore(now - m_timeWindowSeconds);
     m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
-
-    m_yMaxData = std::max<double>(m_yMaxData, y);
 }
 
 void TrendPlotWidget::appendPoints(double x, const QVector<double>& y)
@@ -153,7 +149,6 @@ void TrendPlotWidget::appendPoints(double x, const QVector<double>& y)
     {
         m_plot->graph(i)->addData(now, y[i]);
         m_plot->graph(i)->data()->removeBefore(now - m_timeWindowSeconds);
-        m_yMaxData = std::max<double>(m_yMaxData, y[i]);
     }
 
     m_plot->xAxis->setRange(now - m_timeWindowSeconds, now);
@@ -167,18 +162,33 @@ void TrendPlotWidget::clearData()
             m_plot->graph(i)->data().clear();
         }
     }
-    // m_xData.clear();
-    // m_yData.clear();
 }
 
 void TrendPlotWidget::refreshPlot()
 {
-    if(m_plot)
-    {
-        m_plot->yAxis->rescale(false);
-        m_plot->yAxis->setRange(0, m_yMaxData * 1.2);
-        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    if (!m_plot)
+        return;
+
+    // Y 轴只按当前 X 轴时间窗口内的可见点计算，不考虑已滑出屏幕的历史峰值
+    bool foundRange = false;
+    QCPRange yRange;
+    const QCPRange xRange = m_plot->xAxis->range();
+    for (int i = 0; i < m_plot->graphCount(); ++i) {
+        bool found = false;
+        const QCPRange r = m_plot->graph(i)->getValueRange(found, QCP::sdBoth, xRange);
+        if (found) {
+            yRange = foundRange ? yRange.expanded(r) : r;
+            foundRange = true;
+        }
     }
+
+    if (foundRange) {
+        const double yMax = qMax(yRange.upper, 0.0);
+        m_plot->yAxis->setRange(0, (yMax > 0.0 ? yMax : 1.0) * 1.2);
+    } else {
+        m_plot->yAxis->setRange(0, 1.0);
+    }
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void TrendPlotWidget::ensureGraphCount(int count)
