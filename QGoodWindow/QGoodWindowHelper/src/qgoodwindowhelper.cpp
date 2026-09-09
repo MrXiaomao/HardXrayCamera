@@ -60,6 +60,7 @@ void QGoodWindowHelper::setupUiHelper(QMainWindow* centralWidget, bool isDarkThe
 
     mGoodCentraWidget->setCentralWidget(mCentralWidget);
     setCentralWidget(mGoodCentraWidget);
+    fixMenuBarWidth();
 
     if (!mCentralWidget->windowIcon().isNull())
         setWindowIcon(mCentralWidget->windowIcon());

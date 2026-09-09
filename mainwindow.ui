@@ -34,7 +34,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget_2">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
@@ -1749,7 +1749,7 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QGroupBox" name="groupBox_3">
+        <widget class="QGroupBox" name="groupBox_option">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -2176,10 +2176,14 @@
      <height>18</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu">
+   <widget class="QMenu" name="menu_1">
     <property name="title">
      <string>文件</string>
     </property>
+    <addaction name="action_openFile"/>
+    <addaction name="action_online"/>
+    <addaction name="action_offline"/>
+    <addaction name="separator"/>
     <addaction name="action_exit"/>
    </widget>
    <widget class="QMenu" name="menu_2">
@@ -2189,13 +2193,13 @@
     <addaction name="action_hardwareSetting"/>
     <addaction name="action_signalWidth"/>
    </widget>
-   <widget class="QMenu" name="menu_3">
+   <widget class="QMenu" name="menu_4">
     <property name="title">
      <string>帮助</string>
     </property>
     <addaction name="action_about"/>
    </widget>
-   <widget class="QMenu" name="menu_4">
+   <widget class="QMenu" name="menu_3">
     <property name="title">
      <string>工具</string>
     </property>
@@ -2204,10 +2208,10 @@
     <addaction name="separator"/>
     <addaction name="action_parameterQuery"/>
    </widget>
-   <addaction name="menu"/>
+   <addaction name="menu_1"/>
    <addaction name="menu_2"/>
-   <addaction name="menu_4"/>
    <addaction name="menu_3"/>
+   <addaction name="menu_4"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -2428,6 +2432,40 @@
   <action name="action_parameterQuery">
    <property name="text">
     <string>配置参数查询</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_offline">
+   <property name="icon">
+    <iconset theme="QIcon::ThemeIcon::NetworkOffline"/>
+   </property>
+   <property name="text">
+    <string>离线数据处理</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_online">
+   <property name="icon">
+    <iconset theme="QIcon::ThemeIcon::GoHome"/>
+   </property>
+   <property name="text">
+    <string>返回在线数据测量</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_openFile">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resource/open.png</normaloff>:/resource/open.png</iconset>
+   </property>
+   <property name="text">
+    <string>打开历史文件</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>

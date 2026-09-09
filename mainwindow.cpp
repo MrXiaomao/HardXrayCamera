@@ -38,6 +38,25 @@ MainWindow::MainWindow(QWidget *parent)
     measureTimer->setSingleShot(true);
     connect(measureTimer, &QTimer::timeout, this, &MainWindow::onMeasureTimerTimeout);
     ui->setupUi(this);
+    QStringList args = QCoreApplication::arguments();
+    if (args.contains("-offline")){
+        ui->action_offline->setVisible(false);
+        ui->toolBar->setVisible(false);
+        ui->groupBox_option->setVisible(false);
+        ui->tabWidget_2->setTabVisible(1, false);
+        ui->tabWidget->setTabVisible(1, false);
+        ui->widget_3->setVisible(false);
+        ui->label_3->setVisible(false);
+        ui->spb_waveLen->setVisible(false);
+        ui->menubar->removeAction(ui->menu_2->menuAction());
+        ui->menubar->removeAction(ui->menu_3->menuAction());
+        setWindowTitle(this->windowTitle() + QStringLiteral("[离线版]"));
+    }
+    else {
+        ui->action_online->setVisible(false);
+        ui->action_openFile->setVisible(false);
+    }
+
     loadMonitorAlarmSettings();
     QList<QDoubleSpinBox*> spinBoxs;
     spinBoxs << ui->doubleSpinBox_dev1_temp_1 << ui->doubleSpinBox_dev1_temp_2 << ui->doubleSpinBox_dev1_temp_3;
@@ -425,6 +444,10 @@ MainWindow::MainWindow(QWidget *parent)
         //     );
         m_logBuffer.clear();
     });
+
+    ui->tabWidget->setCurrentIndex(0);
+    ui->tabWidget_2->setCurrentIndex(0);
+    ui->stackedWidget_spectrum->setCurrentWidget(ui->page_cps);
 
     startUdpListening();
     // 开机自动最大化：一次性延迟调用，保留 lambda
@@ -1447,7 +1470,7 @@ void MainWindow::updateUnattendedControls()
 
 void MainWindow::updateMeasureParamsGroupEnabled()
 {
-    ui->groupBox_3->setEnabled(!isMeasureSessionActive());
+    ui->groupBox_option->setEnabled(!isMeasureSessionActive());
 }
 
 QString MainWindow::energyCalibrationFilePath() const
@@ -3249,5 +3272,162 @@ void MainWindow::on_action_parameterQuery_triggered()
     }
 
     parameterQueryDialog->show();
+}
+
+
+void MainWindow::on_action_offline_triggered()
+{
+    const QString SERVER_KEY = "hardXrayCamera.offline.singleInstance";
+    QLocalSocket socket;
+    socket.connectToServer(SERVER_KEY);
+    if (socket.waitForConnected(1000))
+    {
+        // 发送激活指令（发送任意内容即可，这里用固定字符串）
+        socket.write("ACTIVATE");
+        socket.waitForBytesWritten();
+    }
+    else{
+        QTimer::singleShot(0, [&]{
+            QString program = QCoreApplication::applicationFilePath();
+            QStringList arguments;
+            arguments.append("-offline");
+            QProcess::startDetached(program, arguments);
+        });
+    }
+}
+
+
+void MainWindow::on_action_online_triggered()
+{
+    const QString SERVER_KEY = "hardXrayCamera.online.singleInstance";
+    QLocalSocket socket;
+    socket.connectToServer(SERVER_KEY);
+    if (socket.waitForConnected(1000))
+    {
+        // 发送激活指令（发送任意内容即可，这里用固定字符串）
+        socket.write("ACTIVATE");
+        socket.waitForBytesWritten();
+    }
+    else{
+        QTimer::singleShot(0, [&]{
+            QString program = QCoreApplication::applicationFilePath();
+            QProcess::startDetached(program, QStringList());
+        });
+    }
+}
+
+struct DataFileNameInfo
+{
+    QString type;       // 类型
+    QString shotNum;      // 炮号
+    QString date;       // 日期 YYYYMMDD
+    QString time;       // 时间 HHMMSS
+    int durationMs = 0; // 测量时长(毫秒)
+    bool isValid = false;
+};
+DataFileNameInfo parseDataFileName(const QString& fullFileName)
+{
+    DataFileNameInfo info;
+
+    // 先去掉后缀 .dat
+    QString pureName = fullFileName;
+    if (pureName.endsWith(".dat", Qt::CaseInsensitive))
+    {
+        pureName.chop(4);
+    }
+
+    // 按下划线分割
+    QStringList parts = pureName.split('_', Qt::KeepEmptyParts);
+
+    // 严格要求5个字段
+    if (parts.size() != 5)
+    {
+        return info; // isValid 保持 false
+    }
+
+    info.type = parts[0];
+    info.shotNum = parts[1];
+    info.date = parts[2];
+    info.time = parts[3];
+    info.durationMs = parts[4].toInt();
+
+    // 基础合法性校验：日期8位、时间6位
+    if (info.date.length() == 8 && info.time.length() == 6)
+    {
+        info.isValid = true;
+    }
+
+    return info;
+}
+
+QDateTime buildQDateTimeFromFileNameFields(const DataFileNameInfo& info)
+{
+    if (!info.isValid)
+        return {};
+
+    // 把 20260908 + 110842 拼成 "20260908 110842"
+    QString combined = QString("%1 %2").arg(info.date, info.time);
+
+    // 严格按格式解析，避免歧义
+    return QDateTime::fromString(combined, "yyyyMMdd HHmmss");
+}
+void MainWindow::on_action_openFile_triggered()
+{
+    QString fileName = QFileDialog::getOpenFileName(this);
+    if (fileName.isEmpty())
+        return;
+
+    QString integralFileName = fileName.replace(QStringLiteral("波形"), QStringLiteral("积分"));
+    QString waveformFileName = fileName.replace(QStringLiteral("能谱"), QStringLiteral("能谱"));
+
+    {
+        QFile file(integralFileName);
+        if (file.open(QIODevice::ReadOnly)){
+            auto info = parseDataFileName(integralFileName);
+            if (info.isValid)
+            {
+                QDateTime dt = buildQDateTimeFromFileNameFields(info);
+                qInfo() << "解析历史数据:"
+                        << "炮号:" << info.shotNum
+                        << "测量时间:" << dt.toString("yyyy-MM-dd HH:mm:ss")
+                        << "测量时长(ms):" << info.durationMs;
+            }
+
+            const QByteArray data = file.readAll();
+            clearSpectrumData();
+            commandHelper->spectrumProcessor1()->enterOfflineMode();
+            commandHelper->spectrumProcessor1()->clearSpectrumBatch();
+            commandHelper->spectrumProcessor1()->inputData(data);
+            connect(commandHelper->spectrumProcessor1(), &DataProcessor::sigOfflineDataProcessCompleted, this, [=]{
+                updateSpecIdSpinBoxRange();
+                refreshSpectrumPlot();
+                commandHelper->spectrumProcessor1()->disconnect(SIGNAL(sigOfflineDataProcessCompleted));
+                commandHelper->spectrumProcessor1()->leaveOfflineMode();
+            });
+
+            file.close();
+        }
+    }
+
+
+    {
+        QFile file(waveformFileName);
+        if (file.open(QIODevice::ReadOnly)){
+            const QByteArray data = file.readAll();
+            clearWaveformData();
+            commandHelper->spectrumProcessor2()->enterOfflineMode();
+            commandHelper->spectrumProcessor2()->clearWaveformBatch();
+            commandHelper->spectrumProcessor2()->inputData(data);
+            connect(commandHelper->spectrumProcessor2(), &DataProcessor::sigOfflineDataProcessCompleted, this, [=]{
+                updateWaveIdSpinBoxRange();
+                refreshWaveformPlot();
+                commandHelper->spectrumProcessor2()->disconnect(SIGNAL(sigOfflineDataProcessCompleted));
+                commandHelper->spectrumProcessor2()->leaveOfflineMode();
+            });
+
+            file.close();
+        }
+
+    }
 }
 

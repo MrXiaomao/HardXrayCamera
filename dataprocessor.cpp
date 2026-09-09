@@ -120,7 +120,9 @@ void DataProcessor::onProcessLoop()
                     qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "SPE选通指令 " << detName << "]";
                     pos += baseCommandLength;
 
-                    emit sigSendNextCommand();
+                    if (!m_enterOfflineMode){
+                        emit sigSendNextCommand();
+                    }
                     continue;
                 }
 
@@ -130,7 +132,9 @@ void DataProcessor::onProcessLoop()
                     pos += baseCommandLength;
                     m_lastCommandIsQueryVersion.store(true);
 
-                    emit sigSendNextCommand();
+                    if (!m_enterOfflineMode){
+                        emit sigSendNextCommand();
+                    }
                     continue;
                 }
 
@@ -141,7 +145,9 @@ void DataProcessor::onProcessLoop()
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "传输模式设置 " << detName << ((v==0) ? "512道能谱" : ((v==3) ? "HXR能量道" : "指令查询")) << "]";
                         pos += baseCommandLength;
 
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：传输模式设置指令尾部数据无效";
@@ -157,8 +163,10 @@ void DataProcessor::onProcessLoop()
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "复位" << detName << "]";
                         pos += baseCommandLength;
 
-                        QThread::msleep(50); //FPGA复位需要一定时间
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            QThread::msleep(50); //FPGA复位需要一定时间
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：复位指令尾部数据无效";
@@ -178,7 +186,9 @@ void DataProcessor::onProcessLoop()
                             emit sigSpectrumRefreshTimelengthAck(v);
 
                         pos += baseCommandLength;
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：能谱刷新时间指令尾部数据无效";
@@ -198,7 +208,9 @@ void DataProcessor::onProcessLoop()
                             emit sigSpecSpectrumTriggerThresholdAck(v);
 
                         pos += baseCommandLength;
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：能谱触发阈值指令尾部数据无效";
@@ -219,7 +231,9 @@ void DataProcessor::onProcessLoop()
                             emit sigSpecSpectrumDieTimelengthAck(v);
 
                         pos += baseCommandLength;
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：能谱死时间指令尾部数据无效";
@@ -240,7 +254,9 @@ void DataProcessor::onProcessLoop()
                             emit sigSpecTriggerSignalTimeWidthAck(v);
 
                         pos += baseCommandLength;
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：触发信号时钟宽度指令尾部数据无效";
@@ -263,7 +279,9 @@ void DataProcessor::onProcessLoop()
                             emit sigSpecSpectrumTimeWindowAck(no, e2, e1);
 
                         pos += baseCommandLength;
-                        emit sigSendNextCommand();
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                        }
                     }
                     else{
                         qDebug() << "指令反馈：分时能谱能窗指令尾部数据无效";
@@ -292,8 +310,11 @@ void DataProcessor::onProcessLoop()
                                                      << "[" << "能谱测量控制 " << detName
                                                      << (cmd == 1 ? "软件触发" : "硬件触发") << "]";
                         m_measureStarted.store(true);
-                        emit sigSendNextCommand();
-                        emit sigMessureStarted();
+
+                        if (!m_enterOfflineMode){
+                            emit sigSendNextCommand();
+                            emit sigMessureStarted();
+                        }
                         break;
                     }
                     else{
@@ -348,11 +369,18 @@ void DataProcessor::onProcessLoop()
             if (epoch == m_resetEpoch.load())
                 m_pendingData.swap(localData);
         }
+
+        if (m_enterOfflineMode){
+            emit sigOfflineDataProcessCompleted();
+        }
     }
 }
 
 void DataProcessor::handleMeasureStopAck(const QString& detName)
 {
+    if (m_enterOfflineMode)
+        return ;
+
     m_measureStopPrepared.store(false);
     m_measureStarted.store(false);
     qDebug().noquote() << QStringLiteral("收到%1停止测量应答").arg(detName.trimmed());
@@ -802,4 +830,15 @@ void DataProcessor::enterQueryMode()
 void DataProcessor::leaveQueryMode()
 {
     m_isQueryMode.store(false);
+}
+
+void DataProcessor::enterOfflineMode()
+{
+    m_enterOfflineMode.store(true);
+    m_trigMode = Order::TriggerMode::SoftwareTrigger;
+}
+
+void DataProcessor::leaveOfflineMode()
+{
+    m_enterOfflineMode.store(false);
 }

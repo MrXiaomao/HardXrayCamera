@@ -11,6 +11,8 @@
 #include <QDir>
 #include <QTextCodec>
 #include <QStyleFactory>
+#include <QLocalServer>
+#include <QLocalSocket>
 
 #include <log4qt/log4qt.h>
 #include <log4qt/logger.h>
@@ -102,14 +104,42 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
+    // 第一步：尝试创建本地服务器
+    QLocalServer server;
+    QString SERVER_KEY;
+    QStringList args = QCoreApplication::arguments();
+    if (args.contains("-offline")){
+        SERVER_KEY = "hardXrayCamera.offline.singleInstance";
+    }
+    else {
+        SERVER_KEY = "hardXrayCamera.online.singleInstance";
+    }
+
+    // 先清理可能残留的旧服务器（防止程序异常退出导致端口占用）
+    QLocalServer::removeServer(SERVER_KEY);
+    QLocalSocket socket;
+    socket.connectToServer(SERVER_KEY);
+    if (socket.waitForConnected(1000))
+    {
+        // 发送激活指令（发送任意内容即可，这里用固定字符串）
+        socket.write("ACTIVATE");
+        socket.waitForBytesWritten();
+
+        qDebug() << "已有实例运行，已发送激活信号";
+        return 0;
+    }
+    else{
+        // 监听本地套接字
+        server.listen(SERVER_KEY);
+    }
+
     // 日志初始化前统一 locale 为 UTF-8，避免追加写入已有日志文件时使用系统 GBK 编码
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     QApplication::setStyle(QStyleFactory::create("fusion"));//WindowsVista fusion windows
 
     // 启用新的日子记录类
     QString sConfFilename = "./log4qt.conf";
-    QStringList args = QCoreApplication::arguments();
-    if (args.contains("-m") && args.contains("offline"))
+    if (args.contains("-offline"))
         sConfFilename = "./log4qt2.conf";
 
     if (QFileInfo::exists(sConfFilename)){
@@ -131,8 +161,7 @@ int main(int argc, char *argv[])
         logger->addAppender(appender);
 
         //输出到文件(如果需要把离线处理单独保存日志文件，可以改这里)
-        QStringList args = QCoreApplication::arguments();
-        if (args.contains("-m") && args.contains("offline")) {
+        if (args.contains("-offline")) {
             Log4Qt::DailyFileAppender *dailiAppender = new Log4Qt::DailyFileAppender(layout, "logs/.log", "offline_yyyy-MM-dd");
             dailiAppender->setAppendFile(true);
             dailiAppender->activateOptions();
@@ -173,6 +202,46 @@ int main(int argc, char *argv[])
     MainWindow w;
     mw = &w;
 #endif
+
+    // 当有新的客户端连接时，触发激活窗口
+    QObject::connect(&server, &QLocalServer::newConnection, [&server, &w](){
+        QLocalSocket *clientSocket = server.nextPendingConnection();
+        if(clientSocket->waitForReadyRead(1000))
+        {
+            QByteArray recvData = clientSocket->readAll();
+            if(recvData == "ACTIVATE")
+            {
+                QTimer::singleShot(0, [&]{
+                    // 获取窗口原生句柄
+                    HWND hwnd = (HWND)w.winId();
+
+                    // 如果已经最小化，先恢复窗口
+                    if (IsIconic(hwnd)) {
+                        ShowWindow(hwnd, SW_RESTORE);
+                    }
+
+                    // 2. 核心：绕过Windows前台激活限制
+                    DWORD currentThreadId = GetCurrentThreadId();
+                    DWORD foregroundThreadId = GetWindowThreadProcessId(GetForegroundWindow(), NULL);
+                    // Attach前台线程，获取激活权限
+                    if (currentThreadId != foregroundThreadId) {
+                        AttachThreadInput(foregroundThreadId, currentThreadId, TRUE);
+                        SetFocus(hwnd);
+                        SetForegroundWindow(hwnd);
+                        AttachThreadInput(foregroundThreadId, currentThreadId, FALSE);
+                    }
+
+                    // 强制把窗口放到前台
+                    SetForegroundWindow(hwnd);
+
+                    w.setWindowFlags(w.windowFlags() | Qt::WindowStaysOnTopHint);
+                    QApplication::processEvents();
+                    w.setWindowFlags(w.windowFlags() & ~Qt::WindowStaysOnTopHint);
+                });
+            }
+        }
+        clientSocket->deleteLater();
+    });
 
     //打印软件版本号
     qInfo().noquote() << QObject::tr("系统启动，软件版本号: %1").arg(APP_VERSION);

@@ -45,8 +45,19 @@ public:
 
    virtual QString stringForValue(qreal value, const QString &/*format*/) const override
    {
-       if (value >= 1 && value <= 14)
-           return QString("CH %1").arg(QString::number(value / 1.0, 'f', 0));
+       //return QString("CH %1").arg(QString::number(value / 1.0, 'f', 0));
+       quint8 channel = value / 1.0 + 1;
+
+       if (channel >= 1 && channel <= 14){
+            // 通道8本底 通道14Am-241
+
+            if (channel>=13)
+                return QString("CH %1").arg(QString::number(channel+2));//(value+2) / 1.0, 'f', 0));
+            else if (channel>=8)
+               return QString("CH %1").arg(QString::number(channel+1));//(value+1) / 1.0, 'f', 0));
+            else
+                return QString("CH %1").arg(QString::number(channel));//value / 1.0, 'f', 0));
+       }
        else
            return QString();
    }
@@ -343,6 +354,12 @@ private slots:
     void on_action_dataUpload_triggered();
 
     void on_action_parameterQuery_triggered();
+
+    void on_action_offline_triggered();
+
+    void on_action_online_triggered();
+
+    void on_action_openFile_triggered();
 
 private:
     struct EnergyCalibration {

@@ -62,6 +62,10 @@ public:
     void enterQueryMode();
     void leaveQueryMode();
 
+
+    void enterOfflineMode();
+    void leaveOfflineMode();
+
 signals:
     void sigWaveformData(int detectorIndex, int channelNumber, quint32 timeUnits,
                          const QVector<quint16>& samples);
@@ -83,6 +87,7 @@ signals:
     void sigSpecTriggerSignalTimeWidthAck(quint16);
     void sigSpecSpectrumTimeWindowAck(quint8, quint16, quint16);
     void sigOTAVersionAck(quint8);
+    void sigOfflineDataProcessCompleted();// 离线数据处理完毕
 
 public slots:
     void inputData(const QByteArray& data);
@@ -123,6 +128,7 @@ private:
     std::atomic_int m_spectrumBatchFlushSize{SpectrumBatchFlushFast};
     std::atomic_bool m_measureStarted = false;
     std::atomic_bool m_measureStopPrepared = false;
+    std::atomic_bool m_enterOfflineMode = false;
 
     std::atomic_bool m_lastCommandIsQueryVersion = false;
     std::atomic_bool m_isQueryMode = false;
