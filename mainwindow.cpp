@@ -447,7 +447,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->tabWidget->setCurrentIndex(0);
     ui->tabWidget_2->setCurrentIndex(0);
-    ui->stackedWidget_spectrum->setCurrentWidget(ui->page_cps);
+    ui->stackedWidget_spectrum->setCurrentIndex(0);
 
     startUdpListening();
     // 开机自动最大化：一次性延迟调用，保留 lambda
@@ -868,6 +868,7 @@ void MainWindow::saveArmMonitorData(int armIndex, const QVector<double> &tempera
     appendValues(current);
     appendValues(temperature);
     out << values.join(QStringLiteral(",")) << '\n';
+    file.close();
 }
 
 void MainWindow::checkArmMonitorAlarm(int armIndex, const QVector<double> &temperature,
