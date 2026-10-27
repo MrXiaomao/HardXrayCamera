@@ -145,6 +145,11 @@ void DataProcessor::onProcessLoop()
                         qDebug().nospace().noquote() << "Recv HEX: " << localData.mid(pos, 12).toHex(' ') << "[" << "传输模式设置 " << detName << ((v==0) ? "512道能谱" : ((v==3) ? "HXR能量道" : "指令查询")) << "]";
                         pos += baseCommandLength;
 
+                        if (v==0)
+                            m_transferMode = Order::TransferMode::Spectrum512;
+                        else if (v==3)
+                            m_transferMode = Order::TransferMode::Spectrum16;
+
                         if (!m_enterOfflineMode){
                             emit sigSendNextCommand();
                         }
@@ -333,7 +338,7 @@ void DataProcessor::onProcessLoop()
         }
 
         if (!localData.isEmpty()){
-            if (m_measureStarted){
+            if (m_measureStarted || m_enterOfflineMode){
                 // 处理数据
                 if (mDetectorIndex==1)
                     handleFpga1MainData(localData);
@@ -501,6 +506,7 @@ void DataProcessor::handleFpga1MainData(QByteArray &binaryData)
         QMutexLocker locker(&m_dataMutex);
         mode = m_transferMode;
     }
+
     if (mode == Order::TransferMode::Spectrum16)
         processSpec16Data(1, binaryData);
     else

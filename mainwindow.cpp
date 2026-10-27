@@ -1948,9 +1948,9 @@ void MainWindow::onUdpBindStateChanged(bool bound, const QString &message)
 {
     appendUdpLog(message);
     if (bound)
-        qInfo() << message;
+        qInfo().noquote() << message;
     else
-        qWarning() << message;
+        qWarning().noquote() << message;
 }
 
 quint16 MainWindow::udpBroadcastPort() const
@@ -3340,8 +3340,8 @@ DataFileNameInfo parseDataFileName(const QString& fullFileName)
     // 按下划线分割
     QStringList parts = pureName.split('_', Qt::KeepEmptyParts);
 
-    // 严格要求5个字段
-    if (parts.size() != 5)
+    // 严格要求6个字段
+    if (parts.size() != 6)
     {
         return info; // isValid 保持 false
     }
@@ -3378,22 +3378,70 @@ void MainWindow::on_action_openFile_triggered()
     if (fileName.isEmpty())
         return;
 
-    QString integralFileName = fileName.replace(QStringLiteral("波形"), QStringLiteral("积分"));
-    QString waveformFileName = fileName.replace(QStringLiteral("能谱"), QStringLiteral("能谱"));
+    mdetPara.spectrumRefreshInterval = ui->spb_specRefashTime->value();
+    QString spectrumFileName = fileName.replace(QStringLiteral("wave"), QStringLiteral("spec"));
+    QString waveformFileName = fileName.replace(QStringLiteral("spec"), QStringLiteral("wave"));
+    QString horSpectrumFileName = spectrumFileName.replace(QStringLiteral("垂直"), QStringLiteral("水平"));
+    QString verSpectrumFileName = spectrumFileName.replace(QStringLiteral("水平"), QStringLiteral("垂直"));
+    QString horWaveformFileName = waveformFileName.replace(QStringLiteral("垂直"), QStringLiteral("水平"));
+    QString verWaveformFileName = waveformFileName.replace(QStringLiteral("水平"), QStringLiteral("垂直"));
+
+    auto info = parseDataFileName(QFileInfo(fileName).baseName());
+    if (info.isValid)
+    {
+        QDateTime dt = buildQDateTimeFromFileNameFields(info);
+        qInfo().noquote() << "解析历史数据:"
+                          << "炮号:" << info.shotNum
+                          << "测量时间:" << dt.toString("yyyy-MM-dd HH:mm:ss")
+                          << "测量时长(ms):" << info.durationMs;
+    }
+    else{
+        qInfo().noquote() << "文件名无效";
+        return ;
+    }
+
+    // 波形处理
+    {
+        QFile file(horWaveformFileName);
+        if (file.open(QIODevice::ReadOnly)){
+            const QByteArray data = file.readAll();
+            clearWaveformData();
+            commandHelper->waveProcessor1()->enterOfflineMode();
+            commandHelper->waveProcessor1()->clearWaveformBatch();
+            commandHelper->waveProcessor1()->inputData(data);
+            connect(commandHelper->waveProcessor1(), &DataProcessor::sigOfflineDataProcessCompleted, this, [=]{
+                updateWaveIdSpinBoxRange();
+                refreshWaveformPlot();
+                commandHelper->waveProcessor1()->disconnect(SIGNAL(sigOfflineDataProcessCompleted));
+                commandHelper->waveProcessor1()->leaveOfflineMode();
+            });
+
+            file.close();
+        }
+    }
 
     {
-        QFile file(integralFileName);
+        QFile file(verWaveformFileName);
         if (file.open(QIODevice::ReadOnly)){
-            auto info = parseDataFileName(integralFileName);
-            if (info.isValid)
-            {
-                QDateTime dt = buildQDateTimeFromFileNameFields(info);
-                qInfo() << "解析历史数据:"
-                        << "炮号:" << info.shotNum
-                        << "测量时间:" << dt.toString("yyyy-MM-dd HH:mm:ss")
-                        << "测量时长(ms):" << info.durationMs;
-            }
+            const QByteArray data = file.readAll();
+            commandHelper->waveProcessor2()->enterOfflineMode();
+            commandHelper->waveProcessor2()->clearWaveformBatch();
+            commandHelper->waveProcessor2()->inputData(data);
+            connect(commandHelper->waveProcessor2(), &DataProcessor::sigOfflineDataProcessCompleted, this, [=]{
+                updateWaveIdSpinBoxRange();
+                refreshWaveformPlot();
+                commandHelper->waveProcessor2()->disconnect(SIGNAL(sigOfflineDataProcessCompleted));
+                commandHelper->waveProcessor2()->leaveOfflineMode();
+            });
 
+            file.close();
+        }
+    }
+
+    // 能谱处理
+    {
+        QFile file(horSpectrumFileName);
+        if (file.open(QIODevice::ReadOnly)){
             const QByteArray data = file.readAll();
             clearSpectrumData();
             commandHelper->spectrumProcessor1()->enterOfflineMode();
@@ -3408,20 +3456,18 @@ void MainWindow::on_action_openFile_triggered()
 
             file.close();
         }
+
     }
-
-
     {
-        QFile file(waveformFileName);
+        QFile file(verSpectrumFileName);
         if (file.open(QIODevice::ReadOnly)){
             const QByteArray data = file.readAll();
-            clearWaveformData();
             commandHelper->spectrumProcessor2()->enterOfflineMode();
-            commandHelper->spectrumProcessor2()->clearWaveformBatch();
+            commandHelper->spectrumProcessor2()->clearSpectrumBatch();
             commandHelper->spectrumProcessor2()->inputData(data);
             connect(commandHelper->spectrumProcessor2(), &DataProcessor::sigOfflineDataProcessCompleted, this, [=]{
-                updateWaveIdSpinBoxRange();
-                refreshWaveformPlot();
+                updateSpecIdSpinBoxRange();
+                refreshSpectrumPlot();
                 commandHelper->spectrumProcessor2()->disconnect(SIGNAL(sigOfflineDataProcessCompleted));
                 commandHelper->spectrumProcessor2()->leaveOfflineMode();
             });
